@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { CategoryController } from '../controller/category.controller';
 import { authenticateToken } from '../middleware/auth.middleware';
-import { fileUploadService, UPLOAD_CONFIGS } from '../utils/fileUpload';
+import { fileUploadService, UPLOAD_CONFIGS } from '../integration/fileUpload';
 
 const router = Router();
 const categoryUpload = fileUploadService.createUploadMiddleware(UPLOAD_CONFIGS.CATEGORY_FILES);

@@ -3,7 +3,7 @@
 // All functions gracefully fallback when Redis is disabled or unavailable
 
 import { RedisObject } from '../integration/Redis';
-import CONFIG from '../config/config.js';
+import CONFIG from '../config/config';
 
 export class RedisUtils {
     
@@ -346,14 +346,6 @@ export class RedisUtils {
         await RedisObject.sAdd(key, { userId, score });
     }
 
-    static async getUserRank(userId: string): Promise<number | null> {
-        if (!this.isRedisAvailable()) return null;
-        
-        // This would need to be implemented with Redis sorted sets (ZADD, ZRANK)
-        // For now, returning null as placeholder
-        return null;
-    }
-
     // Cache invalidation helpers
     static async invalidateUserRelatedCache(userId: string): Promise<void> {
         if (!this.isRedisAvailable()) {
@@ -457,7 +449,6 @@ export const {
     getFeatureFlags,
     isFeatureEnabled,
     updateUserScore,
-    getUserRank,
     invalidateUserRelatedCache,
     healthCheck,
     cleanupMemoryFallbacks

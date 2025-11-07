@@ -1,5 +1,5 @@
 import CategoryModel, { ICategory } from '../models/category.model';
-import { fileUploadService } from '../utils/fileUpload';
+import { fileUploadService } from '../integration/fileUpload';
 import catchError from '../utils/catchError';
 import { logError, logInfo } from '../utils/SystemLogs';
 import { Types } from 'mongoose';

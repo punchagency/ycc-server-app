@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import amqp from 'amqplib';
 import mongoose from 'mongoose';
-import { RedisObject } from '../utils/Redis';
+import { RedisObject } from '../integration/Redis';
 
 interface HealthCheck {
   service: string;

@@ -2,7 +2,7 @@ import { Response } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { CategoryService, ICategoryInput } from '../service/category.service';
 import Validate from '../utils/Validate';
-import { IUploadedFile } from '../utils/fileUpload';
+import { IUploadedFile } from '../integration/fileUpload';
 
 export class CategoryController {
     static async createCategory(req: AuthenticatedRequest, res: Response): Promise<void> {

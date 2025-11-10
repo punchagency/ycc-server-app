@@ -1,10 +1,9 @@
 import { Schema, model, Document } from 'mongoose';
 
 
-interface IOrder extends Document {
+export interface IOrder extends Document {
     _id: Schema.Types.ObjectId;
     userId: Schema.Types.ObjectId;
-    businessId: Schema.Types.ObjectId;
     items: {
         productId: Schema.Types.ObjectId;
         quantity: number;
@@ -20,6 +19,8 @@ interface IOrder extends Document {
             country: string;
         };
         status: 'pending' | 'declined' | 'confirmed' | 'processing' | 'out_for_delivery' | 'shipped' | 'delivered' | 'cancelled';
+        confirmationToken: string;
+        confirmationExpires: Date;
     }[];
     status: 'pending' | 'declined' | 'confirmed' | 'processing' | 'out_for_delivery' | 'shipped' | 'delivered' | 'cancelled';
     deliveryAddress: {
@@ -54,7 +55,6 @@ interface IOrder extends Document {
 
 const OrderSchema = new Schema({
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    businessId: { type: Schema.Types.ObjectId, ref: 'Business', required: true },
     items: [{
         productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
         quantity: { type: Number, required: true },
@@ -73,7 +73,9 @@ const OrderSchema = new Schema({
             type: String,
             enum: ['pending', 'declined', 'confirmed', 'processing', 'out_for_delivery', 'shipped', 'delivered', 'cancelled'],
             required: true
-        }
+        },
+        confirmationToken: { type: String, required: true },
+        confirmationExpires: { type: Date, required: true }
     }],
     status: {
         type: String,
@@ -90,7 +92,7 @@ const OrderSchema = new Schema({
     shippingMethod: {
         type: String,
         enum: ['standard', 'express', 'overnight'],
-        required: true
+        required: false
     },
     shippingCost: { type: Number },
     tax: { type: Number },

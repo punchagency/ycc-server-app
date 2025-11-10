@@ -4,6 +4,7 @@ import swaggerSpec from './config/swagger';
 import connectDB from './config/database';
 import { RedisConnect } from './integration/Redis';
 import { healthCheck, readinessCheck, livenessCheck } from './middleware/health.middleware';
+import './integration/QueueManager'
 
 const app: Application = express();
 const PORT = process.env.PORT || 4500;

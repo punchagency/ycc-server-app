@@ -10,7 +10,8 @@ export interface AuthResponse {
   user?: {
     id: string;
     email: string;
-    name: string;
+    firstName: string;
+    lastName: string;
     role: typeof ROLES[number];
     business?: {
       id: string;
@@ -22,7 +23,8 @@ export interface AuthResponse {
 }
 
 export interface RegisterInput {
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   password: string;
   phone?: string;
@@ -44,7 +46,8 @@ export interface ValidationResponse {
   valid: boolean;
   userId?: string;
   email?: string;
-  name?: string;
+  firstName?: string;
+  lastName?: string;
   role?: typeof ROLES[number];
   businessId?: string;
   error?: string;
@@ -93,7 +96,8 @@ export class AuthService {
 
       // Create user
       const newUser = new User({
-        name: userData.name,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
         email: userData.email,
         password: hashedPassword,
         phone: userData.phone,
@@ -144,7 +148,8 @@ export class AuthService {
         user: {
           id: savedUser._id.toString(),
           email: savedUser.email,
-          name: savedUser.name,
+          firstName: savedUser.firstName,
+          lastName: savedUser.lastName,
           role: savedUser.role,
           business: business ? {
             id: business._id.toString(),
@@ -214,7 +219,8 @@ export class AuthService {
         user: {
           id: user._id.toString(),
           email: user.email,
-          name: user.name,
+          firstName: user.firstName,
+          lastName: user.lastName,
           role: user.role,
           business: business ? {
             id: business._id.toString(),
@@ -284,7 +290,8 @@ export class AuthService {
         user: {
           id: user._id.toString(),
           email: user.email,
-          name: user.name,
+          firstName: user.firstName,
+          lastName: user.lastName,
           role: user.role,
           business: business ? {
             id: business._id.toString(),
@@ -337,7 +344,8 @@ export class AuthService {
         valid: true,
         userId: user._id.toString(),
         email: user.email,
-        name: user.name,
+        firstName: user.firstName,
+        lastName: user.lastName,
         role: user.role,
         businessId: decoded.businessId
       };
@@ -396,7 +404,8 @@ export class AuthService {
     const payload = {
       userId: user._id.toString(),
       email: user.email,
-      name: user.name,
+      firstName: user.firstName,
+      lastName: user.lastName,
       role: user.role,
       businessId: business ? business._id.toString() : null
     };

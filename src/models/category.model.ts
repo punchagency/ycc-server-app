@@ -7,6 +7,7 @@ export interface ICategory extends Document {
     description?: string;
     imageURL?: string;
     type?: 'service' | 'product';
+    isApproved?: boolean;
     createdAt?: Date;
     updatedAt?: Date;
 }
@@ -15,7 +16,8 @@ const categorySchema = new Schema<ICategory>({
     name: { type: String, required: true },
     description: { type: String, required: false },
     imageURL: { type: String, required: false },
-    type: { type: String, enum: ['service', 'product'], required: false }
+    type: { type: String, enum: ['service', 'product'], required: false },
+    isApproved: { type: Boolean, required: false, default: false }
 }, {
     timestamps: true
 });

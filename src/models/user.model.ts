@@ -1,9 +1,10 @@
 import { Schema, model, Document } from 'mongoose';
 
 export const ROLES = ['admin', 'user', 'distributor', 'manufacturer'] as const;
-interface IUser extends Document {
+export interface IUser extends Document {
   _id: Schema.Types.ObjectId;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   phone: string;
   profilePicture: String;
@@ -14,17 +15,32 @@ interface IUser extends Document {
     state: string;
     country: string;
   };
+  nationality?: string;
   role: typeof ROLES[number];
   password: string;
   refreshToken: string;
   isVerified: boolean;
   isActive: boolean;
+  stripeCustomerId?: string;
+  notificationPreferences: {
+    emailNotifications: boolean;
+    pushNotifications: boolean;
+    orderUpdates: boolean;
+    bookingReminders: boolean;
+    inventoryAlerts: boolean;
+    marketingCommunications: boolean;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
 
 const userSchema = new Schema<IUser>({
-  name: {
+  firstName: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  lastName: {
     type: String,
     required: true,
     trim: true
@@ -68,10 +84,20 @@ const userSchema = new Schema<IUser>({
     state: String,
     country: String,
   },
+  nationality: String,
   phone: {
     type: String,
     default: null
-  }
+  },
+  stripeCustomerId: String,
+  notificationPreferences: {
+    emailNotifications: { type: Boolean, default: true },
+    pushNotifications: { type: Boolean, default: true },
+    orderUpdates: { type: Boolean, default: true },
+    bookingReminders: { type: Boolean, default: true },
+    inventoryAlerts: { type: Boolean, default: true },
+    marketingCommunications: { type: Boolean, default: false },
+  },
 }, {
   timestamps: true
 });

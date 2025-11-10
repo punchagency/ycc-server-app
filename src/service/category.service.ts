@@ -9,6 +9,7 @@ export interface ICategoryInput {
     description?: string;
     imageURL?: string;
     type?: 'service' | 'product';
+    isApproved?: boolean;
 }
 
 export class CategoryService {

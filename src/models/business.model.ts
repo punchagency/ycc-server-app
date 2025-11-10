@@ -1,10 +1,10 @@
 import { Schema, model, Document } from 'mongoose';
 
 export const BUSINESS_TYPE = ['distributor', 'manufacturer'] as const;
-interface IBusiness extends Document {
+export interface IBusiness extends Document {
     _id: Schema.Types.ObjectId;
     userId: Schema.Types.ObjectId;
-    bunsinessName: string;
+    businessName: string;
     website: string;
     address: {
         street: string;
@@ -21,11 +21,11 @@ interface IBusiness extends Document {
         totalReviews: number;
         totalRatings: number;
     },
-    stripeAccountId: string;
-    stripeAccountLink: string;
-    stripeChargesEnabled: boolean;
-    stripedetailsSubmitted: boolean;
-    stripeTransfersEnabled: boolean;
+    stripeAccountId?: string;
+    stripeAccountLink?: string;
+    stripeChargesEnabled?: boolean;
+    stripedetailsSubmitted?: boolean;
+    stripeTransfersEnabled?: boolean;
     license: string;
     isOnboarded: boolean;
     businessType: typeof BUSINESS_TYPE[number];
@@ -37,7 +37,7 @@ const businessSchema = new Schema<IBusiness>({
         ref: 'User',
         required: true
     },
-    bunsinessName: {
+    businessName: {
         type: String,
         required: true,
         trim: true
@@ -82,11 +82,13 @@ const businessSchema = new Schema<IBusiness>({
     },
     stripeAccountId: {
         type: String,
-        required: true
+        required: false,
+        default: null
     },
     stripeAccountLink: {
         type: String,
-        required: true
+        required: false,
+        default: null
     },
     stripeChargesEnabled: {
         type: Boolean,

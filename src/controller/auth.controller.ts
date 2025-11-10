@@ -7,13 +7,17 @@ import Validate from '../utils/Validate';
 export class AuthController {
     static async register(req: Request, res: Response): Promise<void> {
         try {
-            let { name, email, password, phone, role } = req.body;
+            let { firstName, lastName, email, password, phone, role } = req.body;
             email = email.toLowerCase().trim();
-            name = name.trim();
+            firstName = firstName.trim();
             phone = phone.trim();
             // Validation
-            if (!name || !Validate.string(name)) {
-                res.status(400).json({ success: false, message: 'Valid name is required', code: "VALIDATION_ERROR" });
+            if (!firstName || !Validate.string(firstName)) {
+                res.status(400).json({ success: false, message: 'Valid first name is required', code: "VALIDATION_ERROR" });
+                return;
+            }
+            if (!lastName || !Validate.string(lastName)) {
+                res.status(400).json({ success: false, message: 'Valid last name is required', code: "VALIDATION_ERROR" });
                 return;
             }
 
@@ -249,7 +253,8 @@ export class AuthController {
                 data: {
                     user: {
                         id: user._id,
-                        name: user.name,
+                        firstName: user.firstName,
+                        lastName: user.lastName,
                         email: user.email,
                         phone: user.phone,
                         role: user.role,
@@ -280,10 +285,11 @@ export class AuthController {
                 return;
             }
 
-            const { name, phone, profilePicture, address } = req.body;
+            const { firstName, lastName, phone, profilePicture, address } = req.body;
 
             const updateData: any = {};
-            if (name) updateData.name = name;
+            if (firstName) updateData.firstName = firstName;
+            if (lastName) updateData.lastName = lastName;
             if (phone) updateData.phone = phone;
             if (profilePicture) updateData.profilePicture = profilePicture;
             if (address) updateData.address = address;
@@ -308,7 +314,8 @@ export class AuthController {
                 data: {
                     user: {
                         id: user._id,
-                        name: user.name,
+                        firstName: user.firstName,
+                        lastName: user.lastName,
                         email: user.email,
                         phone: user.phone,
                         role: user.role,

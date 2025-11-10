@@ -6,7 +6,7 @@ import { IUploadedFile } from '../integration/fileUpload';
 
 export class CategoryController {
     static async createCategory(req: AuthenticatedRequest, res: Response): Promise<void> {
-        const { name, description, type } = req.body;
+        const { name, description, type, isApproved } = req.body;
         const files = req.files as { [fieldname: string]: IUploadedFile[] } | undefined;
 
         if (!name || !Validate.stringLength(name, 2, 100)) {
@@ -39,7 +39,8 @@ export class CategoryController {
         const categoryData: ICategoryInput = {
             name: name.trim(),
             description: description?.trim(),
-            type: type ? type : null
+            type: type ? type : null,
+            isApproved: isApproved === true ? true : false
         };
 
         if (files?.categoryImage?.[0]) {

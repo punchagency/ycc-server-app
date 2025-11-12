@@ -15,30 +15,50 @@ const options: swaggerJSDoc.Options = {
       }
     ],
     components: {
-      // schemas: {
-      //   CreateUserDto: {
-      //     type: 'object',
-      //     required: ['name', 'email', 'password'],
-      //     properties: {
-      //       name: { type: 'string' },
-      //       email: { type: 'string', format: 'email' },
-      //       password: { type: 'string', minLength: 6 }
-      //     }
-      //   },
-      //   UserResponseDto: {
-      //     type: 'object',
-      //     properties: {
-      //       id: { type: 'string' },
-      //       name: { type: 'string' },
-      //       email: { type: 'string' },
-      //       createdAt: { type: 'string', format: 'date-time' },
-      //       updatedAt: { type: 'string', format: 'date-time' }
-      //     }
-      //   }
-      // }
-    }
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT'
+        }
+      }
+    },
+    tags: [
+      {
+        name: 'Authentication',
+        description: 'User authentication and profile management endpoints'
+      },
+      {
+        name: 'Category',
+        description: 'Category management endpoints'
+      },
+      {
+        name: 'Service',
+        description: 'Service management endpoints'
+      },
+      {
+        name: 'Product',
+        description: 'Product catalog and inventory management endpoints'
+      },
+      {
+        name: 'Cart',
+        description: 'Shopping cart management endpoints'
+      },
+      {
+        name: 'Order',
+        description: 'Order processing and management endpoints'
+      },
+      {
+        name: 'Booking',
+        description: 'Service booking management endpoints'
+      },
+      {
+        name: 'Quote',
+        description: 'Quote approval and management endpoints'
+      }
+    ]
   },
-  apis: ['./src/routes/*.ts']
+  apis: ['./src/docs/*.ts']
 };
 
 export default swaggerJSDoc(options);

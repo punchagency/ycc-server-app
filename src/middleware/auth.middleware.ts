@@ -7,7 +7,8 @@ export interface AuthenticatedRequest extends Request {
   user?: {
     _id: string;
     email: string;
-    name: string;
+    firstName: string;
+    lastName: string;
     role: typeof ROLES[number];
     businessId?: string;
   };
@@ -55,7 +56,8 @@ export const authenticateToken = async (
     req.user = {
       _id: validationResult.userId!,
       email: validationResult.email!,
-      name: validationResult.name!,
+      firstName: validationResult.firstName!,
+      lastName: validationResult.lastName!,
       role: validationResult.role!,
       businessId: validationResult.businessId
     };
@@ -114,7 +116,8 @@ export const optionalAuth = async (
       req.user = {
         _id: validationResult.userId!,
         email: validationResult.email!,
-        name: validationResult.name!,
+        firstName: validationResult.firstName!,
+        lastName: validationResult.lastName!,
         role: validationResult.role!,
         businessId: validationResult.businessId
       };

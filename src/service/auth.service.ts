@@ -153,7 +153,7 @@ export class AuthService {
           role: savedUser.role,
           business: business ? {
             id: business._id.toString(),
-            businessName: business.bunsinessName,
+            businessName: business.businessName,
             businessType: business.businessType
           } : undefined
         }
@@ -224,7 +224,7 @@ export class AuthService {
           role: user.role,
           business: business ? {
             id: business._id.toString(),
-            businessName: business.bunsinessName,
+            businessName: business.businessName,
             businessType: business.businessType
           } : undefined
         }
@@ -295,7 +295,7 @@ export class AuthService {
           role: user.role,
           business: business ? {
             id: business._id.toString(),
-            businessName: business.bunsinessName,
+            businessName: business.businessName,
             businessType: business.businessType
           } : undefined
         }

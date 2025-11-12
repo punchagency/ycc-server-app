@@ -1,9 +1,9 @@
 import Bull from 'bull';
-import { RedisObject } from './Redis.js';
-import SendMail from '../utils/SendMail.js';
-import createNotification from '../utils/createNotification.js';
+import { RedisObject } from './Redis';
+import SendMail from '../utils/SendMail';
+import createNotification from '../utils/createNotification';
 import { logError } from '../utils/SystemLogs';
-import { NOTIFICATION_PRIORITY, NOTIFICATION_TYPES } from '../models/notification.model.js';
+import { NOTIFICATION_PRIORITY, NOTIFICATION_TYPES } from '../models/notification.model';
 import { Schema } from 'mongoose';
 
 let emailQueue: Bull.Queue | null = null;

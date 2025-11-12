@@ -1,5 +1,6 @@
 import { Schema, model, Document } from "mongoose";
 
+export const BOOKING_STATUSES = ['pending', 'confirmed', 'cancelled', 'completed', 'declined'] as const;
 export interface IBooking extends Document {
     _id: Schema.Types.ObjectId;
     userId: Schema.Types.ObjectId;
@@ -18,9 +19,10 @@ export interface IBooking extends Document {
     startTime: Date;
     customerEmail?: string;
     customerPhone?: string;
-    status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'declined';
+    status: typeof BOOKING_STATUSES[number];
     paymentStatus: 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded';
     attachments?: string[];
+    confirmationToken?: string;
     confirmationExpires?: Date;
     isTokenUsed?: boolean;
     confirmedAt?: Date;
@@ -63,6 +65,7 @@ const bookingSchema = new Schema<IBooking>({
     status: { type: String, enum: ['pending', 'confirmed', 'cancelled', 'completed', 'declined'], required: true },
     paymentStatus: { type: String, enum: ['pending', 'paid', 'failed', 'cancelled', 'refunded'], required: true },
     attachments: [{ type: String }],
+    confirmationToken: { type: String },
     confirmationExpires: { type: Date },
     isTokenUsed: { type: Boolean },
     confirmedAt: { type: Date },
@@ -84,5 +87,9 @@ const bookingSchema = new Schema<IBooking>({
 }, {
     timestamps: true
 });
+
+bookingSchema.index({ confirmationToken: 1 });
+bookingSchema.index({ userId: 1, status: 1 });
+bookingSchema.index({ businessId: 1, status: 1 });
 
 export default model<IBooking>('Booking', bookingSchema);

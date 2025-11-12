@@ -86,6 +86,11 @@ class FileUploadService {
             maxFileSize: 5 * 1024 * 1024, // 5MB
             allowedMimeTypes: ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'],
             maxCount: 1
+        },
+        attachments: {
+            maxFileSize: 10 * 1024 * 1024, // 10MB
+            allowedMimeTypes: ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+            maxCount: 10
         }
     };
 
@@ -242,7 +247,11 @@ export const UPLOAD_CONFIGS = {
     ],
     CATEGORY_FILES: [
         { name: 'categoryImage', maxCount: 1 }
+    ],
+    BOOKING_FILES: [
+        { name: 'attachments', maxCount: 10 }
     ]
 };
 
 export { FileUploadService, IUploadedFile, IFileUploadResult };
+export default fileUploadService;

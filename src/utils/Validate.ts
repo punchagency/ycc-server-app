@@ -1,3 +1,5 @@
+import { Types } from "mongoose";
+
 const Validate = {
     email: (email: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
     emailStrict: (email: string): boolean => /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email),
@@ -151,7 +153,7 @@ const Validate = {
         allowedTypes.includes(mimeType),
     bvn: (value: string): boolean => /^\d{11}$/.test(value),
     nin: (value: string): boolean => /^\d{11}$/.test(value),
-    mongoId: (value: string): boolean => /^[a-zA-Z0-9]{24}$/.test(value),
+    mongoId: (value: string): boolean => Boolean(new Types.ObjectId(value)),
 };
 
 export default Validate;

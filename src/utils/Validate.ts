@@ -1,4 +1,5 @@
 import { Types } from "mongoose";
+import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
 
 const Validate = {
     email: (email: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
@@ -12,9 +13,23 @@ const Validate = {
             return false;
         }
     },
-    phone: (phone: string): boolean => /^[0-9]+$/.test(phone),
+    phone: (phone: string, country?: string): boolean => {
+        try {
+            return isValidPhoneNumber(phone, country as any);
+        } catch {
+            return false;
+        }
+    },
     phoneInternational: (phone: string): boolean => /^\+?[1-9]\d{1,14}$/.test(phone),
     phoneNigerian: (phone: string): boolean => /^(\+234|234|0)[789][01]\d{8}$/.test(phone),
+    formatPhone: (phone: string, country?: string): string | null => {
+        try {
+            const phoneNumber = parsePhoneNumber(phone, country as any);
+            return phoneNumber.formatInternational();
+        } catch {
+            return null;
+        }
+    },
     integer: (value: any): boolean => Number.isInteger(value),
     positiveInteger: (value: any): boolean => Number.isInteger(value) && value >= 0,
     negativeInteger: (value: any): boolean => Number.isInteger(value) && value < 0,
@@ -117,20 +132,7 @@ const Validate = {
     alpha: (value: string): boolean => /^[a-zA-Z]+$/.test(value),
     alphanumeric: (value: string): boolean => /^[a-zA-Z0-9]+$/.test(value),
     nigerianPostalCode: (value: string): boolean => /^\d{6}$/.test(value),
-    formatPhone: (phone: string): string => {
-        let inputString = phone.split(' ').join('')
-            .split('+').join('')
-            .split('-').join('')
-            .split('(').join('')
-            .split(')').join('');
-        if (inputString.startsWith('009')) {
-            return inputString.slice(3);
-        } else if (inputString.startsWith('0')) {
-            return '+234' + inputString.slice(1);
-        } else {
-            return inputString;
-        }
-    },
+
     formatCurrency: (amount: number, currency: string = 'NGN'): string => {
         return new Intl.NumberFormat('en-NG', {
             style: 'currency',

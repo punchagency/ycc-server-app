@@ -3,10 +3,16 @@ import { OrderService } from '../service/order.service';
 import catchError from '../utils/catchError';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { UpdateOrderStatusDto } from '../dto/order.dto';
+import { logError } from '../utils/SystemLogs';
+import Validate from '../utils/Validate';
 
 class OrderController {
     static async createOrder(req: AuthenticatedRequest, res: Response) {
         try {
+            if (!req.user) {
+                res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
+                return;
+            }
             const { products, deliveryAddress, estimatedDeliveryDate } = req.body;
             const userId = req.user?._id;
 
@@ -304,6 +310,10 @@ class OrderController {
     }
     static async updateOrderStatus(req: AuthenticatedRequest, res: Response) {
         try {
+            if (!req.user) {
+                res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
+                return;
+            }
             const { orderId, status, reason, notes, trackingNumber }: UpdateOrderStatusDto = req.body;
             const userId = req.user?._id;
             const userRole = req.user?.role;
@@ -323,12 +333,110 @@ class OrderController {
             const [error, result] = await catchError(OrderService.updateOrderStatus(userId.toString(), orderId, status, userRole, reason, notes, trackingNumber));
 
             if (error) {
+                logError({ message: "Updating order status failed!", source: "OrderController.updateOrderStatus", error });
                 return res.status(400).json({ success: false, message: error.message, code: 'UPDATE_FAILED' });
             }
 
             return res.status(200).json({ success: true, message: 'Order status updated successfully', data: result?.order });
         } catch (error: any) {
             return res.status(500).json({ success: false, message: error.message || 'Internal server error', code: 'INTERNAL_ERROR' });
+        }
+    }
+    static async getOrderById(req: AuthenticatedRequest, res: Response){
+        try {
+            if (!req.user) {
+                res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
+                return;
+            }
+
+            const { id } = req.params;
+
+            if (!Validate.mongoId(id)) {
+                res.status(400).json({ success: false, message: 'Invalid order id', code: 'INVALID_ORDER_ID' });
+                return;
+            }
+
+            const [error, result] = await catchError(OrderService.getOrderById(id, req.user._id.toString(), req.user.role));
+
+            if (error) {
+                logError({ message: "Fetching order by id failed!", source: "OrderController.getOrderById", error });
+                res.status(400).json({ success: false, message: error.message || 'Failed to fetch order', code: 'FETCH_FAILED' });
+                return;
+            }
+
+            res.status(200).json({ success: true, message: 'Order fetched successfully', data: result });
+        } catch (error) {
+            logError({ message: "Fetching order by id failed!", source: "OrderController.getOrderById", error });
+            res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
+        }
+    }
+    static async getOrders(req: AuthenticatedRequest, res: Response){
+        try {
+            if (!req.user) {
+                res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
+                return;
+            }
+
+            const { page, limit, status, paymentStatus, startDate, endDate, sortBy, orderBy } = req.query;
+
+            if (status && !['pending', 'declined', 'confirmed', 'processing', 'out_for_delivery', 'shipped', 'delivered', 'cancelled'].includes(status as string)) {
+                res.status(400).json({ success: false, message: 'Invalid status value', code: 'INVALID_STATUS' });
+                return;
+            }
+
+            if (paymentStatus && !['paid', 'pending', 'failed'].includes(paymentStatus as string)) {
+                res.status(400).json({ success: false, message: 'Invalid payment status value', code: 'INVALID_PAYMENT_STATUS' });
+                return;
+            }
+
+            if (startDate && isNaN(new Date(startDate as string).getTime())) {
+                res.status(400).json({ success: false, message: 'Invalid start date format', code: 'INVALID_START_DATE' });
+                return;
+            }
+
+            if (endDate && isNaN(new Date(endDate as string).getTime())) {
+                res.status(400).json({ success: false, message: 'Invalid end date format', code: 'INVALID_END_DATE' });
+                return;
+            }
+
+            if (startDate && endDate && new Date(startDate as string) > new Date(endDate as string)) {
+                res.status(400).json({ success: false, message: 'Start date must be before end date', code: 'INVALID_DATE_RANGE' });
+                return;
+            }
+
+            if (sortBy && !['createdAt', 'status', 'paymentStatus', 'totalAmount'].includes(sortBy as string)) {
+                res.status(400).json({ success: false, message: 'Invalid sort by field', code: 'INVALID_SORTBY' });
+                return;
+            }
+
+            if (orderBy && !['asc', 'desc'].includes(orderBy as string)) {
+                res.status(400).json({ success: false, message: 'Invalid order by value', code: 'INVALID_ORDERBY' });
+                return;
+            }
+
+            const [error, result] = await catchError(OrderService.getOrders({
+                userId: req.user._id.toString(),
+                role: req.user.role,
+                page: page ? parseInt(page as string) : undefined,
+                limit: limit ? parseInt(limit as string) : undefined,
+                status: status as string,
+                paymentStatus: paymentStatus as string,
+                startDate: startDate ? new Date(startDate as string) : undefined,
+                endDate: endDate ? new Date(endDate as string) : undefined,
+                sortBy: sortBy as string,
+                orderBy: orderBy as string
+            }));
+
+            if (error) {
+                logError({ message: "Fetching orders failed!", source: "OrderController.getOrders", error });
+                res.status(400).json({ success: false, message: error.message || 'Failed to fetch orders', code: 'FETCH_FAILED' });
+                return;
+            }
+
+            res.status(200).json({ success: true, message: 'Orders fetched successfully', data: result?.orders, pagination: result?.pagination });
+        } catch (error) {
+            logError({ message: "Fetching orders failed!", source: "OrderController.getOrders", error });
+            res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
         }
     }
 }

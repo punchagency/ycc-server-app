@@ -25,6 +25,76 @@ class StripeService {
         return StripeService.instance;
     }
 
+    public async createConnectAccount({
+        email,
+        businessType,
+        country = 'US'
+    }: {
+        email: string,
+        businessType: 'company' | 'individual',
+        country?: string
+    }): Promise<Stripe.Account> {
+        try {
+            const account = await StripeService.stripe.accounts.create({
+                type: 'express',
+                email,
+                country,
+                business_type: businessType,
+                capabilities: {
+                    card_payments: { requested: true },
+                    transfers: { requested: true }
+                }
+            });
+            return account;
+        } catch (error) {
+            logError({ message: 'Stripe account creation failed', error, source: 'StripeService.createConnectAccount' });
+            if (error instanceof Error) {
+                throw new Error(`Stripe account creation failed: ${error.message}`);
+            }
+            throw error;
+        }
+    }
+
+    public async createAccountLink({
+        accountId,
+        refreshUrl,
+        returnUrl
+    }: {
+        accountId: string,
+        refreshUrl: string,
+        returnUrl: string
+    }): Promise<Stripe.AccountLink> {
+        try {
+            const accountLink = await StripeService.stripe.accountLinks.create({
+                account: accountId,
+                refresh_url: refreshUrl,
+                return_url: returnUrl,
+                type: 'account_onboarding',
+                collect: "eventually_due"
+            });
+            return accountLink;
+        } catch (error) {
+            logError({ message: 'Stripe account link creation failed', error, source: 'StripeService.createAccountLink' });
+            if (error instanceof Error) {
+                throw new Error(`Stripe account link creation failed: ${error.message}`);
+            }
+            throw error;
+        }
+    }
+
+    public async retrieveAccount(accountId: string): Promise<Stripe.Account> {
+        try {
+            const account = await StripeService.stripe.accounts.retrieve(accountId);
+            return account;
+        } catch (error) {
+            logError({ message: 'Stripe account retrieval failed', error, source: 'StripeService.retrieveAccount' });
+            if (error instanceof Error) {
+                throw new Error(`Stripe account retrieval failed: ${error.message}`);
+            }
+            throw error;
+        }
+    }
+
     public async getPaymentIntentAndProcessRefund({
         invoiceId,
         refundAmount,

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { ProductController } from '../controller/product.controller';
 import { authenticateToken } from '../middleware/auth.middleware';
-import { fileUploadService, UPLOAD_CONFIGS } from '../utils/fileUpload';
+import { fileUploadService, UPLOAD_CONFIGS } from '../integration/fileUpload';
 
 const router = Router();
 const productUpload = fileUploadService.createUploadMiddleware(UPLOAD_CONFIGS.PRODUCT_FILES);

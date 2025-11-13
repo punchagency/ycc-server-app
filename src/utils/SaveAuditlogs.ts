@@ -1,10 +1,26 @@
-import { IAuditLog } from '../models/auditTrail.model.js';
-import AuditTrailModel from '../models/auditTrail.model.js';
-import { logError } from './SystemLogs.js';
+import { Schema } from 'mongoose';
+import AuditTrailModel from '../models/auditTrail.model';
+import { ROLES } from '../models/user.model';
+import { logError } from './SystemLogs';
 
+export interface AuditLogInput {
+    userId?: Schema.Types.ObjectId | string;
+    email?: string;
+    name?: string;
+    action: string;
+    actionType?: 'create' | 'read' | 'update' | 'delete' | 'login' | 'logout' | 'payment' | 'admin_action' | 'other' | null;
+    entityType: typeof ROLES[number];
+    entityId?: Schema.Types.ObjectId | string;
+    oldValues?: any;
+    newValues?: any;
+    ipAddress?: string;
+    userAgent?: string;
+    sessionId?: string;
+    additionalContext?: any;
+}
 class AuditLogger {
     private static instance: AuditLogger;
-    private logQueue: IAuditLog[] = [];
+    private logQueue: AuditLogInput[] = [];
     private readonly BATCH_SIZE = 30;
     private flushInterval: NodeJS.Timeout;
 
@@ -24,7 +40,7 @@ class AuditLogger {
         return AuditLogger.instance;
     }
 
-    public async log(logData: IAuditLog): Promise<void> {
+    public async log(logData: AuditLogInput): Promise<void> {
         this.logQueue.push(logData);
 
         if (this.logQueue.length >= this.BATCH_SIZE) {
@@ -87,7 +103,7 @@ const auditLogger = AuditLogger.getInstance();
  * Save an audit log for user actions
  * @param logData The audit log data to save
  */
-export const saveAuditLog = async (logData: IAuditLog): Promise<void> => {
+export const saveAuditLog = async (logData: AuditLogInput): Promise<void> => {
     await auditLogger.log(logData);
 };
 
@@ -95,7 +111,7 @@ export const saveAuditLog = async (logData: IAuditLog): Promise<void> => {
  * Save a critical audit log that should be written to the database immediately
  * @param logData The audit log data to save
  */
-export const saveCriticalAuditLog = async (logData: IAuditLog): Promise<void> => {
+export const saveCriticalAuditLog = async (logData: AuditLogInput): Promise<void> => {
     await auditLogger.log(logData);
     await auditLogger.forceFlush(); // Force immediate write to database for critical logs
 };

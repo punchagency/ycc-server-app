@@ -1,6 +1,7 @@
 import { Schema, model, Document } from 'mongoose';
 
-
+export const ORDER_STATUSES = ['pending', 'declined', 'confirmed', 'processing', 'out_for_delivery', 'shipped', 'delivered', 'cancelled'] as const;
+export const ORDER_PAYMENT_STATUSES =['paid', 'pending', 'failed'];
 export interface IOrder extends Document {
     _id: Schema.Types.ObjectId;
     userId: Schema.Types.ObjectId;
@@ -22,7 +23,7 @@ export interface IOrder extends Document {
         confirmationToken: string;
         confirmationExpires: Date;
     }[];
-    status: 'pending' | 'declined' | 'confirmed' | 'processing' | 'out_for_delivery' | 'shipped' | 'delivered' | 'cancelled';
+    status: typeof ORDER_STATUSES[number];
     deliveryAddress: {
         street: string;
         city: string;
@@ -39,7 +40,7 @@ export interface IOrder extends Document {
     totalAmount: number;
     platformFee: number;
     invoiceId?: Schema.Types.ObjectId;
-    paymentStatus: 'paid' | 'pending' | 'failed';
+    paymentStatus: typeof ORDER_PAYMENT_STATUSES[number];
     stripeInvoiceUrl?: string;
     stripeInvoiceId?: string;
     orderHistory: {

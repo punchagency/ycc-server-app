@@ -2,14 +2,14 @@ import { Schema, model, Document } from "mongoose";
 import { ROLES } from "./user.model";
 
 export interface IAuditLog extends Document {
-    _id: Schema.Types.ObjectId;
-    userId?: Schema.Types.ObjectId;
+    _id: Schema.Types.ObjectId | string;
+    userId?: Schema.Types.ObjectId | string;
     email?: string;
     name?: string;
     action: string;
     actionType?: 'create' | 'read' | 'update' | 'delete' | 'login' | 'logout' | 'payment' | 'admin_action' | 'other' | null;
     entityType: typeof ROLES[number];
-    entityId?: Schema.Types.ObjectId;
+    entityId?: Schema.Types.ObjectId | string;
     oldValues?: any;
     newValues?: any;
     ipAddress?: string;

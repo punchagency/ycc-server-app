@@ -125,6 +125,36 @@ export class BookingController {
 
             const { status, paymentStatus, startDate, endDate, page, limit, sortBy, sortOrder } = req.query;
 
+            if(status && !['pending', 'confirmed', 'cancelled', 'completed', 'declined'].includes(status as string)){
+                res.status(400).json({ success: false, message: 'Status must be one of: pending, confirmed, cancelled, completed, declined', code: 'INVALID_STATUS' });
+                return;
+            }
+
+            if(startDate && !DateTime.fromISO(startDate as string).isValid){
+                res.status(400).json({ success: false, message: 'Invalid start date format', code: 'INVALID_START_DATE' });
+                return;
+            }
+
+            if(endDate && !DateTime.fromISO(endDate as string).isValid){
+                res.status(400).json({ success: false, message: 'Invalid end date format', code: 'INVALID_END_DATE' });
+                return;
+            }
+
+            if(startDate && endDate && DateTime.fromISO(startDate as string) > DateTime.fromISO(endDate as string)){
+                res.status(400).json({ success: false, message: 'Start date must be before end date', code: 'INVALID_DATE_RANGE' });
+                return;
+            }
+
+            if(sortBy && !['createdAt', 'status', 'paymentStatus', 'vendorName'].includes(sortBy as string)){
+                res.status(400).json({ success: false, message: 'Sort by field must be one of: createdAt, status, paymentStatus, vendorName', code: 'INVALID_SORTBY' });
+                return;
+            }
+
+            if(sortOrder && !['asc', 'desc'].includes(sortOrder as string)){
+                res.status(400).json({ success: false, message: 'Sort order must be either asc or desc', code: 'INVALID_SORTORDER' });
+                return;
+            }
+
             const [error, result] = await catchError(BookingService.getBookings({
                 userId: req.user._id.toString(),
                 role: req.user.role,

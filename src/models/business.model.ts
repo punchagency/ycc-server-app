@@ -72,8 +72,7 @@ const businessSchema = new Schema<IBusiness>({
     },
     taxId: {
         type: String,
-        required: true,
-        unique: true
+        required: true
     },
     ratings: {
         averageRating: Number,

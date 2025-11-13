@@ -7,10 +7,15 @@ import Validate from '../utils/Validate';
 export class AuthController {
     static async register(req: Request, res: Response): Promise<void> {
         try {
-            let { firstName, lastName, email, password, phone, role } = req.body;
+            let { firstName, lastName, email, password, phone, nationality, role, businessName, businessEmail, businessPhone, website, taxId, license } = req.body;
             email = email.toLowerCase().trim();
             firstName = firstName.trim();
-            phone = phone.trim();
+            if (phone) phone = phone.trim();
+            if (nationality) nationality = nationality.trim();
+            
+            const files = req.files as { [fieldname: string]: any[] };
+            const profilePicture = files?.profilePicture?.[0]?.location || null;
+            
             // Validation
             if (!firstName || !Validate.string(firstName)) {
                 res.status(400).json({ success: false, message: 'Valid first name is required', code: "VALIDATION_ERROR" });
@@ -26,30 +31,70 @@ export class AuthController {
                 return;
             }
 
-            if (!password || password.length < 6) {
-                res.status(400).json({ success: false, message: 'Password must be at least 6 characters long', code: "VALIDATION_ERROR" });
+            if (!password || password.length < 8) {
+                res.status(400).json({ success: false, message: 'Password must be at least 8 characters long', code: "VALIDATION_ERROR" });
                 return;
             }
 
-            if (phone && !Validate.phone(phone)) {
-                res.status(400).json({ success: false, message: 'Valid phone number is required', code: "VALIDATION_ERROR" });
-                return;
+            if (phone) {
+                if (!Validate.phone(phone)) {
+                    res.status(400).json({ success: false, message: 'Valid phone number is required', code: "VALIDATION_ERROR" });
+                    return;
+                }
+                phone = Validate.formatPhone(phone) || phone;
+            }
+
+            if (businessPhone) {
+                if (!Validate.phone(businessPhone)) {
+                    res.status(400).json({ success: false, message: 'Valid business phone is required', code: "VALIDATION_ERROR" });
+                    return;
+                }
+                businessPhone = Validate.formatPhone(businessPhone) || businessPhone;
             }
 
             if(!Validate.oneOf({ allowedValues: ROLES as any, value: role})){
-                res.status(400).json({ success: false, message: 'Valid role is required', code: "VALIDATION_ERROR" })
+                res.status(400).json({ success: false, message: 'Valid role is required', code: "VALIDATION_ERROR" });
+                return;
             }
 
-            const registerData: RegisterInput = req.body;
+            // Business validation for distributor/manufacturer
+            if (role === 'distributor' || role === 'manufacturer') {
+                if (!businessName || !Validate.string(businessName)) {
+                    res.status(400).json({ success: false, message: 'Business name is required for business accounts', code: "VALIDATION_ERROR" });
+                    return;
+                }
+                if (!businessEmail || !Validate.email(businessEmail)) {
+                    res.status(400).json({ success: false, message: 'Valid business email is required for business accounts', code: "VALIDATION_ERROR" });
+                    return;
+                }
+
+                if (!website || !Validate.string(website)) {
+                    res.status(400).json({ success: false, message: 'Website is required for business accounts', code: "VALIDATION_ERROR" });
+                    return;
+                }
+                if (!taxId || !Validate.string(taxId)) {
+                    res.status(400).json({ success: false, message: 'Tax ID is required for business accounts', code: "VALIDATION_ERROR" });
+                    return;
+                }
+                if (!license || !Validate.string(license)) {
+                    res.status(400).json({ success: false, message: 'License is required for business accounts', code: "VALIDATION_ERROR" });
+                    return;
+                }
+            }
+
+            const registerData: RegisterInput = {
+                ...req.body,
+                phone,
+                businessPhone,
+                profilePicture
+            };
             const result = await AuthService.register(registerData);
 
             if (result.success) {
                 res.status(201).json({
                     success: true,
-                    message: 'User registered successfully',
+                    message: 'Registration successful. Please check your email for activation code.',
                     data: {
-                        token: result.token,
-                        refreshToken: result.refreshToken,
                         user: result.user
                     }
                 });
@@ -73,12 +118,12 @@ export class AuthController {
             email = email.toLowerCase().trim();
             // Validation
             if (!email || !Validate.email(email)) {
-                res.status(400).json({ success: false, message: 'Valid email is required' });
+                res.status(400).json({ success: false, message: 'Valid email is required', code: "VALIDATION_ERROR" });
                 return;
             }
 
             if (!password || !Validate.string(password)) {
-                res.status(400).json({ success: false, message: 'Password is required' });
+                res.status(400).json({ success: false, message: 'Password is required', code: "VALIDATION_ERROR" });
                 return;
             }
 
@@ -116,7 +161,8 @@ export class AuthController {
             if (!refreshToken) {
                 res.status(400).json({
                     success: false,
-                    message: 'Refresh token is required'
+                    message: 'Refresh token is required',
+                    code: 'VALIDATION_ERROR'
                 });
                 return;
             }
@@ -152,7 +198,8 @@ export class AuthController {
             if (!req.user) {
                 res.status(401).json({
                     success: false,
-                    message: 'Authentication required'
+                    message: 'Authentication required',
+                    code: 'UNAUTHORIZED'
                 });
                 return;
             }
@@ -183,7 +230,8 @@ export class AuthController {
             if (!req.user) {
                 res.status(401).json({
                     success: false,
-                    message: 'Authentication required'
+                    message: 'Authentication required',
+                    code: 'UNAUTHORIZED'
                 });
                 return;
             }
@@ -193,15 +241,17 @@ export class AuthController {
             if (!oldPassword || !newPassword) {
                 res.status(400).json({
                     success: false,
-                    message: 'Old password and new password are required'
+                    message: 'Old password and new password are required',
+                    code: 'VALIDATION_ERROR'
                 });
                 return;
             }
 
-            if (newPassword.length < 6) {
+            if (newPassword.length < 8) {
                 res.status(400).json({
                     success: false,
-                    message: 'New password must be at least 6 characters long'
+                    message: 'New password must be at least 8 characters long',
+                    code: 'VALIDATION_ERROR'
                 });
                 return;
             }
@@ -232,7 +282,8 @@ export class AuthController {
             if (!req.user) {
                 res.status(401).json({
                     success: false,
-                    message: 'Authentication required'
+                    message: 'Authentication required',
+                    code: 'UNAUTHORIZED'
                 });
                 return;
             }
@@ -242,7 +293,8 @@ export class AuthController {
             if (!user) {
                 res.status(404).json({
                     success: false,
-                    message: 'User not found'
+                    message: 'User not found',
+                    code: 'USER_NOT_FOUND'
                 });
                 return;
             }
@@ -280,17 +332,27 @@ export class AuthController {
             if (!req.user) {
                 res.status(401).json({
                     success: false,
-                    message: 'Authentication required'
+                    message: 'Authentication required',
+                    code: 'UNAUTHORIZED'
                 });
                 return;
             }
 
-            const { firstName, lastName, phone, profilePicture, address } = req.body;
+            const { firstName, lastName, phone, nationality, address } = req.body;
+            const files = req.files as { [fieldname: string]: any[] };
+            const profilePicture = files?.profilePicture?.[0]?.location;
 
             const updateData: any = {};
-            if (firstName) updateData.firstName = firstName;
-            if (lastName) updateData.lastName = lastName;
-            if (phone) updateData.phone = phone;
+            if (firstName) updateData.firstName = firstName.trim();
+            if (lastName) updateData.lastName = lastName.trim();
+            if (phone) {
+                if (!Validate.phone(phone)) {
+                    res.status(400).json({ success: false, message: 'Valid phone number is required', code: "VALIDATION_ERROR" });
+                    return;
+                }
+                updateData.phone = Validate.formatPhone(phone) || phone;
+            }
+            if (nationality) updateData.nationality = nationality.trim();
             if (profilePicture) updateData.profilePicture = profilePicture;
             if (address) updateData.address = address;
 
@@ -303,7 +365,8 @@ export class AuthController {
             if (!user) {
                 res.status(404).json({
                     success: false,
-                    message: 'User not found'
+                    message: 'User not found',
+                    code: 'USER_NOT_FOUND'
                 });
                 return;
             }
@@ -333,6 +396,134 @@ export class AuthController {
                 success: false,
                 message: 'Profile update failed'
             });
+        }
+    }
+
+    static async activateAccount(req: Request, res: Response): Promise<void> {
+        try {
+            const { email, code } = req.body;
+
+            if (!email || !Validate.email(email)) {
+                res.status(400).json({ success: false, message: 'Valid email is required', code: 'VALIDATION_ERROR' });
+                return;
+            }
+
+            if (!code || !Validate.string(code)) {
+                res.status(400).json({ success: false, message: 'Activation code is required', code: 'VALIDATION_ERROR' });
+                return;
+            }
+
+            const result = await AuthService.activateAccount(email.toLowerCase().trim(), code.trim());
+
+            if (result.success) {
+                res.status(200).json({
+                    success: true,
+                    message: 'Account activated successfully',
+                    data: {
+                        token: result.token,
+                        refreshToken: result.refreshToken,
+                        user: result.user
+                    }
+                });
+            } else {
+                res.status(400).json({ success: false, message: result.error });
+            }
+        } catch (error) {
+            res.status(500).json({ success: false, message: 'Account activation failed' });
+        }
+    }
+
+    static async resendActivationCode(req: Request, res: Response): Promise<void> {
+        try {
+            const { email } = req.body;
+
+            if (!email || !Validate.email(email)) {
+                res.status(400).json({ success: false, message: 'Valid email is required', code: 'VALIDATION_ERROR' });
+                return;
+            }
+
+            const result = await AuthService.resendActivationCode(email.toLowerCase().trim());
+
+            if (result.success) {
+                res.status(200).json({ success: true, message: 'Activation code sent successfully' });
+            } else {
+                res.status(400).json({ success: false, message: result.error });
+            }
+        } catch (error) {
+            res.status(500).json({ success: false, message: 'Failed to resend activation code' });
+        }
+    }
+
+    static async forgotPassword(req: Request, res: Response): Promise<void> {
+        try {
+            const { email } = req.body;
+
+            if (!email || !Validate.email(email)) {
+                res.status(400).json({ success: false, message: 'Valid email is required', code: 'VALIDATION_ERROR' });
+                return;
+            }
+
+            const result = await AuthService.forgotPassword(email.toLowerCase().trim());
+
+            if (result.success) {
+                res.status(200).json({ success: true, message: 'Reset code sent to your email' });
+            } else {
+                res.status(400).json({ success: false, message: result.error });
+            }
+        } catch (error) {
+            res.status(500).json({ success: false, message: 'Failed to process forgot password request' });
+        }
+    }
+
+    static async resetPassword(req: Request, res: Response): Promise<void> {
+        try {
+            const { email, code, newPassword } = req.body;
+
+            if (!email || !Validate.email(email)) {
+                res.status(400).json({ success: false, message: 'Valid email is required', code: 'VALIDATION_ERROR' });
+                return;
+            }
+
+            if (!code || !Validate.string(code)) {
+                res.status(400).json({ success: false, message: 'Reset code is required', code: 'VALIDATION_ERROR' });
+                return;
+            }
+
+            if (!newPassword || newPassword.length < 8) {
+                res.status(400).json({ success: false, message: 'Password must be at least 8 characters long', code: 'VALIDATION_ERROR' });
+                return;
+            }
+
+            const result = await AuthService.resetPassword(email.toLowerCase().trim(), code.trim(), newPassword);
+
+            if (result.success) {
+                res.status(200).json({ success: true, message: 'Password reset successfully' });
+            } else {
+                res.status(400).json({ success: false, message: result.error });
+            }
+        } catch (error) {
+            res.status(500).json({ success: false, message: 'Failed to reset password' });
+        }
+    }
+
+    static async resendResetPasswordCode(req: Request, res: Response): Promise<void> {
+        try {
+            const { email } = req.body;
+
+            if (!email || !Validate.email(email)) {
+                res.status(400).json({ success: false, message: 'Valid email is required', code: 'VALIDATION_ERROR' });
+                return;
+            }
+
+            const result = await AuthService.resendResetPasswordCode(email.toLowerCase().trim());
+
+            if (result.success) {
+                res.status(200).json({ success: true, message: 'Reset code sent successfully' });
+            } else {
+                res.status(400).json({ success: false, message: result.error });
+            }
+        } catch (error) {
+            res.status(500).json({ success: false, message: 'Failed to resend reset code' });
         }
     }
 }

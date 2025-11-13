@@ -19,6 +19,10 @@ export interface IUser extends Document {
   role: typeof ROLES[number];
   password: string;
   refreshToken: string;
+  activationCode?: string;
+  activationCodeExpires?: Date;
+  resetPasswordCode?: string;
+  resetPasswordCodeExpires?: Date;
   isVerified: boolean;
   isActive: boolean;
   stripeCustomerId?: string;
@@ -65,13 +69,29 @@ const userSchema = new Schema<IUser>({
     type: String,
     default: null
   },
+  activationCode: {
+    type: String,
+    default: null
+  },
+  activationCodeExpires: {
+    type: Date,
+    default: null
+  },
+  resetPasswordCode: {
+    type: String,
+    default: null
+  },
+  resetPasswordCodeExpires: {
+    type: Date,
+    default: null
+  },
   isVerified: {
     type: Boolean,
     default: false
   },
   isActive: {
     type: Boolean,
-    default: true
+    default: false
   },
   profilePicture: {
     type: String,

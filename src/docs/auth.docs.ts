@@ -7,41 +7,103 @@
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
- *             required: [firstName, lastName, email, password]
+ *             required: [firstName, lastName, email, password, role]
  *             properties:
  *               firstName:
  *                 type: string
+ *                 example: John
  *               lastName:
  *                 type: string
+ *                 example: Doe
  *               email:
  *                 type: string
  *                 format: email
+ *                 example: john.doe@example.com
  *               password:
  *                 type: string
  *                 minLength: 8
+ *                 example: SecurePass123!
  *               phone:
  *                 type: string
+ *                 example: +1234567890
+ *               nationality:
+ *                 type: string
+ *                 example: United States
+ *               profilePicture:
+ *                 type: string
+ *                 format: binary
+ *                 description: Profile picture image file (JPEG, PNG, JPG, WEBP - max 5MB)
  *               role:
  *                 type: string
  *                 enum: [user, admin, distributor, manufacturer]
+ *                 example: user
  *               businessName:
  *                 type: string
+ *                 description: Required for distributor/manufacturer roles
+ *                 example: ABC Distribution
  *               businessType:
  *                 type: string
+ *                 enum: [distributor, manufacturer]
+ *                 description: Required for distributor/manufacturer roles
+ *               businessEmail:
+ *                 type: string
+ *                 format: email
+ *                 description: Required for distributor/manufacturer roles
+ *                 example: contact@abcdistribution.com
+ *               businessPhone:
+ *                 type: string
+ *                 description: Required for distributor/manufacturer roles
+ *                 example: +1234567890
  *               website:
  *                 type: string
+ *                 description: Required for distributor/manufacturer roles
+ *                 example: https://example.com
  *               taxId:
  *                 type: string
+ *                 description: Required for distributor/manufacturer roles
+ *                 example: 12-3456789
  *               license:
  *                 type: string
+ *                 description: Required for distributor/manufacturer roles
+ *                 example: LIC-123456
  *     responses:
- *       200:
- *         description: User registered successfully
+ *       201:
+ *         description: User registered successfully. Activation code sent to email.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Registration successful. Please check your email for activation code.
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       type: object
  *       400:
  *         description: Validation error or user already exists
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                 code:
+ *                   type: string
+ *       500:
+ *         description: Server error
  */
 
 /**
@@ -61,13 +123,37 @@
  *               email:
  *                 type: string
  *                 format: email
+ *                 example: john.doe@example.com
  *               password:
  *                 type: string
+ *                 example: SecurePass123!
  *     responses:
  *       200:
  *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Login successful
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     token:
+ *                       type: string
+ *                     refreshToken:
+ *                       type: string
+ *                     user:
+ *                       type: object
  *       401:
  *         description: Invalid credentials
+ *       500:
+ *         description: Server error
  */
 
 /**
@@ -126,16 +212,20 @@
  *             properties:
  *               oldPassword:
  *                 type: string
+ *                 example: OldPass123!
  *               newPassword:
  *                 type: string
  *                 minLength: 8
+ *                 example: NewPass123!
  *     responses:
  *       200:
  *         description: Password changed successfully
  *       400:
- *         description: Invalid old password
+ *         description: Invalid old password or validation error
  *       401:
  *         description: Unauthorized
+ *       500:
+ *         description: Server error
  */
 
 /**
@@ -164,7 +254,7 @@
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
@@ -174,8 +264,11 @@
  *                 type: string
  *               phone:
  *                 type: string
+ *               nationality:
+ *                 type: string
  *               profilePicture:
  *                 type: string
+ *                 format: binary
  *               address:
  *                 type: object
  *                 properties:
@@ -194,4 +287,133 @@
  *         description: Profile updated successfully
  *       401:
  *         description: Unauthorized
+ */
+
+/**
+ * @swagger
+ * /auth/activate-account:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Activate user account with code
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, code]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               code:
+ *                 type: string
+ *                 example: "123456"
+ *     responses:
+ *       200:
+ *         description: Account activated successfully
+ *       400:
+ *         description: Invalid or expired code
+ */
+
+/**
+ * @swagger
+ * /auth/resend-activation-code:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Resend activation code
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       200:
+ *         description: Activation code sent successfully
+ *       400:
+ *         description: Invalid request
+ */
+
+/**
+ * @swagger
+ * /auth/forgot-password:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Request password reset code
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       200:
+ *         description: Reset code sent to email
+ *       400:
+ *         description: Invalid request
+ */
+
+/**
+ * @swagger
+ * /auth/reset-password:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Reset password with code
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, code, newPassword]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               code:
+ *                 type: string
+ *                 example: "123456"
+ *               newPassword:
+ *                 type: string
+ *                 minLength: 8
+ *     responses:
+ *       200:
+ *         description: Password reset successfully
+ *       400:
+ *         description: Invalid or expired code
+ */
+
+/**
+ * @swagger
+ * /auth/resend-reset-code:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Resend password reset code
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       200:
+ *         description: Reset code sent successfully
+ *       400:
+ *         description: Invalid request
  */

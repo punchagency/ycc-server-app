@@ -280,11 +280,87 @@ export class OrderService {
 
         return { success: true, order };
     }
-    static async getOrderById() {
+    static async getOrderById(id: string, userId: string, userRole: typeof ROLES[number]) {
+        const order = await OrderModel.findById(id)
+            .populate('userId', 'firstName lastName email phone')
+            .populate('items.productId', 'name price imageURLs')
+            .populate('items.businessId', 'businessName email phone address');
 
+        if (!order) throw new Error('Order not found');
+
+        if (userRole === 'user') {
+            if (order.userId.toString() !== userId) {
+                throw new Error('Unauthorized to view this order');
+            }
+        } else if (userRole === 'distributor' || userRole === 'manufacturer') {
+            const business = await BusinessModel.findOne({ userId });
+            if (!business) throw new Error('Business not found');
+
+            const hasBusinessItems = order.items.some(item => 
+                item.businessId.toString() === business._id.toString()
+            );
+
+            if (!hasBusinessItems) {
+                throw new Error('Unauthorized to view this order');
+            }
+        }
+
+        return order;
     }
-    static async getOrders() {
 
+    static async getOrders({userId, role, page = 1, limit = 10, status, paymentStatus, startDate, endDate, sortBy = 'createdAt', orderBy = 'desc'}:{
+        userId: string;
+        role: typeof ROLES[number];
+        page?: number;
+        limit?: number;
+        status?: string;
+        paymentStatus?: string;
+        startDate?: Date;
+        endDate?: Date;
+        sortBy?: string;
+        orderBy?: string;
+    }) {
+        const query: any = {};
+
+        if (role === 'user') {
+            query.userId = userId;
+        } else if (role === 'distributor' || role === 'manufacturer') {
+            const business = await BusinessModel.findOne({ userId });
+            if (!business) throw new Error('Business not found');
+            query['items.businessId'] = business._id;
+        }
+
+        if (status) query.status = status;
+        if (paymentStatus) query.paymentStatus = paymentStatus;
+        if (startDate || endDate) {
+            query.createdAt = {};
+            if (startDate) query.createdAt.$gte = startDate;
+            if (endDate) query.createdAt.$lte = endDate;
+        }
+
+        const sortOptions: any = {};
+        sortOptions[sortBy] = orderBy === 'asc' ? 1 : -1;
+
+        const skip = (page - 1) * limit;
+        const total = await OrderModel.countDocuments(query);
+
+        const orders = await OrderModel.find(query)
+            .populate('userId', 'firstName lastName email phone')
+            .populate('items.productId', 'name price imageURLs')
+            .populate('items.businessId', 'businessName email phone')
+            .sort(sortOptions)
+            .skip(skip)
+            .limit(limit);
+
+        return {
+            orders,
+            pagination: {
+                total,
+                page,
+                pages: Math.ceil(total / limit),
+                limit
+            }
+        };
     }
     static async confirmOrder(token: string) {
         const order = await OrderModel.findOne({ 'items.confirmationToken': token });

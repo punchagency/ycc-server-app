@@ -3,7 +3,7 @@ import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { ProductService, IProductInput } from '../service/product.service';
 import { CreateProductDTO, UpdateProductDTO, ProductSearchDTO, UpdateStockDTO } from '../dto/product.dto';
 import Validate from '../utils/Validate';
-import { IUploadedFile } from '../utils/fileUpload';
+import { IUploadedFile } from '../integration/fileUpload';
 
 export class ProductController {
     static async createProduct(req: AuthenticatedRequest, res: Response): Promise<void> {

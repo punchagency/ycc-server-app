@@ -12,34 +12,47 @@
  *         application/json:
  *           schema:
  *             type: object
- *             required: [deliveryAddress, shippingMethod]
+ *             required: [products, deliveryAddress]
  *             properties:
+ *               products:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required: [productId, quantity]
+ *                   properties:
+ *                     productId:
+ *                       type: string
+ *                     quantity:
+ *                       type: number
+ *                       minimum: 1
+ *                     discount:
+ *                       type: number
  *               deliveryAddress:
  *                 type: object
- *                 required: [street, city, state, zip, country]
+ *                 required: [street, zipcode, city, state, country]
  *                 properties:
  *                   street:
+ *                     type: string
+ *                   zipcode:
  *                     type: string
  *                   city:
  *                     type: string
  *                   state:
  *                     type: string
- *                   zip:
- *                     type: string
  *                   country:
  *                     type: string
- *               shippingMethod:
+ *               estimatedDeliveryDate:
  *                 type: string
- *                 enum: [standard, express, overnight]
- *               notes:
- *                 type: string
+ *                 format: date-time
  *     responses:
  *       201:
  *         description: Order created successfully
+ *       400:
+ *         description: Validation error or order creation failed
  *       401:
  *         description: Unauthorized
- *       400:
- *         description: Cart is empty or invalid data
+ *       500:
+ *         description: Internal server error
  */
 
 /**
@@ -47,20 +60,23 @@
  * /crew-orders/confirm/{token}:
  *   get:
  *     tags: [Order]
- *     summary: Confirm order with token
+ *     summary: Confirm order with token (returns HTML page)
  *     parameters:
  *       - in: path
  *         name: token
  *         required: true
  *         schema:
  *           type: string
+ *         description: Order confirmation token
  *     responses:
  *       200:
- *         description: Order confirmed successfully
- *       400:
- *         description: Invalid or expired token
- *       404:
- *         description: Order not found
+ *         description: HTML page showing confirmation success or failure
+ *         content:
+ *           text/html:
+ *             schema:
+ *               type: string
+ *       500:
+ *         description: Internal server error (HTML page)
  */
 
 /**
@@ -68,30 +84,32 @@
  * /crew-orders/decline/{token}:
  *   post:
  *     tags: [Order]
- *     summary: Decline order with token
+ *     summary: Decline order with token (returns HTML page)
  *     parameters:
  *       - in: path
  *         name: token
  *         required: true
  *         schema:
  *           type: string
+ *         description: Order confirmation token
  *     requestBody:
- *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [reason]
  *             properties:
  *               reason:
  *                 type: string
+ *                 description: Optional reason for declining the order
  *     responses:
  *       200:
- *         description: Order declined successfully
- *       400:
- *         description: Invalid or expired token
- *       404:
- *         description: Order not found
+ *         description: HTML page showing decline success or failure
+ *         content:
+ *           text/html:
+ *             schema:
+ *               type: string
+ *       500:
+ *         description: Internal server error (HTML page)
  */
 
 /**
@@ -112,18 +130,108 @@
  *             properties:
  *               orderId:
  *                 type: string
+ *                 description: Order ID to update
  *               status:
  *                 type: string
  *                 enum: [confirmed, processing, shipped, out_for_delivery, cancelled]
+ *                 description: New status for the order
  *               reason:
  *                 type: string
+ *                 description: Optional reason for status change
  *               trackingNumber:
  *                 type: string
+ *                 description: Optional tracking number (for shipped status)
  *               notes:
  *                 type: string
+ *                 description: Optional notes about the status change
  *     responses:
  *       200:
  *         description: Order status updated successfully
+ *       400:
+ *         description: Validation error or update failed
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
+
+/**
+ * @swagger
+ * /orders:
+ *   get:
+ *     tags: [Order]
+ *     summary: Get all orders with filters and pagination
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, declined, confirmed, processing, out_for_delivery, shipped, delivered, cancelled]
+ *       - in: query
+ *         name: paymentStatus
+ *         schema:
+ *           type: string
+ *           enum: [paid, pending, failed]
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [createdAt, status, paymentStatus, totalAmount]
+ *           default: createdAt
+ *       - in: query
+ *         name: orderBy
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: desc
+ *     responses:
+ *       200:
+ *         description: Orders fetched successfully
+ *       401:
+ *         description: Unauthorized
+ */
+
+/**
+ * @swagger
+ * /orders/{id}:
+ *   get:
+ *     tags: [Order]
+ *     summary: Get order by ID
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Order fetched successfully
+ *       400:
+ *         description: Invalid order ID
  *       401:
  *         description: Unauthorized
  *       404:

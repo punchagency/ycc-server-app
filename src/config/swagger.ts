@@ -59,6 +59,10 @@ const options: swaggerJSDoc.Options = {
       {
         name: 'Events',
         description: 'Event management and guest invitation endpoints'
+      },
+      {
+        name: 'Documents',
+        description: 'Document management endpoints'
       }
     ]
   },

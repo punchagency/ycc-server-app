@@ -7,7 +7,7 @@
 
 /**
  * @swagger
- * /stripe-account/create:
+ * /api/v2/stripe-account/create:
  *   post:
  *     summary: Create a Stripe Connect Express account for a business
  *     tags: [Stripe Account]
@@ -61,7 +61,7 @@
 
 /**
  * @swagger
- * /stripe-account/get:
+ * /api/v2/stripe-account/get:
  *   post:
  *     summary: Get Stripe account details (local and live from Stripe)
  *     tags: [Stripe Account]
@@ -112,7 +112,7 @@
 
 /**
   * @swagger
-  * /stripe-account/refresh-link:
+  * /api/v2/stripe-account/refresh-link:
   *   post:
   *     summary: Refresh Stripe account link
   *     tags: [Stripe Account]

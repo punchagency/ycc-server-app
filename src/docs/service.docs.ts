@@ -1,6 +1,6 @@
 /**
  * @swagger
- * /service:
+ * /api/v2/service:
  *   post:
  *     tags: [Service]
  *     summary: Create a new service
@@ -38,7 +38,7 @@
 
 /**
  * @swagger
- * /service/business:
+ * /api/v2/service/business:
  *   get:
  *     tags: [Service]
  *     summary: Get all services for authenticated user's business
@@ -53,7 +53,7 @@
 
 /**
  * @swagger
- * /service/{id}:
+ * /api/v2/service/{id}:
  *   get:
  *     tags: [Service]
  *     summary: Get service by ID
@@ -76,7 +76,7 @@
 
 /**
  * @swagger
- * /service/{id}:
+ * /api/v2/service/{id}:
  *   put:
  *     tags: [Service]
  *     summary: Update service
@@ -121,7 +121,7 @@
 
 /**
  * @swagger
- * /service/{id}:
+ * /api/v2/service/{id}:
  *   delete:
  *     tags: [Service]
  *     summary: Delete service

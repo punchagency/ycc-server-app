@@ -1,6 +1,6 @@
 /**
  * @swagger
- * /events:
+ * /api/v2/event:
  *   post:
  *     summary: Create a new event
  *     tags: [Events]
@@ -53,7 +53,7 @@
 
 /**
  * @swagger
- * /events:
+ * /api/v2/event:
  *   get:
  *     summary: Get all events for authenticated user
  *     tags: [Events]
@@ -103,7 +103,7 @@
 
 /**
  * @swagger
- * /events/{eventId}:
+ * /api/v2/event/{eventId}:
  *   get:
  *     summary: Get event by ID
  *     tags: [Events]
@@ -126,7 +126,7 @@
 
 /**
  * @swagger
- * /events/{eventId}:
+ * /api/v2/event/{eventId}:
  *   put:
  *     summary: Update an event
  *     tags: [Events]
@@ -175,7 +175,7 @@
 
 /**
  * @swagger
- * /events/{eventId}:
+ * /api/v2/event/{eventId}:
  *   delete:
  *     summary: Delete an event
  *     tags: [Events]
@@ -198,7 +198,7 @@
 
 /**
  * @swagger
- * /events/{eventId}/guests:
+ * /api/v2/event/{eventId}/guests:
  *   post:
  *     summary: Add guests to an event
  *     tags: [Events]
@@ -234,7 +234,7 @@
 
 /**
  * @swagger
- * /events/{eventId}/guests:
+ * /api/v2/event/{eventId}/guests:
  *   delete:
  *     summary: Remove guests from an event
  *     tags: [Events]

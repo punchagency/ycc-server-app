@@ -1,6 +1,6 @@
 /**
  * @swagger
- * /quote/{id}/approve:
+ * /api/v2/quote/{id}/approve:
  *   post:
  *     tags: [Quote]
  *     summary: Approve quote and proceed with payment
@@ -24,7 +24,7 @@
 
 /**
  * @swagger
- * /quote/{id}/decline:
+ * /api/v2/quote/{id}/decline:
  *   post:
  *     tags: [Quote]
  *     summary: Decline a quote

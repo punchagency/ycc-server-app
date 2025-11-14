@@ -1,6 +1,6 @@
 /**
  * @swagger
- * /cart:
+ * /api/v2/cart:
  *   get:
  *     tags: [Cart]
  *     summary: Get user's cart
@@ -15,7 +15,7 @@
 
 /**
  * @swagger
- * /cart/add:
+ * /api/v2/cart/add:
  *   post:
  *     tags: [Cart]
  *     summary: Add item to cart
@@ -45,7 +45,7 @@
 
 /**
  * @swagger
- * /cart/update:
+ * /api/v2/cart/update:
  *   put:
  *     tags: [Cart]
  *     summary: Update cart item quantity
@@ -75,7 +75,7 @@
 
 /**
  * @swagger
- * /cart/remove/{productId}:
+ * /api/v2/cart/remove/{productId}:
  *   delete:
  *     tags: [Cart]
  *     summary: Remove item from cart
@@ -98,7 +98,7 @@
 
 /**
  * @swagger
- * /cart/clear:
+ * /api/v2/cart/clear:
  *   delete:
  *     tags: [Cart]
  *     summary: Clear all items from cart

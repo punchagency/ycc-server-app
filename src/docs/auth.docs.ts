@@ -1,6 +1,6 @@
 /**
  * @swagger
- * /auth/register:
+ * /api/v2/auth/register:
  *   post:
  *     tags: [Authentication]
  *     summary: Register a new user
@@ -108,7 +108,7 @@
 
 /**
  * @swagger
- * /auth/login:
+ * /api/v2/auth/login:
  *   post:
  *     tags: [Authentication]
  *     summary: Login user
@@ -158,7 +158,7 @@
 
 /**
  * @swagger
- * /auth/refresh-token:
+ * /api/v2/auth/refresh-token:
  *   post:
  *     tags: [Authentication]
  *     summary: Refresh access token
@@ -181,7 +181,7 @@
 
 /**
  * @swagger
- * /auth/logout:
+ * /api/v2/auth/logout:
  *   post:
  *     tags: [Authentication]
  *     summary: Logout user
@@ -196,7 +196,7 @@
 
 /**
  * @swagger
- * /auth/change-password:
+ * /api/v2/auth/change-password:
  *   post:
  *     tags: [Authentication]
  *     summary: Change user password
@@ -230,7 +230,7 @@
 
 /**
  * @swagger
- * /auth/profile:
+ * /api/v2/auth/profile:
  *   get:
  *     tags: [Authentication]
  *     summary: Get user profile
@@ -245,7 +245,7 @@
 
 /**
  * @swagger
- * /auth/profile:
+ * /api/v2/auth/profile:
  *   put:
  *     tags: [Authentication]
  *     summary: Update user profile
@@ -291,7 +291,7 @@
 
 /**
  * @swagger
- * /auth/activate-account:
+ * /api/v2/auth/activate-account:
  *   post:
  *     tags: [Authentication]
  *     summary: Activate user account with code
@@ -318,7 +318,7 @@
 
 /**
  * @swagger
- * /auth/resend-activation-code:
+ * /api/v2/auth/resend-activation-code:
  *   post:
  *     tags: [Authentication]
  *     summary: Resend activation code
@@ -342,7 +342,7 @@
 
 /**
  * @swagger
- * /auth/forgot-password:
+ * /api/v2/auth/forgot-password:
  *   post:
  *     tags: [Authentication]
  *     summary: Request password reset code
@@ -366,7 +366,7 @@
 
 /**
  * @swagger
- * /auth/reset-password:
+ * /api/v2/auth/reset-password:
  *   post:
  *     tags: [Authentication]
  *     summary: Reset password with code
@@ -396,7 +396,7 @@
 
 /**
  * @swagger
- * /auth/resend-reset-code:
+ * /api/v2/auth/resend-reset-code:
  *   post:
  *     tags: [Authentication]
  *     summary: Resend password reset code

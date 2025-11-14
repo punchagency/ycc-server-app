@@ -7,7 +7,7 @@
 
 /**
  * @swagger
- * /invoices:
+ * /api/v2/invoice:
  *   get:
  *     summary: Get user invoices with filtering and pagination
  *     tags: [Invoices]
@@ -126,7 +126,7 @@
 
 /**
  * @swagger
- * /invoices/finance-analytics:
+ * /api/v2/invoice/finance-analytics:
  *   get:
  *     summary: Get financial analytics and trends
  *     tags: [Invoices]

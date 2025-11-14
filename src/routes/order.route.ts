@@ -4,11 +4,11 @@ import { authenticateToken } from '../middleware/auth.middleware';
 
 const router = Router();
 
-router.post('/orders', authenticateToken, OrderController.createOrder);
-router.get('/orders', authenticateToken, OrderController.getOrders);
-router.get('/orders/:id', authenticateToken, OrderController.getOrderById);
-router.get('/crew-orders/confirm/:token', OrderController.confirmOrder);
-router.post('/crew-orders/decline/:token', OrderController.declineOrder);
-router.patch('/orders/status', authenticateToken, OrderController.updateOrderStatus);
+router.post('/', authenticateToken, OrderController.createOrder);
+router.get('/', authenticateToken, OrderController.getOrders);
+router.get('/:id', authenticateToken, OrderController.getOrderById);
+router.get('/confirm/:token', OrderController.confirmOrder);
+router.post('/decline/:token', OrderController.declineOrder);
+router.patch('/status', authenticateToken, OrderController.updateOrderStatus);
 
 export default router;

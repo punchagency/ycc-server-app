@@ -1,6 +1,6 @@
 /**
  * @swagger
- * /product:
+ * /api/v2/product:
  *   post:
  *     tags: [Product]
  *     summary: Create a new product
@@ -66,7 +66,7 @@
 
 /**
  * @swagger
- * /product/search:
+ * /api/v2/product/search:
  *   get:
  *     tags: [Product]
  *     summary: Search products
@@ -106,7 +106,7 @@
 
 /**
  * @swagger
- * /product/business:
+ * /api/v2/product/business:
  *   get:
  *     tags: [Product]
  *     summary: Get products for authenticated user's business
@@ -121,7 +121,7 @@
 
 /**
  * @swagger
- * /product/low-stock:
+ * /api/v2/product/low-stock:
  *   get:
  *     tags: [Product]
  *     summary: Get low stock products
@@ -136,7 +136,7 @@
 
 /**
  * @swagger
- * /product/{id}:
+ * /api/v2/product/{id}:
  *   get:
  *     tags: [Product]
  *     summary: Get product by ID
@@ -155,7 +155,7 @@
 
 /**
  * @swagger
- * /product/{id}:
+ * /api/v2/product/{id}:
  *   put:
  *     tags: [Product]
  *     summary: Update product
@@ -227,7 +227,7 @@
 
 /**
  * @swagger
- * /product/{id}:
+ * /api/v2/product/{id}:
  *   delete:
  *     tags: [Product]
  *     summary: Delete product
@@ -250,7 +250,7 @@
 
 /**
  * @swagger
- * /product/{id}/stock:
+ * /api/v2/product/{id}/stock:
  *   patch:
  *     tags: [Product]
  *     summary: Update product stock

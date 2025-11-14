@@ -1,6 +1,6 @@
 /**
  * @swagger
- * /orders:
+ * /api/v2/order:
  *   post:
  *     tags: [Order]
  *     summary: Create a new order
@@ -47,17 +47,61 @@
  *     responses:
  *       201:
  *         description: Order created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
  *       400:
  *         description: Validation error or order creation failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 code:
+ *                   type: string
  *       401:
  *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 code:
+ *                   type: string
  *       500:
  *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 code:
+ *                   type: string
  */
 
 /**
  * @swagger
- * /crew-orders/confirm/{token}:
+ * /api/v2/order/confirm/{token}:
  *   get:
  *     tags: [Order]
  *     summary: Confirm order with token (returns HTML page)
@@ -81,7 +125,7 @@
 
 /**
  * @swagger
- * /crew-orders/decline/{token}:
+ * /api/v2/order/decline/{token}:
  *   post:
  *     tags: [Order]
  *     summary: Decline order with token (returns HTML page)
@@ -114,7 +158,7 @@
 
 /**
  * @swagger
- * /orders/status:
+ * /api/v2/order/status:
  *   patch:
  *     tags: [Order]
  *     summary: Update order status
@@ -147,17 +191,61 @@
  *     responses:
  *       200:
  *         description: Order status updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
  *       400:
  *         description: Validation error or update failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 code:
+ *                   type: string
  *       401:
  *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 code:
+ *                   type: string
  *       500:
  *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 code:
+ *                   type: string
  */
 
 /**
  * @swagger
- * /orders:
+ * /api/v2/order:
  *   get:
  *     tags: [Order]
  *     summary: Get all orders with filters and pagination
@@ -209,13 +297,74 @@
  *     responses:
  *       200:
  *         description: Orders fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                     page:
+ *                       type: integer
+ *                     pages:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *       400:
+ *         description: Validation error or fetch failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 code:
+ *                   type: string
  *       401:
  *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 code:
+ *                   type: string
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 code:
+ *                   type: string
  */
 
 /**
  * @swagger
- * /orders/{id}:
+ * /api/v2/order/{id}:
  *   get:
  *     tags: [Order]
  *     summary: Get order by ID
@@ -230,10 +379,54 @@
  *     responses:
  *       200:
  *         description: Order fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
  *       400:
- *         description: Invalid order ID
+ *         description: Invalid order ID or fetch failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 code:
+ *                   type: string
  *       401:
  *         description: Unauthorized
- *       404:
- *         description: Order not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 code:
+ *                   type: string
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 code:
+ *                   type: string
  */

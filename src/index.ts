@@ -41,19 +41,19 @@ import serviceRoutes from './routes/service.route';
 import stripeAccountRoutes from './routes/stripe_account.route';
 
 // Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/booking', bookingRoutes);
-app.use('/api/cart', cartRoutes);
-app.use('/api/category', categoryRoutes);
-app.use('/api/document', documentRoutes);
-app.use('/api/events', eventRoutes);
-app.use('/api/invoice', invoiceRoutes);
-app.use('/api/notification', notificationRoutes);
-app.use('/api/order', orderRoutes);
-app.use('/api/product', productRoutes);
-app.use('/api/quote', quoteRoutes);
-app.use('/api/service', serviceRoutes);
-app.use('/api/stripe', stripeAccountRoutes);
+app.use('/api/v2/auth', authRoutes);
+app.use('/api/v2/booking', bookingRoutes);
+app.use('/api/v2/cart', cartRoutes);
+app.use('/api/v2/category', categoryRoutes);
+app.use('/api/v2/document', documentRoutes);
+app.use('/api/v2/event', eventRoutes);
+app.use('/api/v2/invoice', invoiceRoutes);
+app.use('/api/v2/notification', notificationRoutes);
+app.use('/api/v2/order', orderRoutes);
+app.use('/api/v2/product', productRoutes);
+app.use('/api/v2/quote', quoteRoutes);
+app.use('/api/v2/service', serviceRoutes);
+app.use('/api/v2/stripe-account', stripeAccountRoutes);
 
 app.get('/', (_, res: Response) => {
     res.json({ 

@@ -7,7 +7,7 @@
 
 /**
  * @swagger
- * /documents/upload:
+ * /api/v2/document/upload:
  *   post:
  *     summary: Upload a document
  *     tags: [Documents]
@@ -80,7 +80,7 @@
 
 /**
  * @swagger
- * /documents/category/{category}:
+ * /api/v2/document/category/{category}:
  *   get:
  *     summary: Get documents by category
  *     tags: [Documents]
@@ -149,7 +149,7 @@
 
 /**
  * @swagger
- * /documents/{documentId}:
+ * /api/v2/document/{documentId}:
  *   delete:
  *     summary: Delete a document
  *     tags: [Documents]
@@ -184,7 +184,7 @@
 
 /**
  * @swagger
- * /documents/{documentId}/download:
+ * /api/v2/document/{documentId}/download:
  *   get:
  *     summary: Get document download URL
  *     tags: [Documents]

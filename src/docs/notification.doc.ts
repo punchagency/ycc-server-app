@@ -1,6 +1,6 @@
 /**
  * @swagger
- * /notifications:
+ * /api/v2/notification:
  *   get:
  *     tags: [Notification]
  *     summary: Get user notifications with pagination and filters
@@ -80,7 +80,7 @@
 
 /**
  * @swagger
- * /notifications/{id}/read:
+ * /api/v2/notification/{id}/read:
  *   patch:
  *     tags: [Notification]
  *     summary: Mark notification as read
@@ -119,7 +119,7 @@
 
 /**
  * @swagger
- * /notifications/read-all:
+ * /api/v2/notification/read-all:
  *   patch:
  *     tags: [Notification]
  *     summary: Mark all notifications as read
@@ -147,7 +147,7 @@
 
 /**
  * @swagger
- * /notifications/{id}:
+ * /api/v2/notification/{id}:
  *   delete:
  *     tags: [Notification]
  *     summary: Delete a notification
@@ -186,7 +186,7 @@
 
 /**
  * @swagger
- * /notifications:
+ * /api/v2/notification:
  *   delete:
  *     tags: [Notification]
  *     summary: Delete multiple notifications

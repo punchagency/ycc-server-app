@@ -1,6 +1,6 @@
 /**
  * @swagger
- * /booking:
+ * /api/v2/booking:
  *   post:
  *     tags: [Booking]
  *     summary: Create a new booking
@@ -56,7 +56,7 @@
 
 /**
  * @swagger
- * /booking:
+ * /api/v2/booking:
  *   get:
  *     tags: [Booking]
  *     summary: Get all bookings
@@ -110,7 +110,7 @@
 
 /**
  * @swagger
- * /booking/{id}:
+ * /api/v2/booking/{id}:
  *   get:
  *     tags: [Booking]
  *     summary: Get booking by ID
@@ -133,7 +133,7 @@
 
 /**
  * @swagger
- * /booking/{id}/confirm:
+ * /api/v2/booking/{id}/confirm:
  *   patch:
  *     tags: [Booking]
  *     summary: Confirm a booking
@@ -156,7 +156,7 @@
 
 /**
  * @swagger
- * /booking/{id}/status:
+ * /api/v2/booking/{id}/status:
  *   patch:
  *     tags: [Booking]
  *     summary: Update booking status

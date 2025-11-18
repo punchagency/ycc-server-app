@@ -1,10 +1,12 @@
 import express, { Application, Response } from 'express';
+import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './config/swagger';
 import connectDB from './config/database';
 import { RedisConnect } from './integration/Redis';
 import { healthCheck, readinessCheck, livenessCheck } from './middleware/health.middleware';
 import './integration/QueueManager'
+import CONFIG from './config/config';
 
 const app: Application = express();
 const PORT = process.env.PORT || 4500;
@@ -13,7 +15,16 @@ const PORT = process.env.PORT || 4500;
 connectDB();
 RedisConnect();
 
+// CORS Configuration
+const corsOptions: cors.CorsOptions = {
+    origin: [CONFIG.links.frontend, "http://localhost:5174", "http://localhost:5173"],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+};
+
 // Middleware
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

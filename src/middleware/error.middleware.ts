@@ -724,7 +724,7 @@ export const asyncHandler = (fn: Function) => {
 
 // Error boundary for catching unhandled promise rejections
 export const setupGlobalErrorHandlers = (): void => {
-  process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+  process.on('unhandledRejection', (reason: any, _promise: Promise<any>) => {
     Logger.error('Unhandled promise rejection', {
       metadata: {
         reason: reason?.message || reason,

@@ -5,6 +5,7 @@ import Business, { BUSINESS_TYPE } from '../models/business.model';
 import crypto from 'crypto';
 import { addEmailJob } from '../integration/QueueManager';
 import { DateTime } from 'luxon';
+import { logError } from '../utils/SystemLogs';
 
 export interface AuthResponse {
   success: boolean;
@@ -34,6 +35,13 @@ export interface RegisterInput {
   nationality?: string;
   role?: typeof ROLES[number];
   profilePicture?: string | null;
+  address: {
+    street: string;
+    zipcode: string;
+    city: string;
+    state: string;
+    country: string;
+  };
   // Business-specific fields (for distributor/manufacturer roles)
   businessName?: string;
   businessType?: typeof BUSINESS_TYPE[number];
@@ -113,6 +121,7 @@ export class AuthService {
         password: hashedPassword,
         phone: userData.phone,
         nationality: userData.nationality,
+        address: userData.address,
         profilePicture: userData.profilePicture,
         role: userData.role || 'user',
         activationCode,
@@ -141,7 +150,6 @@ export class AuthService {
         userData.businessName
       ) {
         // For simplicity, creating placeholder Stripe account details
-        // TODO: In production, you would integrate with Stripe API
         const newBusiness = new Business({
           userId: savedUser._id,
           businessName: userData.businessName,
@@ -246,7 +254,7 @@ export class AuthService {
         }
       };
     } catch (error) {
-      console.error('Login error:', error);
+      logError({message: 'Login error', error: error as Error, source: 'AuthService'})
       return {
         success: false,
         error: 'Login failed. Please try again.'

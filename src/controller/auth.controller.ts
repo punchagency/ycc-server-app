@@ -7,7 +7,7 @@ import Validate from '../utils/Validate';
 export class AuthController {
     static async register(req: Request, res: Response): Promise<void> {
         try {
-            let { firstName, lastName, email, password, phone, nationality, role, businessName, businessEmail, businessPhone, website, taxId, license } = req.body;
+            let { firstName, lastName, email, password, phone, nationality, address, role, businessName, businessEmail, businessPhone, website, taxId, license } = req.body;
             email = email.toLowerCase().trim();
             firstName = firstName.trim();
             if (phone) phone = phone.trim();
@@ -54,6 +54,32 @@ export class AuthController {
 
             if(!Validate.oneOf({ allowedValues: ROLES as any, value: role})){
                 res.status(400).json({ success: false, message: 'Valid role is required', code: "VALIDATION_ERROR" });
+                return;
+            }
+
+            // Address validation
+            if (!address || typeof address !== 'object') {
+                res.status(400).json({ success: false, message: 'Valid address is required', code: "VALIDATION_ERROR" });
+                return;
+            }
+            if (!address.street || !Validate.string(address.street)) {
+                res.status(400).json({ success: false, message: 'Valid street address is required', code: "VALIDATION_ERROR" });
+                return;
+            }
+            if (!address.zipcode || !Validate.string(address.zipcode)) {
+                res.status(400).json({ success: false, message: 'Valid zipcode is required', code: "VALIDATION_ERROR" });
+                return;
+            }
+            if (!address.city || !Validate.string(address.city)) {
+                res.status(400).json({ success: false, message: 'Valid city is required', code: "VALIDATION_ERROR" });
+                return;
+            }
+            if (!address.state || !Validate.string(address.state)) {
+                res.status(400).json({ success: false, message: 'Valid state is required', code: "VALIDATION_ERROR" });
+                return;
+            }
+            if (!address.country || !Validate.string(address.country)) {
+                res.status(400).json({ success: false, message: 'Valid country is required', code: "VALIDATION_ERROR" });
                 return;
             }
 

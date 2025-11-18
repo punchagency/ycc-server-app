@@ -14,6 +14,7 @@ const Validate = {
         }
     },
     phone: (phone: string, country?: string): boolean => {
+        if(!country) country = 'US';
         try {
             return isValidPhoneNumber(phone, country as any);
         } catch {
@@ -23,6 +24,7 @@ const Validate = {
     phoneInternational: (phone: string): boolean => /^\+?[1-9]\d{1,14}$/.test(phone),
     phoneNigerian: (phone: string): boolean => /^(\+234|234|0)[789][01]\d{8}$/.test(phone),
     formatPhone: (phone: string, country?: string): string | null => {
+        if(!country) country = 'US';
         try {
             const phoneNumber = parsePhoneNumber(phone, country as any);
             return phoneNumber.formatInternational();

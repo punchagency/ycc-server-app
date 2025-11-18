@@ -36,7 +36,7 @@ const CONFIG = {
 		}
 	},
 	links: {
-		frontend: process.env.FRONTEND_URL,
+		frontend: process.env.FRONTEND_URL || "http://localhost:5173",
 	}
 };
 

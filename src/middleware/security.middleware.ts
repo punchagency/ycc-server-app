@@ -14,7 +14,7 @@ export const createRateLimit = (windowMs: number, max: number, message?: string)
     },
     standardHeaders: true,
     legacyHeaders: false,
-    handler: (req: Request, res: Response) => {
+    handler: (_req: Request, res: Response) => {
       res.status(429).json({
         error: message || 'Too many requests from this IP, please try again later',
         code: 'RATE_LIMIT_EXCEEDED',

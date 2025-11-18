@@ -10,7 +10,7 @@
  *         multipart/form-data:
  *           schema:
  *             type: object
- *             required: [firstName, lastName, email, password, role]
+ *             required: [firstName, lastName, email, password, role, address]
  *             properties:
  *               firstName:
  *                 type: string
@@ -32,6 +32,25 @@
  *               nationality:
  *                 type: string
  *                 example: United States
+ *               address:
+ *                 type: object
+ *                 required: true
+ *                 properties:
+ *                   street:
+ *                     type: string
+ *                     example: 123 Main Street
+ *                   zipcode:
+ *                     type: string
+ *                     example: 12345
+ *                   city:
+ *                     type: string
+ *                     example: New York
+ *                   state:
+ *                     type: string
+ *                     example: NY
+ *                   country:
+ *                     type: string
+ *                     example: United States
  *               profilePicture:
  *                 type: string
  *                 format: binary

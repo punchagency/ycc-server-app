@@ -6,7 +6,6 @@ import connectDB from './config/database';
 import { RedisConnect } from './integration/Redis';
 import { healthCheck, readinessCheck, livenessCheck } from './middleware/health.middleware';
 import './integration/QueueManager'
-import CONFIG from './config/config';
 
 const app: Application = express();
 const PORT = process.env.PORT || 4500;
@@ -15,13 +14,36 @@ const PORT = process.env.PORT || 4500;
 connectDB();
 RedisConnect();
 
+const allowedOrigins = [
+    'http://localhost:5174',
+    'http://localhost:5173',
+    'https://ycc-sage.vercel.app',
+    'https://ycc-client.vercel.app',
+    'https://ycc-client.netlify.app',
+    'https://yachtcrewcenter-dev.netlify.app',
+    'https://yachtcrewcenter.com',
+];
 // CORS Configuration
 const corsOptions: cors.CorsOptions = {
-    origin: [CONFIG.links.frontend, "http://localhost:5174", "http://localhost:5173"],
+    origin: process.env.ENV === 'development' ? '*' : allowedOrigins, // Allow all origins in development
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'Accept',
+        'Access-Control-Allow-Origin',
+        'x-retry-count'
+    ],
+    exposedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'Access-Control-Allow-Origin',
+    ],
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
 };
+
 
 // Middleware
 app.use(cors(corsOptions));
@@ -67,7 +89,7 @@ app.use('/api/v2/service', serviceRoutes);
 app.use('/api/v2/stripe-account', stripeAccountRoutes);
 
 app.get('/', (_, res: Response) => {
-    res.json({ 
+    res.json({
         message: 'Welcome to YCC Server API',
         version: '1.0.0',
         endpoints: {

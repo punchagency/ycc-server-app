@@ -3,6 +3,7 @@ import UserModel from "../models/user.model";
 import StripeService from "../integration/stripe";
 import { logInfo } from "../utils/SystemLogs";
 import { saveAuditLog } from "../utils/SaveAuditlogs";
+import 'dotenv/config';
 
 export class StripeAccountService {
 

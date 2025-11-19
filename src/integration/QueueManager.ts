@@ -5,6 +5,7 @@ import createNotification from '../utils/createNotification';
 import { logError } from '../utils/SystemLogs';
 import { NOTIFICATION_PRIORITY, NOTIFICATION_TYPES } from '../models/notification.model';
 import { Schema } from 'mongoose';
+import 'dotenv/config';
 
 let emailQueue: Bull.Queue | null = null;
 let notificationQueue: Bull.Queue | null = null;

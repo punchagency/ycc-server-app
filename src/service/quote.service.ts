@@ -6,6 +6,7 @@ import InvoiceModel from "../models/invoice.model";
 import StripeService from "../integration/stripe";
 import Stripe from 'stripe';
 import { addEmailJob } from "../integration/QueueManager";
+import 'dotenv/config';
 
 export class QuoteService {
     static async approveQuoteAndPay({quoteId, userId}: {quoteId: string, userId: string}) {

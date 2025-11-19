@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { Logger } from './logging.middleware';
+import 'dotenv/config';
 
 // Error severity levels
 export enum ErrorSeverity {

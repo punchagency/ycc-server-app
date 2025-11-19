@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import amqp from 'amqplib';
 import mongoose from 'mongoose';
 import { RedisObject } from '../integration/Redis';
+import 'dotenv/config';
 
 interface HealthCheck {
   service: string;

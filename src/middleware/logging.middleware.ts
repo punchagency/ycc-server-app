@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import morgan from 'morgan';
 import fs from 'fs';
 import path from 'path';
+import 'dotenv/config';
 
 // Log levels
 export enum LogLevel {

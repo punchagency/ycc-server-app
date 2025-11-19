@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import SendGrid from "@sendgrid/mail";
 import { logCritical } from './SystemLogs';
+import 'dotenv/config';
 
 
 const SendMail = async ({ email, subject, html }: { email: string | string[], subject: string, html: string }) => {

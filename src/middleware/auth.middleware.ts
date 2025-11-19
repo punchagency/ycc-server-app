@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AuthService } from '../service/auth.service';
 import { ROLES } from '../models/user.model';
+import 'dotenv/config';
 
 export interface AuthenticatedRequest extends Request {
   user?: {

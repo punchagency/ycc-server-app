@@ -10,6 +10,7 @@ import { generateVendorBookingEmail, generateCrewBookingConfirmationEmail } from
 import { DateTime } from 'luxon';
 import { logError } from "../utils/SystemLogs";
 import CONSTANTS from "../config/constant";
+import 'dotenv/config';
 
 export class BookingService {
     static async createBooking({ userId, serviceId, serviceLocation, dateTime, notes, contact, attachments }: { userId: string, serviceId: string, serviceLocation: { street: string, city: string, state: string, zip: string, country: string }, dateTime: string, notes?: string, contact?: { email?: string, phone?: string }, attachments?: string[] }) {

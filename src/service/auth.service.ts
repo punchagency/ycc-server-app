@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { addEmailJob } from '../integration/QueueManager';
 import { DateTime } from 'luxon';
 import { logError } from '../utils/SystemLogs';
+import 'dotenv/config';
 
 export interface AuthResponse {
   success: boolean;
@@ -78,9 +79,9 @@ export class AuthService {
   }
 
   private static getRefreshTokenSecret(): string {
-    const secret = process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET;
+    const secret = process.env.JWT_SECRET;
     if (!secret) {
-      throw new Error('REFRESH_TOKEN_SECRET environment variable is not configured');
+      throw new Error('JWT_SECRET environment variable is not configured');
     }
     return secret;
   }

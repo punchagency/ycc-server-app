@@ -10,6 +10,7 @@ import { generateUserOrderConfirmationEmail } from "../templates/email-templates
 import { Schema } from "mongoose";
 import CONSTANTS from "../config/constant";
 import StripeService from "../integration/stripe";
+import 'dotenv/config';
 
 export interface CreateOrderInput {
     userId: Schema.Types.ObjectId | string;

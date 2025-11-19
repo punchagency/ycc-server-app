@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { EventEmitter } from 'events';
 import { logError, logInfo } from '../utils/SystemLogs';
 import catchError from '../utils/catchError';
+import 'dotenv/config';
 
 export const pineconeEmitter = new EventEmitter();
 

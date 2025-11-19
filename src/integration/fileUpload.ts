@@ -7,6 +7,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { logError, logInfo } from '../utils/SystemLogs';
 import catchError from '../utils/catchError';
+import 'dotenv/config';
 
 interface IFileUploadConfig {
     maxFileSize: number;

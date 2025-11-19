@@ -5,6 +5,7 @@ import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { UpdateOrderStatusDto } from '../dto/order.dto';
 import { logError } from '../utils/SystemLogs';
 import Validate from '../utils/Validate';
+import 'dotenv/config';
 
 class OrderController {
     static async createOrder(req: AuthenticatedRequest, res: Response) {

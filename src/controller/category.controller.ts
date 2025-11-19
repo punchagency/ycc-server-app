@@ -40,7 +40,7 @@ export class CategoryController {
             name: name.trim(),
             description: description?.trim(),
             type: type ? type : null,
-            isApproved: isApproved === true ? true : false
+            isApproved: isApproved == 'true' ? true : false
         };
 
         if (files?.categoryImage?.[0]) {
@@ -105,7 +105,7 @@ export class CategoryController {
 
     static async updateCategory(req: AuthenticatedRequest, res: Response): Promise<void> {
         const { id } = req.params;
-        const { name, description, type } = req.body;
+        const { name, description, type, isApproved } = req.body;
         const files = req.files as { [fieldname: string]: IUploadedFile[] } | undefined;
 
         if (!Validate.mongoId(id)) {
@@ -172,6 +172,10 @@ export class CategoryController {
         if (files?.categoryImage?.[0]) {
             updateData.imageURL = files.categoryImage[0].location;
         }
+        if(isApproved !== undefined){
+            updateData.isApproved = isApproved == 'true' ? true : false;
+        }
+        console.log({updateData}, {req: req.body});
 
         const updatedCategory = await CategoryService.updateCategory(id, updateData);
         if (!updatedCategory) {

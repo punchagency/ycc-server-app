@@ -57,31 +57,34 @@ export class AuthController {
                 return;
             }
 
-            // Address validation
-            if (!address || typeof address !== 'object') {
-                res.status(400).json({ success: false, message: 'Valid address is required', code: "VALIDATION_ERROR" });
-                return;
+            if(role !== 'admin'){
+                // Address validation
+                if (!address || typeof address !== 'object') {
+                    res.status(400).json({ success: false, message: 'Valid address is required', code: "VALIDATION_ERROR" });
+                    return;
+                }
+                if (!address.street || !Validate.string(address.street)) {
+                    res.status(400).json({ success: false, message: 'Valid street address is required', code: "VALIDATION_ERROR" });
+                    return;
+                }
+                if (!address.zipcode || !Validate.string(address.zipcode)) {
+                    res.status(400).json({ success: false, message: 'Valid zipcode is required', code: "VALIDATION_ERROR" });
+                    return;
+                }
+                if (!address.city || !Validate.string(address.city)) {
+                    res.status(400).json({ success: false, message: 'Valid city is required', code: "VALIDATION_ERROR" });
+                    return;
+                }
+                if (!address.state || !Validate.string(address.state)) {
+                    res.status(400).json({ success: false, message: 'Valid state is required', code: "VALIDATION_ERROR" });
+                    return;
+                }
+                if (!address.country || !Validate.string(address.country)) {
+                    res.status(400).json({ success: false, message: 'Valid country is required', code: "VALIDATION_ERROR" });
+                    return;
+                }
             }
-            if (!address.street || !Validate.string(address.street)) {
-                res.status(400).json({ success: false, message: 'Valid street address is required', code: "VALIDATION_ERROR" });
-                return;
-            }
-            if (!address.zipcode || !Validate.string(address.zipcode)) {
-                res.status(400).json({ success: false, message: 'Valid zipcode is required', code: "VALIDATION_ERROR" });
-                return;
-            }
-            if (!address.city || !Validate.string(address.city)) {
-                res.status(400).json({ success: false, message: 'Valid city is required', code: "VALIDATION_ERROR" });
-                return;
-            }
-            if (!address.state || !Validate.string(address.state)) {
-                res.status(400).json({ success: false, message: 'Valid state is required', code: "VALIDATION_ERROR" });
-                return;
-            }
-            if (!address.country || !Validate.string(address.country)) {
-                res.status(400).json({ success: false, message: 'Valid country is required', code: "VALIDATION_ERROR" });
-                return;
-            }
+            
 
             // Business validation for distributor/manufacturer
             if (role === 'distributor' || role === 'manufacturer') {

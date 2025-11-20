@@ -26,6 +26,14 @@ export interface IUser extends Document {
   isVerified: boolean;
   isActive: boolean;
   stripeCustomerId?: string;
+  // Business-related fields for distributors/manufacturers
+  businessName?: string;
+  businessType?: string;
+  businessEmail?: string;
+  businessPhone?: string;
+  website?: string;
+  taxId?: string;
+  license?: string;
   notificationPreferences: {
     emailNotifications: boolean;
     pushNotifications: boolean;
@@ -106,6 +114,35 @@ const userSchema = new Schema<IUser>({
   },
   nationality: String,
   phone: {
+    type: String,
+    default: null
+  },
+  // Business-related fields for distributors/manufacturers
+  businessName: {
+    type: String,
+    default: null
+  },
+  businessType: {
+    type: String,
+    default: null
+  },
+  businessEmail: {
+    type: String,
+    default: null
+  },
+  businessPhone: {
+    type: String,
+    default: null
+  },
+  website: {
+    type: String,
+    default: null
+  },
+  taxId: {
+    type: String,
+    default: null
+  },
+  license: {
     type: String,
     default: null
   },

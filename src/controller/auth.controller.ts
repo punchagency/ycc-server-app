@@ -431,6 +431,115 @@ export class AuthController {
         }
     }
 
+    static async updateDistributorProfile(req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            if (!req.user) {
+                res.status(401).json({
+                    success: false,
+                    message: 'Authentication required',
+                    code: 'UNAUTHORIZED'
+                });
+                return;
+            }
+
+            // Check if user is distributor or manufacturer
+            if (req.user.role !== 'distributor' && req.user.role !== 'manufacturer') {
+                res.status(403).json({
+                    success: false,
+                    message: 'This endpoint is only for distributor and manufacturer accounts',
+                    code: 'FORBIDDEN'
+                });
+                return;
+            }
+
+            const { businessName, businessEmail, businessPhone, website, address } = req.body;
+
+            const updateData: any = {};
+            
+            if (businessName) updateData.businessName = businessName.trim();
+            
+            if (businessEmail) {
+                if (!Validate.email(businessEmail)) {
+                    res.status(400).json({ 
+                        success: false, 
+                        message: 'Valid business email is required', 
+                        code: "VALIDATION_ERROR" 
+                    });
+                    return;
+                }
+                updateData.businessEmail = businessEmail.toLowerCase().trim();
+            }
+            
+            if (businessPhone) {
+                if (!Validate.phone(businessPhone)) {
+                    res.status(400).json({ 
+                        success: false, 
+                        message: 'Valid business phone is required', 
+                        code: "VALIDATION_ERROR" 
+                    });
+                    return;
+                }
+                updateData.businessPhone = Validate.formatPhone(businessPhone) || businessPhone;
+            }
+            
+            if (website) updateData.website = website.trim();
+            
+            if (address) {
+                const parsedAddress = TryParseJSON(address, null);
+                if (parsedAddress) {
+                    updateData.address = parsedAddress;
+                } else {
+                    updateData.address = address;
+                }
+            }
+
+            const user = await User.findByIdAndUpdate(
+                req.user._id,
+                updateData,
+                { new: true, runValidators: true }
+            ).select('-password -refreshToken');
+
+            if (!user) {
+                res.status(404).json({
+                    success: false,
+                    message: 'User not found',
+                    code: 'USER_NOT_FOUND'
+                });
+                return;
+            }
+
+            res.status(200).json({
+                success: true,
+                message: 'Business profile updated successfully',
+                data: {
+                    user: {
+                        id: user._id,
+                        firstName: user.firstName,
+                        lastName: user.lastName,
+                        email: user.email,
+                        phone: user.phone,
+                        role: user.role,
+                        businessName: user.businessName,
+                        businessEmail: user.businessEmail,
+                        businessPhone: user.businessPhone,
+                        website: user.website,
+                        address: user.address,
+                        isVerified: user.isVerified,
+                        isActive: user.isActive,
+                        createdAt: user.createdAt,
+                        updatedAt: user.updatedAt
+                    }
+                }
+            });
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: 'Business profile update failed'
+            });
+        }
+    }
+
+
     static async activateAccount(req: Request, res: Response): Promise<void> {
         try {
             const { email, code } = req.body;

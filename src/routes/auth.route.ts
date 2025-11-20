@@ -22,5 +22,6 @@ router.post('/logout', authenticateToken, AuthController.logout);
 router.post('/change-password', authenticateToken, AuthController.changePassword);
 router.get('/profile', authenticateToken, AuthController.getProfile);
 router.put('/profile', authenticateToken, uploadProfilePicture, AuthController.updateProfile);
+router.put('/distributor-profile', authenticateToken, AuthController.updateDistributorProfile);
 
 export default router;

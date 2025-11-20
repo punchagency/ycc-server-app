@@ -24,7 +24,7 @@
  *                 type: string
  *               isQuotable:
  *                 type: boolean
- *               images:
+ *               serviceImage:
  *                 type: array
  *                 items:
  *                   type: string
@@ -44,11 +44,26 @@
  *     summary: Get all services for authenticated user's business
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of services per page
  *     responses:
  *       200:
- *         description: Services retrieved successfully
+ *         description: Services retrieved successfully with pagination
  *       401:
  *         description: Unauthorized
+ *       403:
+ *         description: Only distributors can view their services
  */
 
 /**
@@ -105,7 +120,7 @@
  *                 type: string
  *               isQuotable:
  *                 type: boolean
- *               images:
+ *               serviceImage:
  *                 type: array
  *                 items:
  *                   type: string

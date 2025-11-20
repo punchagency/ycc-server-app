@@ -30,7 +30,7 @@ export class ServiceController {
                 return;
             }
 
-            if (!price || typeof price !== 'number' || price < 0) {
+            if (!price || typeof Number(price) !== 'number' || Number(price) < 1) {
                 res.status(400).json({ success: false, message: 'Valid price is required', code: 'VALIDATION_ERROR' });
                 return;
             }
@@ -51,7 +51,7 @@ export class ServiceController {
             const serviceData: CreateServiceDTO = {
                 name: name.trim(),
                 description: description?.trim(),
-                price,
+                price: Number(price),
                 businessId,
                 categoryId,
                 isQuotable: isQuotable || false
@@ -155,7 +155,7 @@ export class ServiceController {
                 return;
             }
 
-            if (price !== undefined && (typeof price !== 'number' || price < 0)) {
+            if (price !== undefined && (typeof Number(price) !== 'number' || Number(price) < 0)) {
                 res.status(400).json({ success: false, message: 'Valid price is required', code: 'VALIDATION_ERROR' });
                 return;
             }
@@ -171,7 +171,7 @@ export class ServiceController {
             const updateData: UpdateServiceDTO = {};
             if (name) updateData.name = name.trim();
             if (description) updateData.description = description.trim();
-            if (price !== undefined) updateData.price = price;
+            if (price !== undefined) updateData.price = Number(price);
             if (categoryId) updateData.categoryId = categoryId;
             if (isQuotable !== undefined) updateData.isQuotable = isQuotable;
 

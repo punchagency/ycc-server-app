@@ -3,6 +3,7 @@ import { AuthService, RegisterInput, LoginInput } from '../service/auth.service'
 import User, { ROLES } from '../models/user.model';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import Validate from '../utils/Validate';
+import { TryParseJSON } from '../utils/Helpers';
 
 export class AuthController {
     static async register(req: Request, res: Response): Promise<void> {
@@ -58,6 +59,8 @@ export class AuthController {
             }
 
             if(role !== 'admin'){
+                console.log({address});
+                address = TryParseJSON(address, {street: '', zipcode: '', city: '', state: '', country: ''})
                 // Address validation
                 if (!address || typeof address !== 'object') {
                     res.status(400).json({ success: false, message: 'Valid address is required', code: "VALIDATION_ERROR" });

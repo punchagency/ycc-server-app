@@ -5,6 +5,7 @@ import Validate from '../utils/Validate';
 import { IUploadedFile } from '../integration/fileUpload';
 
 export class CategoryController {
+
     static async createCategory(req: AuthenticatedRequest, res: Response): Promise<void> {
         const { name, description, type, isApproved } = req.body;
         const files = req.files as { [fieldname: string]: IUploadedFile[] } | undefined;
@@ -64,8 +65,24 @@ export class CategoryController {
         });
     }
 
-    static async getAllCategories(_req: AuthenticatedRequest, res: Response): Promise<void> {
-        const categories = await CategoryService.getAllCategories();
+    static async getAllCategories(req: AuthenticatedRequest, res: Response): Promise<void> {
+        const { type, isApproved } = req.query;
+        let query: { type?: string; isApproved?: boolean } = {};
+        if (type) {
+            if (!['service', 'product'].includes(type as string)) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Invalid category type',
+                    code: 'VALIDATION_ERROR'
+                });
+                return;
+            }
+            query.type = type as string;
+        }
+        if (isApproved) {
+            query.isApproved = isApproved == 'true' ? true : false;
+        }
+        const categories = await CategoryService.getAllCategories(query);
 
         res.json({
             success: true,

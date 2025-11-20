@@ -43,6 +43,12 @@
  *         schema:
  *           type: string
  *           enum: [service, product]
+ *         description: Filter by type (includes categories with null type)
+ *       - in: query
+ *         name: isApproved
+ *         schema:
+ *           type: boolean
+ *         description: Filter by approval status
  *     responses:
  *       200:
  *         description: Categories retrieved successfully

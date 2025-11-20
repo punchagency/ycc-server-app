@@ -36,16 +36,29 @@ export class CategoryService {
         return category;
     }
 
-    static async getAllCategories(): Promise<ICategory[]> {
+    static async getAllCategories(query?: { type?: string; isApproved?: boolean }): Promise<ICategory[]> {
+        const filter: any = {};
+
+        if (query?.type) {
+            filter.$or = [
+                { type: query.type },
+                { type: null }
+            ];
+        }
+
+        if (query?.isApproved !== undefined) {
+            filter.isApproved = query.isApproved;
+        }
+
         const [error, categories] = await catchError(
-            CategoryModel.find().sort({ createdAt: -1 })
+            CategoryModel.find(filter).sort({ createdAt: -1 })
         );
 
         if (error) {
             await logError({
                 message: 'Failed to fetch categories',
                 source: 'CategoryService.getAllCategories',
-                additionalData: { error: error.message }
+                additionalData: { error: error.message, query }
             });
             return [];
         }

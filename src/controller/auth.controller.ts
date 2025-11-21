@@ -465,9 +465,13 @@ export class AuthController {
 
             const { businessName, businessEmail, businessPhone, website, address } = req.body;
 
-            const updateData: any = {};
+            const userUpdateData: any = {};
+            const businessUpdateData: any = {};
             
-            if (businessName) updateData.businessName = businessName.trim();
+            if (businessName) {
+                userUpdateData.businessName = businessName.trim();
+                businessUpdateData.businessName = businessName.trim();
+            }
             
             if (businessEmail) {
                 if (!Validate.email(businessEmail)) {
@@ -478,7 +482,8 @@ export class AuthController {
                     });
                     return;
                 }
-                updateData.businessEmail = businessEmail.toLowerCase().trim();
+                userUpdateData.businessEmail = businessEmail.toLowerCase().trim();
+                businessUpdateData.email = businessEmail.toLowerCase().trim();
             }
             
             if (businessPhone) {
@@ -490,23 +495,27 @@ export class AuthController {
                     });
                     return;
                 }
-                updateData.businessPhone = Validate.formatPhone(businessPhone) || businessPhone;
+                const formattedPhone = Validate.formatPhone(businessPhone) || businessPhone;
+                userUpdateData.businessPhone = formattedPhone;
+                businessUpdateData.phone = formattedPhone;
             }
             
-            if (website) updateData.website = website.trim();
+            if (website) {
+                userUpdateData.website = website.trim();
+                businessUpdateData.website = website.trim();
+            }
             
             if (address) {
                 const parsedAddress = TryParseJSON(address, null);
-                if (parsedAddress) {
-                    updateData.address = parsedAddress;
-                } else {
-                    updateData.address = address;
-                }
+                const addressData = parsedAddress || address;
+                userUpdateData.address = addressData;
+                businessUpdateData.address = addressData;
             }
 
+            // Update User model
             const user = await User.findByIdAndUpdate(
                 req.user._id,
-                updateData,
+                userUpdateData,
                 { new: true, runValidators: true }
             ).select('-password -refreshToken');
 
@@ -518,6 +527,13 @@ export class AuthController {
                 });
                 return;
             }
+
+            // Update Business model
+            const business = await Business.findOneAndUpdate(
+                { userId: req.user._id },
+                businessUpdateData,
+                { new: true, runValidators: false } // Skip validators as some required fields may not be in update
+            );
 
             res.status(200).json({
                 success: true,
@@ -539,7 +555,17 @@ export class AuthController {
                         isActive: user.isActive,
                         createdAt: user.createdAt,
                         updatedAt: user.updatedAt
-                    }
+                    },
+                    business: business ? {
+                        id: business._id,
+                        businessName: business.businessName,
+                        email: business.email,
+                        phone: business.phone,
+                        website: business.website,
+                        address: business.address,
+                        businessType: business.businessType,
+                        isOnboarded: business.isOnboarded
+                    } : null
                 }
             });
         } catch (error) {

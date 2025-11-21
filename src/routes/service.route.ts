@@ -12,6 +12,8 @@ router.post(
     ServiceController.createService
 );
 
+router.post('/bulk-upload', ServiceController.uploadMultipleServices);
+
 router.get('/business', authenticateToken, ServiceController.getBusinessServices);
 
 router.get('/:id', authenticateToken, ServiceController.getService);

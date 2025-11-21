@@ -49,6 +49,81 @@ export class ServiceService {
         return service;
     }
 
+    static async uploadMultipleServices(userId: string, services: Array<{ name: string; description?: string; price: number; categoryName: string; isQuotable?: boolean }>) {
+        const categoryCache = new Map<string, string>();
+        const newCategories: string[] = [];
+        const createdServices: IService[] = [];
+        const failedServices: Array<{ service: any; reason: string }> = [];
+
+        for (const serviceData of services) {
+            try {
+                let categoryId = categoryCache.get(serviceData.categoryName.toLowerCase());
+
+                if (!categoryId) {
+                    let category = await CategoryService.getCategoryByName(serviceData.categoryName);
+                    
+                    if (!category) {
+                        category = await CategoryService.createCategory({
+                            name: serviceData.categoryName,
+                            type: 'service',
+                            isApproved: false
+                        });
+                        
+                        if (category) {
+                            newCategories.push(category.name);
+                        }
+                    }
+
+                    if (!category) {
+                        failedServices.push({ service: serviceData, reason: 'Failed to create category' });
+                        continue;
+                    }
+
+                    categoryId = category._id.toString();
+                    categoryCache.set(serviceData.categoryName.toLowerCase(), categoryId);
+                }
+
+                const [error, service] = await catchError(
+                    ServiceModel.create({
+                        name: serviceData.name,
+                        description: serviceData.description,
+                        price: serviceData.price,
+                        businessId: userId,
+                        categoryId,
+                        isQuotable: serviceData.isQuotable || false,
+                        imageURLs: []
+                    })
+                );
+
+                if (error || !service) {
+                    failedServices.push({ service: serviceData, reason: error?.message || 'Failed to create service' });
+                } else {
+                    createdServices.push(service);
+                    const category = await CategoryService.getCategoryById(categoryId);
+                    if (category) {
+                        pineconeEmitter.emit('index', {
+                            serviceId: service._id.toString(),
+                            name: service.name,
+                            description: service.description || '',
+                            categoryName: category.name,
+                            price: service.price
+                        });
+                    }
+                }
+            } catch (err: any) {
+                failedServices.push({ service: serviceData, reason: err.message || 'Unknown error' });
+            }
+        }
+
+        await logInfo({
+            message: 'Bulk service upload completed',
+            source: 'ServiceService.uploadMultipleServices',
+            additionalData: { userId, total: services.length, created: createdServices.length, failed: failedServices.length }
+        });
+
+        return { createdServices, failedServices, newCategories };
+    }
+
     static async getServiceById(id: string): Promise<IService | null> {
         if (!Types.ObjectId.isValid(id)) return null;
 

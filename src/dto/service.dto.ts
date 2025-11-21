@@ -14,3 +14,10 @@ export interface UpdateServiceDTO {
     categoryId?: string;
     isQuotable?: boolean;
 }
+export interface BulkServiceInput {
+    name: string;
+    description?: string;
+    price: number;
+    categoryName: string;
+    isQuotable?: boolean;
+}

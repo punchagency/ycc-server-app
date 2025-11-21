@@ -156,3 +156,84 @@
  *       404:
  *         description: Service not found
  */
+
+/**
+ * @swagger
+ * /api/v2/service/bulk-upload:
+ *   post:
+ *     tags: [Service]
+ *     summary: Upload multiple services at once
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [userId, services]
+ *             properties:
+ *               userId:
+ *                 type: string
+ *                 description: Distributor user ID
+ *               services:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required: [name, price, categoryName]
+ *                   properties:
+ *                     name:
+ *                       type: string
+ *                       minLength: 2
+ *                       maxLength: 50
+ *                     description:
+ *                       type: string
+ *                     price:
+ *                       type: number
+ *                       minimum: 1
+ *                     categoryName:
+ *                       type: string
+ *                       description: Category name (will be created if doesn't exist)
+ *                     isQuotable:
+ *                       type: boolean
+ *     responses:
+ *       201:
+ *         description: Bulk upload completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     created:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                     failed:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                     newCategories:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                 summary:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                     successful:
+ *                       type: integer
+ *                     failed:
+ *                       type: integer
+ *                     newCategoriesCreated:
+ *                       type: integer
+ *       400:
+ *         description: Validation error
+ *       403:
+ *         description: User must be a distributor
+ */

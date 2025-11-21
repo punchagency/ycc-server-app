@@ -1,8 +1,11 @@
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import { ServiceService } from '../service/service.service';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
-import { CreateServiceDTO, UpdateServiceDTO } from '../dto/service.dto';
+import { CreateServiceDTO, UpdateServiceDTO, BulkServiceInput } from '../dto/service.dto';
 import Validate from '../utils/Validate';
+import UserModel from '../models/user.model';
+import BusinessModel from '../models/business.model';
+import { Types } from 'mongoose';
 
 export class ServiceController {
     static async createService(req: AuthenticatedRequest, res: Response): Promise<void> {
@@ -71,6 +74,69 @@ export class ServiceController {
             });
         } catch (error) {
             res.status(500).json({ success: false, message: 'Failed to create service' });
+        }
+    }
+
+    static async uploadMultipleServices(req: Request, res: Response): Promise<void> {
+        try {
+            const { userId, services }: { userId: string; services: BulkServiceInput[] } = req.body;
+
+            if (!userId || !Types.ObjectId.isValid(userId)) {
+                res.status(400).json({ success: false, message: 'Valid user ID is required', code: 'VALIDATION_ERROR' });
+                return;
+            }
+
+            if (!services || !Array.isArray(services) || services.length === 0) {
+                res.status(400).json({ success: false, message: 'Services array is required', code: 'VALIDATION_ERROR' });
+                return;
+            }
+
+            const user = await UserModel.findById(userId);
+            if (!user || user.role !== 'distributor') {
+                res.status(403).json({ success: false, message: 'User must be a distributor', code: 'FORBIDDEN' });
+                return;
+            }
+
+            const business = await BusinessModel.findOne({ userId });
+            if (!business) {
+                res.status(400).json({ success: false, message: 'Business not found for user', code: 'BUSINESS_NOT_FOUND' });
+                return;
+            }
+
+            for (const service of services) {
+                if (!service.name || !Validate.stringLength(service.name, 2, 50)) {
+                    res.status(400).json({ success: false, message: 'Each service name must be 2-50 characters', code: 'VALIDATION_ERROR' });
+                    return;
+                }
+                if (!service.price || typeof Number(service.price) !== 'number' || Number(service.price) < 1) {
+                    res.status(400).json({ success: false, message: 'Each service must have a valid price', code: 'VALIDATION_ERROR' });
+                    return;
+                }
+                if (!service.categoryName || !Validate.string(service.categoryName)) {
+                    res.status(400).json({ success: false, message: 'Each service must have a category name', code: 'VALIDATION_ERROR' });
+                    return;
+                }
+            }
+
+            const result = await ServiceService.uploadMultipleServices(business._id.toString(), services);
+
+            res.status(201).json({
+                success: true,
+                message: 'Bulk upload completed',
+                data: {
+                    created: result.createdServices,
+                    failed: result.failedServices,
+                    newCategories: result.newCategories
+                },
+                summary: {
+                    total: services.length,
+                    successful: result.createdServices.length,
+                    failed: result.failedServices.length,
+                    newCategoriesCreated: result.newCategories.length
+                }
+            });
+        } catch (error) {
+            res.status(500).json({ success: false, message: 'Failed to upload services' });
         }
     }
 

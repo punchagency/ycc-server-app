@@ -340,6 +340,7 @@ export class AuthController {
                     email: user.email,
                     phone: user.phone,
                     role: user.role,
+                    nationality: user.nationality,
                     profilePicture: user.profilePicture,
                     address: user.address,
                     isVerified: user.isVerified,

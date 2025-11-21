@@ -273,4 +273,21 @@ export class ServiceService {
 
         return services || [];
     }
+
+    static async aggregateServices(pipeline: any[]): Promise<any[]> {
+        const [error, result] = await catchError(
+            ServiceModel.aggregate(pipeline)
+        );
+
+        if (error) {
+            await logError({
+                message: 'Failed to execute service aggregation',
+                source: 'ServiceService.aggregateServices',
+                additionalData: { error: error.message }
+            });
+            return [];
+        }
+
+        return result || [];
+    }
 }

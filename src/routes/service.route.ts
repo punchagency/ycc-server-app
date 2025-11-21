@@ -12,6 +12,9 @@ router.post(
     ServiceController.createService
 );
 
+// Crew member routes - must be before parameterized routes
+router.get('/crew-services', authenticateToken, ServiceController.fetchServicesForCrew);
+
 router.post('/bulk-upload', ServiceController.uploadMultipleServices);
 
 router.get('/business', authenticateToken, ServiceController.getBusinessServices);

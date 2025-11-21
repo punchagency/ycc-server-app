@@ -288,4 +288,165 @@ export class ServiceController {
             res.status(500).json({ success: false, message: 'Failed to delete service' });
         }
     }
+
+    static async fetchServicesForCrew(req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            if (!req.user || req.user.role !== 'user') {
+                res.status(403).json({ success: false, message: 'Only crew members can access services', code: 'FORBIDDEN' });
+                return;
+            }
+
+            const {
+                search = '',
+                category = '',
+                minPrice,
+                maxPrice,
+                page = '1',
+                limit = '12',
+                sortBy = 'random'
+            } = req.query;
+
+            const pageNum = parseInt(page as string) || 1;
+            const limitNum = parseInt(limit as string) || 12;
+            const skip = (pageNum - 1) * limitNum;
+
+            // Build match query
+            const matchQuery: any = {};
+
+            // Search functionality
+            if (search) {
+                matchQuery.$or = [
+                    { name: { $regex: search, $options: 'i' } },
+                    { description: { $regex: search, $options: 'i' } }
+                ];
+            }
+
+            // Price range filter
+            if (minPrice !== undefined || maxPrice !== undefined) {
+                matchQuery.price = {};
+                if (minPrice !== undefined) matchQuery.price.$gte = parseFloat(minPrice as string);
+                if (maxPrice !== undefined) matchQuery.price.$lte = parseFloat(maxPrice as string);
+            }
+
+            // Build aggregation pipeline
+            const aggregationPipeline: any[] = [
+                { $match: matchQuery },
+                {
+                    // Join with category collection
+                    $lookup: {
+                        from: 'categories',
+                        localField: 'categoryId',
+                        foreignField: '_id',
+                        as: 'category'
+                    }
+                },
+                { $unwind: '$category' },
+                {
+                    // Filter only approved categories
+                    $match: { 'category.isApproved': true }
+                },
+                {
+                    // Join with business collection
+                    $lookup: {
+                        from: 'businesses',
+                        localField: 'businessId',
+                        foreignField: '_id',
+                        as: 'business'
+                    }
+                },
+                { $unwind: '$business' }
+            ];
+
+            // Add category filter after lookups
+            if (category) {
+                aggregationPipeline.push({
+                    $match: { 'category.name': { $regex: category, $options: 'i' } }
+                });
+            }
+
+            // Project fields
+            aggregationPipeline.push({
+                $project: {
+                    _id: 1,
+                    name: 1,
+                    description: 1,
+                    price: 1,
+                    imageURLs: 1,
+                    isQuotable: 1,
+                    category: {
+                        _id: '$category._id',
+                        name: '$category.name',
+                        description: '$category.description',
+                        imageURL: '$category.imageURL'
+                    },
+                    business: {
+                        _id: '$business._id',
+                        businessName: '$business.businessName',
+                        businessPhone: '$business.businessPhone',
+                        businessEmail: '$business.businessEmail',
+                        address: '$business.address',
+                        website: '$business.website'
+                    },
+                    createdAt: 1,
+                    updatedAt: 1
+                }
+            });
+
+            // Add sorting
+            if (sortBy === 'price_asc') {
+                aggregationPipeline.push({ $sort: { price: 1 } });
+            } else if (sortBy === 'price_desc') {
+                aggregationPipeline.push({ $sort: { price: -1 } });
+            } else if (sortBy === 'name') {
+                aggregationPipeline.push({ $sort: { name: 1 } });
+            } else {
+                // Random order
+                aggregationPipeline.push({
+                    $addFields: { randomSort: { $rand: {} } }
+                });
+                aggregationPipeline.push({ $sort: { randomSort: 1 } });
+            }
+
+            // Get total count
+            const countPipeline = [...aggregationPipeline];
+            countPipeline.push({ $count: 'total' });
+            const countResult = await ServiceService.aggregateServices(countPipeline);
+            const totalServices = countResult[0]?.total || 0;
+
+            // Add pagination
+            aggregationPipeline.push({ $skip: skip });
+            aggregationPipeline.push({ $limit: limitNum });
+
+            // Execute aggregation
+            const services = await ServiceService.aggregateServices(aggregationPipeline);
+
+            // Calculate pagination info
+            const totalPages = Math.ceil(totalServices / limitNum);
+            const hasNextPage = pageNum < totalPages;
+            const hasPrevPage = pageNum > 1;
+
+            res.status(200).json({
+                success: true,
+                message: 'Services fetched successfully',
+                data: {
+                    services,
+                    pagination: {
+                        currentPage: pageNum,
+                        totalPages,
+                        totalServices,
+                        hasNextPage,
+                        hasPrevPage,
+                        limit: limitNum
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('Error in fetchServicesForCrew:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to fetch services',
+                error: process.env.NODE_ENV === 'development' ? (error as Error).message : 'Internal server error'
+            });
+        }
+    }
 }

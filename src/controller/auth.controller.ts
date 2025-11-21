@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthService, RegisterInput, LoginInput } from '../service/auth.service';
 import User, { ROLES } from '../models/user.model';
+import Business from '../models/business.model';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import Validate from '../utils/Validate';
 import { TryParseJSON } from '../utils/Helpers';
@@ -331,25 +332,34 @@ export class AuthController {
                 return;
             }
 
+            const responseData: any = {
+                user: {
+                    _id: user._id,
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    email: user.email,
+                    phone: user.phone,
+                    role: user.role,
+                    profilePicture: user.profilePicture,
+                    address: user.address,
+                    isVerified: user.isVerified,
+                    isActive: user.isActive,
+                    createdAt: user.createdAt,
+                    updatedAt: user.updatedAt
+                }
+            };
+
+            if (user.role === 'distributor' || user.role === 'manufacturer') {
+                const business = await Business.findOne({ userId: user._id });
+                if (business) {
+                    responseData.business = business;
+                }
+            }
+
             res.status(200).json({
                 success: true,
                 message: 'Profile retrieved successfully',
-                data: {
-                    user: {
-                        _id: user._id,
-                        firstName: user.firstName,
-                        lastName: user.lastName,
-                        email: user.email,
-                        phone: user.phone,
-                        role: user.role,
-                        profilePicture: user.profilePicture,
-                        address: user.address,
-                        isVerified: user.isVerified,
-                        isActive: user.isActive,
-                        createdAt: user.createdAt,
-                        updatedAt: user.updatedAt
-                    }
-                }
+                data: responseData
             });
         } catch (error) {
             res.status(500).json({

@@ -314,7 +314,7 @@
  *   put:
  *     tags: [Authentication]
  *     summary: Update distributor/manufacturer business profile
- *     description: Update business information for distributor and manufacturer accounts. Only accessible to users with distributor or manufacturer roles.
+ *     description: Update business information for distributor and manufacturer accounts. This endpoint updates both the User and Business models to ensure data consistency. Only accessible to users with distributor or manufacturer roles.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -368,7 +368,7 @@
  *                     example: United States
  *     responses:
  *       200:
- *         description: Business profile updated successfully
+ *         description: Business profile updated successfully in both User and Business models
  *         content:
  *           application/json:
  *             schema:
@@ -419,6 +419,28 @@
  *                         updatedAt:
  *                           type: string
  *                           format: date-time
+ *                     business:
+ *                       type: object
+ *                       nullable: true
+ *                       description: Business model information (synchronized with user data)
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                         businessName:
+ *                           type: string
+ *                         email:
+ *                           type: string
+ *                         phone:
+ *                           type: string
+ *                         website:
+ *                           type: string
+ *                         address:
+ *                           type: object
+ *                         businessType:
+ *                           type: string
+ *                           enum: [distributor, manufacturer]
+ *                         isOnboarded:
+ *                           type: boolean
  *       400:
  *         description: Validation error - Invalid email or phone format
  *         content:

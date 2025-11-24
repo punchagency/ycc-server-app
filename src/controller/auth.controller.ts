@@ -381,13 +381,12 @@ export class AuthController {
                 return;
             }
 
-            const { firstName, lastName, phone, nationality, address } = req.body;
+            const { phone, nationality, address } = req.body;
             const files = req.files as { [fieldname: string]: any[] };
             const profilePicture = files?.profilePicture?.[0]?.location;
 
             const updateData: any = {};
-            if (firstName) updateData.firstName = firstName.trim();
-            if (lastName) updateData.lastName = lastName.trim();
+            // Note: firstName and lastName are not allowed to be updated
             if (phone) {
                 if (!Validate.phone(phone)) {
                     res.status(400).json({ success: false, message: 'Valid phone number is required', code: "VALIDATION_ERROR" });
@@ -463,15 +462,12 @@ export class AuthController {
                 return;
             }
 
-            const { businessName, businessEmail, businessPhone, website, address } = req.body;
+            const { businessEmail, businessPhone, website, address } = req.body;
 
             const userUpdateData: any = {};
             const businessUpdateData: any = {};
             
-            if (businessName) {
-                userUpdateData.businessName = businessName.trim();
-                businessUpdateData.businessName = businessName.trim();
-            }
+            // Note: businessName is not allowed to be updated
             
             if (businessEmail) {
                 if (!Validate.email(businessEmail)) {

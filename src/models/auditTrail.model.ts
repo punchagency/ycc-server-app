@@ -30,7 +30,7 @@ const AuditLogSchema = new Schema({
     actionType: {
         type: String,
         enum: ['create', 'read', 'update', 'delete', 'login', 'logout', 'payment', 'admin_action', 'other'],
-        required: true
+        required: false
     },
     entityType: {
         type: String,

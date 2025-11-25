@@ -31,8 +31,8 @@ export interface IProduct extends Document {
 const productSchema = new Schema<IProduct>({
     userId: { type: Schema.Types.ObjectId, required: true, ref: 'User' },
     businessId: { type: Schema.Types.ObjectId, required: true, ref: 'Business' },
-    stripeProductId: { type: String, required: true },
-    stripePriceId: { type: String, required: true },
+    stripeProductId: { type: String, required: false },
+    stripePriceId: { type: String, required: false },
     name: { type: String, required: true },
     price: { type: Number, required: true },
     category: { type: Schema.Types.ObjectId, required: true, ref: 'Category' },

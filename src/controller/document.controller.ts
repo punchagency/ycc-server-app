@@ -158,4 +158,26 @@ export class DocumentController {
             }
         });
     }
+
+    static async getDocumentCountsByCategory(req: AuthenticatedRequest, res: Response) {
+        const userId = req.user?._id;
+
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'Unauthorized', code: 'UNAUTHORIZED' });
+        }
+
+        const [error, counts] = await catchError(
+            DocumentService.getDocumentCountsByCategory(userId)
+        );
+
+        if (error) {
+            return res.status(500).json({ success: false, message: error.message, code: 'FETCH_ERROR' });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Document counts retrieved successfully',
+            data: counts
+        });
+    }
 }

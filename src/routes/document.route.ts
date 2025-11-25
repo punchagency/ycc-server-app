@@ -30,4 +30,6 @@ router.get(
     DocumentController.getDocumentDownloadUrl
 );
 
+router.get('/counts', authenticateToken, DocumentController.getDocumentCountsByCategory);
+
 export default router;

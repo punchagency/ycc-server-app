@@ -228,3 +228,54 @@
  *       500:
  *         description: Download error
  */
+
+/**
+ * @swagger
+ * /api/v2/document/counts:
+ *   get:
+ *     summary: Get document counts by category
+ *     tags: [Documents]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: businessId
+ *         schema:
+ *           type: string
+ *         description: Filter by business ID
+ *     responses:
+ *       200:
+ *         description: Document counts retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       category:
+ *                         type: string
+ *                       count:
+ *                         type: number
+ *             example:
+ *               success: true
+ *               message: Document counts retrieved successfully
+ *               data:
+ *                 - category: invoice
+ *                   count: 5
+ *                 - category: contract
+ *                   count: 3
+ *                 - category: receipt
+ *                   count: 2
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Fetch error
+ */

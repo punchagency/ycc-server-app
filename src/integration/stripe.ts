@@ -239,6 +239,56 @@ class StripeService {
             throw error;
         }
     }
+
+    public async createProduct({
+        name,
+        description,
+        images
+    }: {
+        name: string,
+        description?: string,
+        images?: string[]
+    }): Promise<Stripe.Product> {
+        try {
+            const product = await StripeService.stripe.products.create({
+                name,
+                description,
+                images
+            });
+            return product;
+        } catch (error) {
+            logError({ message: 'Stripe product creation failed', error, source: 'StripeService.createProduct' });
+            if (error instanceof Error) {
+                throw new Error(`Stripe product creation failed: ${error.message}`);
+            }
+            throw error;
+        }
+    }
+
+    public async createPrice({
+        productId,
+        unitAmount,
+        currency = 'usd'
+    }: {
+        productId: string,
+        unitAmount: number,
+        currency?: string
+    }): Promise<Stripe.Price> {
+        try {
+            const price = await StripeService.stripe.prices.create({
+                product: productId,
+                unit_amount: unitAmount,
+                currency
+            });
+            return price;
+        } catch (error) {
+            logError({ message: 'Stripe price creation failed', error, source: 'StripeService.createPrice' });
+            if (error instanceof Error) {
+                throw new Error(`Stripe price creation failed: ${error.message}`);
+            }
+            throw error;
+        }
+    }
 }
 
 export default StripeService;

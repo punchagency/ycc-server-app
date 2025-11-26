@@ -37,8 +37,10 @@ export interface IProductSearchQuery {
     minPrice?: number;
     maxPrice?: number;
     businessId?: string;
+    businessName?: string;
     page?: number;
     limit?: number;
+    random?: boolean;
 }
 
 export class ProductService {
@@ -189,7 +191,7 @@ export class ProductService {
     }
 
     static async searchProducts(query: IProductSearchQuery): Promise<{ products: IProduct[]; total: number }> {
-        const { name, category, minPrice, maxPrice, businessId, page = 1, limit = 20 } = query;
+        const { name, category, minPrice, maxPrice, businessId, page = 1, limit = 20, random = false } = query;
         const skip = (page - 1) * limit;
 
         const mongoQuery: any = {};
@@ -212,9 +214,24 @@ export class ProductService {
             if (maxPrice !== undefined) mongoQuery.price.$lte = maxPrice;
         }
 
+        let productQuery = ProductModel.find(mongoQuery)
+            .populate('category', 'name')
+            .populate('businessId', 'businessName email phone address businessType');
+
+        if (random) {
+            const [countError, totalCount] = await catchError(ProductModel.countDocuments(mongoQuery));
+            if (countError || !totalCount) {
+                return { products: [], total: 0 };
+            }
+            const randomSkip = Math.floor(Math.random() * Math.max(0, totalCount - limit));
+            productQuery = productQuery.skip(randomSkip).limit(limit);
+        } else {
+            productQuery = productQuery.skip(skip).limit(limit).sort({ createdAt: -1 });
+        }
+
         const [error, result] = await catchError(
             Promise.all([
-                ProductModel.find(mongoQuery).populate('category', 'name').skip(skip).limit(limit).sort({ createdAt: -1 }),
+                productQuery.exec(),
                 ProductModel.countDocuments(mongoQuery)
             ])
         );
@@ -228,7 +245,8 @@ export class ProductService {
             return { products: [], total: 0 };
         }
 
-        const [products, total] = result;
+        let [products, total] = result;
+
         return { products: products || [], total: total || 0 };
     }
 

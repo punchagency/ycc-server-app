@@ -218,6 +218,12 @@
  *           type: integer
  *           default: 20
  *         description: Items per page
+ *       - in: query
+ *         name: random
+ *         schema:
+ *           type: boolean
+ *           default: false
+ *         description: Randomize the products fetched
  *     responses:
  *       200:
  *         description: Products retrieved successfully

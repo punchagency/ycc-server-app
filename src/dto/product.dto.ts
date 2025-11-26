@@ -50,6 +50,7 @@ export interface ProductSearchDTO {
     maxPrice?: number;
     page?: number;
     limit?: number;
+    random?: boolean;
 }
 
 export interface UpdateStockDTO {

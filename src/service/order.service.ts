@@ -286,7 +286,7 @@ export class OrderService {
             .populate('items.businessId', 'businessName email phone address');
 
         if (!order) throw new Error('Order not found');
-
+        console.log(order)
         if (userRole === 'user') {
             if (order.userId._id.toString() !== userId) {
                 throw new Error('Unauthorized to view this order');
@@ -296,7 +296,7 @@ export class OrderService {
             if (!business) throw new Error('Business not found');
 
             const hasBusinessItems = order.items.some((item: any) => 
-                item.businessId.toString() === business._id.toString()
+                item.businessId._id.toString() === business._id.toString()
             );
 
             if (!hasBusinessItems) {

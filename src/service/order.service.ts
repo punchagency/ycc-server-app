@@ -296,7 +296,7 @@ export class OrderService {
             if (!business) throw new Error('Business not found');
 
             const hasBusinessItems = order.items.some((item: any) => 
-                item.businessId.toString() === business._id.toString()
+                item.businessId._id.toString() === business._id.toString()
             );
 
             if (!hasBusinessItems) {

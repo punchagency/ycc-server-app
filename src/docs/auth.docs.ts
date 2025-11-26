@@ -310,6 +310,218 @@
 
 /**
  * @swagger
+ * /api/v2/auth/distributor-profile:
+ *   put:
+ *     tags: [Authentication]
+ *     summary: Update distributor/manufacturer business profile
+ *     description: Update business information for distributor and manufacturer accounts. This endpoint updates both the User and Business models to ensure data consistency. Only accessible to users with distributor or manufacturer roles.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               businessName:
+ *                 type: string
+ *                 description: Name of the business
+ *                 example: ABC Distribution Co.
+ *               businessEmail:
+ *                 type: string
+ *                 format: email
+ *                 description: Business contact email address
+ *                 example: contact@abcdistribution.com
+ *               businessPhone:
+ *                 type: string
+ *                 description: Business contact phone number
+ *                 example: +1234567890
+ *               website:
+ *                 type: string
+ *                 format: uri
+ *                 description: Business website URL
+ *                 example: https://www.abcdistribution.com
+ *               address:
+ *                 type: object
+ *                 description: Business address details
+ *                 properties:
+ *                   street:
+ *                     type: string
+ *                     description: Street address
+ *                     example: 123 Business Blvd
+ *                   zipcode:
+ *                     type: string
+ *                     description: ZIP or postal code
+ *                     example: 12345
+ *                   city:
+ *                     type: string
+ *                     description: City name
+ *                     example: New York
+ *                   state:
+ *                     type: string
+ *                     description: State or province
+ *                     example: NY
+ *                   country:
+ *                     type: string
+ *                     description: Country name
+ *                     example: United States
+ *     responses:
+ *       200:
+ *         description: Business profile updated successfully in both User and Business models
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Business profile updated successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                         firstName:
+ *                           type: string
+ *                         lastName:
+ *                           type: string
+ *                         email:
+ *                           type: string
+ *                         phone:
+ *                           type: string
+ *                         role:
+ *                           type: string
+ *                           enum: [distributor, manufacturer]
+ *                         businessName:
+ *                           type: string
+ *                         businessEmail:
+ *                           type: string
+ *                         businessPhone:
+ *                           type: string
+ *                         website:
+ *                           type: string
+ *                         address:
+ *                           type: object
+ *                         isVerified:
+ *                           type: boolean
+ *                         isActive:
+ *                           type: boolean
+ *                         createdAt:
+ *                           type: string
+ *                           format: date-time
+ *                         updatedAt:
+ *                           type: string
+ *                           format: date-time
+ *                     business:
+ *                       type: object
+ *                       nullable: true
+ *                       description: Business model information (synchronized with user data)
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                         businessName:
+ *                           type: string
+ *                         email:
+ *                           type: string
+ *                         phone:
+ *                           type: string
+ *                         website:
+ *                           type: string
+ *                         address:
+ *                           type: object
+ *                         businessType:
+ *                           type: string
+ *                           enum: [distributor, manufacturer]
+ *                         isOnboarded:
+ *                           type: boolean
+ *       400:
+ *         description: Validation error - Invalid email or phone format
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Valid business email is required
+ *                 code:
+ *                   type: string
+ *                   example: VALIDATION_ERROR
+ *       401:
+ *         description: Authentication required - No valid token provided
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Authentication required
+ *                 code:
+ *                   type: string
+ *                   example: UNAUTHORIZED
+ *       403:
+ *         description: Forbidden - User role is not distributor or manufacturer
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: This endpoint is only for distributor and manufacturer accounts
+ *                 code:
+ *                   type: string
+ *                   example: FORBIDDEN
+ *       404:
+ *         description: User not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: User not found
+ *                 code:
+ *                   type: string
+ *                   example: USER_NOT_FOUND
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Business profile update failed
+ */
+
+/**
+ * @swagger
  * /api/v2/auth/activate-account:
  *   post:
  *     tags: [Authentication]

@@ -29,7 +29,7 @@ export class CartService {
                 })
                 .populate({
                     path: 'items.businessId',
-                    select: 'bunsinessName email phone userId',
+                    select: 'businessName email phone userId',
                     populate: { path: 'userId', select: 'name email phone' }
                 })
         );

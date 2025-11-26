@@ -8,6 +8,7 @@ const productUpload = fileUploadService.createUploadMiddleware(UPLOAD_CONFIGS.PR
 
 // Product CRUD operations
 router.post('/', authenticateToken, productUpload, ProductController.createProduct);
+router.post('/bulk', ProductController.createMultipleProducts);
 router.get('/search', ProductController.searchProducts);
 router.get('/business', authenticateToken, ProductController.getBusinessProducts);
 router.get('/low-stock', authenticateToken, ProductController.getLowStockProducts);

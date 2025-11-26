@@ -50,8 +50,31 @@ export interface ProductSearchDTO {
     maxPrice?: number;
     page?: number;
     limit?: number;
+    random?: boolean;
 }
 
 export interface UpdateStockDTO {
     quantity: number;
+}
+
+export interface BulkProductInput {
+    name: string;
+    price: number;
+    categoryName: string;
+    sku?: string;
+    quantity: number;
+    minRestockLevel: number;
+    description?: string;
+    wareHouseAddress: {
+        street?: string;
+        zipcode?: string;
+        city?: string;
+        state: string;
+        country: string;
+    };
+    hsCode: string;
+    weight: number;
+    length: number;
+    width: number;
+    height: number;
 }

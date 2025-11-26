@@ -3,6 +3,7 @@ import { fileUploadService } from '../integration/fileUpload';
 import catchError from '../utils/catchError';
 import { logInfo, logError } from '../utils/SystemLogs';
 import { saveAuditLog } from '../utils/SaveAuditlogs';
+import { Types } from 'mongoose';
 
 export class DocumentService {
     static async uploadDocument(
@@ -162,5 +163,39 @@ export class DocumentService {
         if (!url) throw new Error('Failed to generate download URL');
 
         return { url, document };
+    }
+
+    static async getDocumentCountsByCategory(
+        userId: string,
+        isAdmin: boolean = false,
+        businessId?: string
+    ) {
+        const matchQuery: any = {};
+        
+        if (!isAdmin) {
+            matchQuery.userId = new Types.ObjectId(userId);
+        }
+        
+        if (businessId) {
+            matchQuery.businessId = new Types.ObjectId(businessId);
+        }
+
+        const [error, counts] = await catchError(
+            DocumentModel.aggregate([
+                { $match: matchQuery },
+                { $group: { _id: '$category', count: { $sum: 1 } } },
+                { $project: { category: '$_id', count: 1, _id: 0 } },
+                { $sort: { count: -1 } }
+            ])
+        );
+
+        if (error) throw error;
+
+        const countMap = new Map(counts.map((c: any) => [c.category, c.count]));
+        
+        return DOCUMENT_CATEGORIES.map(category => ({
+            category,
+            count: countMap.get(category) || 0
+        }));
     }
 }

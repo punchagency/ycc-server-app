@@ -11,6 +11,12 @@ export const DOCUMENT_CATEGORIES = [
     'legal',
     'financial',
     'identity',
+    'Identification',
+    'Employment',
+    'Certificates $ Licenses',
+    'Medical',
+    'Yacht',
+    'Insurance',
     'other'
 ] as const;
 

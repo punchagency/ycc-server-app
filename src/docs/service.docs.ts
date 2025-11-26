@@ -237,3 +237,152 @@
  *       403:
  *         description: User must be a distributor
  */
+
+/**
+ * @swagger
+ * /api/v2/service/crew-services:
+ *   get:
+ *     tags: [Service]
+ *     summary: Fetch services for crew members
+ *     description: Retrieve a paginated list of services available to crew members. Services are filtered to only show those from approved categories. Supports search, filtering by category, price range, and multiple sorting options.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search term to filter services by name or description (case-insensitive)
+ *         example: yacht cleaning
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *         description: Filter services by category name (case-insensitive)
+ *         example: Maintenance
+ *       - in: query
+ *         name: minPrice
+ *         schema:
+ *           type: number
+ *           format: float
+ *         description: Minimum price filter
+ *         example: 50
+ *       - in: query
+ *         name: maxPrice
+ *         schema:
+ *           type: number
+ *           format: float
+ *         description: Maximum price filter
+ *         example: 500
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number for pagination
+ *         example: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 12
+ *         description: Number of items per page
+ *         example: 12
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [random, name, price_asc, price_desc]
+ *           default: random
+ *         description: Sort order for results
+ *         example: price_asc
+ *     responses:
+ *       200:
+ *         description: Services fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Services fetched successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     services:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           _id:
+ *                             type: string
+ *                           name:
+ *                             type: string
+ *                             example: Professional Yacht Cleaning
+ *                           description:
+ *                             type: string
+ *                           price:
+ *                             type: number
+ *                             example: 250
+ *                           imageURLs:
+ *                             type: array
+ *                             items:
+ *                               type: string
+ *                           isQuotable:
+ *                             type: boolean
+ *                           category:
+ *                             type: object
+ *                             properties:
+ *                               _id:
+ *                                 type: string
+ *                               name:
+ *                                 type: string
+ *                               description:
+ *                                 type: string
+ *                               imageURL:
+ *                                 type: string
+ *                           business:
+ *                             type: object
+ *                             properties:
+ *                               _id:
+ *                                 type: string
+ *                               businessName:
+ *                                 type: string
+ *                               businessPhone:
+ *                                 type: string
+ *                               businessEmail:
+ *                                 type: string
+ *                               address:
+ *                                 type: object
+ *                               website:
+ *                                 type: string
+ *                           createdAt:
+ *                             type: string
+ *                             format: date-time
+ *                           updatedAt:
+ *                             type: string
+ *                             format: date-time
+ *                     pagination:
+ *                       type: object
+ *                       properties:
+ *                         currentPage:
+ *                           type: integer
+ *                         totalPages:
+ *                           type: integer
+ *                         totalServices:
+ *                           type: integer
+ *                         hasNextPage:
+ *                           type: boolean
+ *                         hasPrevPage:
+ *                           type: boolean
+ *                         limit:
+ *                           type: integer
+ *       403:
+ *         description: Only crew members can access this endpoint
+ *       500:
+ *         description: Server error
+ */

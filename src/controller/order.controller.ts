@@ -367,7 +367,7 @@ class OrderController {
 
             res.status(200).json({ success: true, message: 'Order fetched successfully', data: result });
         } catch (error) {
-            logError({ message: "Fetching order by id failed!", source: "OrderController.getOrderById", error });
+            logError({ message: "Fetching order by id failed", source: "OrderController.getOrderById", error });
             res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
         }
     }

@@ -16,7 +16,7 @@ export class CartController {
             res.status(200).json({
                 success: true,
                 message: cart ? 'Cart retrieved successfully' : 'Cart is empty',
-                data: { cart }
+                data: cart ? cart : null
             });
         } catch (error) {
             res.status(500).json({ success: false, message: 'Failed to retrieve cart' });

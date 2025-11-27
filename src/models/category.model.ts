@@ -22,4 +22,7 @@ const categorySchema = new Schema<ICategory>({
     timestamps: true
 });
 
+categorySchema.index({ name: 'text', description: 'text' });
+categorySchema.index({ type: 1, isApproved: 1 });
+
 export default model<ICategory>('Category', categorySchema);

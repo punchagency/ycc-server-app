@@ -159,4 +159,8 @@ const userSchema = new Schema<IUser>({
   timestamps: true
 });
 
+userSchema.index({ firstName: 'text', lastName: 'text', email: 'text' });
+userSchema.index({ email: 1 });
+userSchema.index({ phone: 1 });
+
 export default model<IUser>('User', userSchema);

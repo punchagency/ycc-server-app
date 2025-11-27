@@ -40,4 +40,7 @@ const notificationSchema = new Schema<INotification>({
     timestamps: true
 });
 
+notificationSchema.index({ reciepientId: 1, read: 1 });
+notificationSchema.index({ reciepientId: 1 });
+
 export default model<INotification>('Notification', notificationSchema);

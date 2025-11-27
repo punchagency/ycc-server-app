@@ -73,9 +73,9 @@ import productRoutes from './routes/product.route';
 import quoteRoutes from './routes/quote.route';
 import serviceRoutes from './routes/service.route';
 import stripeAccountRoutes from './routes/stripe_account.route';
-import adminAnalyticsRoutes from './routes/admin-analytics.route';
 import distributorAnalyticsRoutes from './routes/distributor-analytics.route';
 import searchRoutes from './routes/search.route';
+import adminDashboardRoutes from './routes/admin-dashboard.route';
 
 // Routes
 app.use('/api/v2/auth', authRoutes);
@@ -91,7 +91,7 @@ app.use('/api/v2/product', productRoutes);
 app.use('/api/v2/quote', quoteRoutes);
 app.use('/api/v2/service', serviceRoutes);
 app.use('/api/v2/stripe-account', stripeAccountRoutes);
-app.use('/api/v2/admin-analytics', adminAnalyticsRoutes);
+app.use('/api/v2/admin/dashboard', adminDashboardRoutes);
 app.use('/api/v2/distributor-analytics', distributorAnalyticsRoutes);
 app.use('/api/v2/search', searchRoutes);
 

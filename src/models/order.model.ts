@@ -131,4 +131,7 @@ const OrderSchema = new Schema({
     timestamps: true
 });
 
+OrderSchema.index({ userId: 1, status: 1 });
+OrderSchema.index({ trackingNumber: 1 });
+
 export default model<IOrder>('Order', OrderSchema);

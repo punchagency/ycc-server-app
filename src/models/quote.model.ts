@@ -73,4 +73,5 @@ const quoteSchema = new Schema<IQuote>({
     timestamps: true
 });
 
+quoteSchema.index({ bookingId: 1 });
 export default model<IQuote>('Quote', quoteSchema);

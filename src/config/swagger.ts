@@ -71,6 +71,10 @@ const options: swaggerJSDoc.Options = {
       {
         name: 'Distributor Analytics',
         description: 'Distributor analytics and business metrics endpoints'
+      },
+      {
+        name: 'Search',
+        description: 'Global search across multiple entities'
       }
     ]
   },

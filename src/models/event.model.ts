@@ -33,4 +33,7 @@ const eventSchema = new Schema<IEvent>({
     timestamps: true
 });
 
+eventSchema.index({ userId: 1, type: 1 });
+eventSchema.index({ userId: 1, start: 1, end: 1 });
+
 export default model<IEvent>('Event', eventSchema);

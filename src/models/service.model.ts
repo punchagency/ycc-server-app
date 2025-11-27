@@ -23,4 +23,7 @@ const serviceSchema = new Schema<IService>({
     timestamps: true
 });
 
+serviceSchema.index({ name: 'text', description: 'text' });
+serviceSchema.index({ businessId: 1 });
+
 export default model<IService>('Service', serviceSchema);

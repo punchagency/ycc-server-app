@@ -1,6 +1,6 @@
 /**
  * @swagger
- * /api/admin/dashboard/user-stats:
+ * /api/v2/admin/dashboard/user-stats:
  *   get:
  *     summary: Get user statistics
  *     description: Returns counts of crew users, distributors, manufacturers, and total users
@@ -47,7 +47,7 @@
 
 /**
  * @swagger
- * /api/admin/dashboard/platform-trends:
+ * /api/v2/admin/dashboard/platform-trends:
  *   get:
  *     summary: Get platform trends
  *     description: Returns chart data for orders, bookings, invoices, and user growth over time
@@ -180,7 +180,7 @@
 
 /**
  * @swagger
- * /api/admin/dashboard/leaderboards:
+ * /api/v2/admin/dashboard/leaderboards:
  *   get:
  *     summary: Get leaderboards
  *     description: Returns top 3 users by orders/bookings and top 3 suppliers/service providers

@@ -3,7 +3,7 @@ import {
   getUserStats as getUserStatsController,
   getPlatformTrends as getPlatformTrendsController,
   getLeaderboards as getLeaderboardsController,
-} from '../controller/adminDashboard.controller';
+} from '../controller/admin-dashboard.controller';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth.middleware';
 
 const router = Router();

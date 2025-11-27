@@ -2,7 +2,7 @@ import {
   getUserStats as getUserStatsService,
   getPlatformTrends as getPlatformTrendsService,
   getLeaderboards as getLeaderboardsService,
-} from '../service/adminDashboard.service';
+} from '../service/admin-dashboard.service';
 
 /**
  * GET /api/admin/dashboard/user-stats

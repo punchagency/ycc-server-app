@@ -35,4 +35,10 @@ const invoiceSchema = new Schema<IInvoice>({
     timestamps: true
 });
 
+invoiceSchema.index({ userId: 1, status: 1 });
+invoiceSchema.index({ userId: 1 });
+invoiceSchema.index({ orderId: 1 });
+invoiceSchema.index({ bookingId: 1 });
+invoiceSchema.index({ stripeInvoiceId: 1 });
+
 export default model<IInvoice>('Invoice', invoiceSchema);

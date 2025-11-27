@@ -113,4 +113,7 @@ const businessSchema = new Schema<IBusiness>({
     timestamps: true
 });
 
+businessSchema.index({ businessName: 'text', email: 'text' });
+businessSchema.index({ userId: 1 });
+
 export default model<IBusiness>('Business', businessSchema);

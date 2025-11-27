@@ -57,4 +57,8 @@ const productSchema = new Schema<IProduct>({
     timestamps: true
 });
 
+productSchema.index({ name: 'text', description: 'text', sku: 'text' });
+productSchema.index({ userId: 1, name: 1 });
+productSchema.index({ businessId: 1 });
+
 export default model<IProduct>('Product', productSchema);

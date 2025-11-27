@@ -20,7 +20,6 @@ export interface CreateOrderInput {
 }
 
 export class OrderService {
-
     private static async notifyOps(order: any, business: any, eventType: string) {
         const subject = `[OPS ALERT] Order ${order._id} - ${eventType.replaceAll('_', ' ').toUpperCase()}`;
         const html = `
@@ -59,7 +58,6 @@ export class OrderService {
             html
         });
     }
-
     private static async handleProductOrderEvent(orderId: string, eventType: 'client_cancel_after_confirmation' | 'client_cancel_after_shipment' | 'supplier_cancel') {
         const order = await OrderModel.findById(orderId);
         if (!order) throw new Error('Order not found');
@@ -282,23 +280,23 @@ export class OrderService {
         return { success: true, order };
     }
     static async getOrderById(id: string, userId: string, userRole: typeof ROLES[number]) {
-        const order = await OrderModel.findById(id)
+        const order: any = await OrderModel.findById(id)
             .populate('userId', 'firstName lastName email phone')
             .populate('items.productId', 'name price imageURLs')
             .populate('items.businessId', 'businessName email phone address');
 
         if (!order) throw new Error('Order not found');
-
+        console.log(order)
         if (userRole === 'user') {
-            if (order.userId.toString() !== userId) {
+            if (order.userId._id.toString() !== userId) {
                 throw new Error('Unauthorized to view this order');
             }
         } else if (userRole === 'distributor' || userRole === 'manufacturer') {
             const business = await BusinessModel.findOne({ userId });
             if (!business) throw new Error('Business not found');
 
-            const hasBusinessItems = order.items.some(item => 
-                item.businessId.toString() === business._id.toString()
+            const hasBusinessItems = order.items.some((item: any) => 
+                item.businessId._id.toString() === business._id.toString()
             );
 
             if (!hasBusinessItems) {
@@ -308,7 +306,6 @@ export class OrderService {
 
         return order;
     }
-
     static async getOrders({userId, role, page = 1, limit = 10, status, paymentStatus, startDate, endDate, sortBy = 'createdAt', orderBy = 'desc'}:{
         userId: string;
         role: typeof ROLES[number];
@@ -410,7 +407,6 @@ export class OrderService {
 
         return { success: true, orderId: order._id };
     }
-
     static async declineOrder(token: string, reason?: string) {
         const order = await OrderModel.findOne({ 'items.confirmationToken': token });
         if (!order) throw new Error('Order not found or invalid token');
@@ -457,7 +453,6 @@ export class OrderService {
 
         return { success: true, orderId: order._id };
     }
-
     static async updateOrderStatus(userId: string, orderId: string, status: 'confirmed' | 'processing' | 'shipped' | 'out_for_delivery'| 'cancelled', userRole: typeof ROLES[number], reason?: string, notes?: string, trackingNumber?: string) {
         const order = await OrderModel.findById(orderId);
         if (!order) throw new Error('Order not found');

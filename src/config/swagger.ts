@@ -75,6 +75,10 @@ const options: swaggerJSDoc.Options = {
       {
         name: 'Search',
         description: 'Global search across multiple entities'
+      },
+      {
+        name: 'Users',
+        description: 'User management endpoints'
       }
     ]
   },

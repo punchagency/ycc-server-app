@@ -7,6 +7,7 @@ import ServiceModel from "../models/service.model";
 import OrderModel from "../models/order.model";
 import BookingModel from "../models/booking.model";
 import InvoiceModel from "../models/invoice.model";
+import { Types } from "mongoose";
 
 export class DistributorAnalyticsService {
     static async getTotalProducts(businessId: string) {
@@ -17,7 +18,7 @@ export class DistributorAnalyticsService {
     }
     static async getLowStockItemsNumber(businessId: string) {
         return await ProductModel.countDocuments({
-            businessId: businessId,
+            businessId: new Types.ObjectId(businessId),
             $expr: { $lt: ["$quantity", "$minRestockLevel"] }
         });
     }
@@ -28,16 +29,16 @@ export class DistributorAnalyticsService {
     }
     static async getActiveOrdersNumber(businessId: string) {
         return await OrderModel.countDocuments({
-            "items.businessId": businessId,
+            "items.businessId": new Types.ObjectId(businessId),
             status: { $in: ['pending', 'confirmed', 'processing', 'out_for_delivery', 'shipped'] }
         });
     }
     static async getTotalBookings(businessId: string) {
         return await BookingModel.countDocuments({ businessId: businessId });
     }
-    static async getPopularServicesNumber(businessId: string) {        
+    static async getPopularServicesNumber(businessId: string) {
         const popularServices = await BookingModel.aggregate([
-            { $match: { businessId: businessId } },
+            { $match: { businessId: new Types.ObjectId(businessId) } },
             { $group: { _id: "$serviceId", bookingCount: { $sum: 1 } } },
             { $sort: { bookingCount: -1 } },
             { $limit: 10 },
@@ -59,7 +60,7 @@ export class DistributorAnalyticsService {
         
         const popularProducts = await OrderModel.aggregate([
             { $unwind: "$items" },
-            { $match: { "items.businessId": businessId } },
+            { $match: { "items.businessId": new Types.ObjectId(businessId) } },
             { $group: { _id: "$items.productId", orderCount: { $sum: 1 } } },
             { $sort: { orderCount: -1 } },
             { $limit: 10 },

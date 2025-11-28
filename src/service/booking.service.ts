@@ -372,6 +372,7 @@ export class BookingService {
     static async getBookings({userId, role, page = 1, limit = 10, status, paymentStatus, startDate, endDate, sortBy = 'createdAt', sortOrder = 'desc' }: {userId: string; role: string; page?: number; limit?: number; status?: string; paymentStatus?: string; startDate?: Date; endDate?: Date; sortBy?: string; sortOrder?: string}) {
         const query: any = {};
 
+        // For admin, fetch all bookings (no user/business filter)
         if (role === 'user') {
             query.userId = userId;
         } else if (role === 'distributor' || role === 'manufacturer') {
@@ -381,6 +382,7 @@ export class BookingService {
             }
             query.businessId = business._id;
         }
+        // Admin role has no query restriction, returns all bookings
 
         if (status) query.status = status;
         if (paymentStatus) query.paymentStatus = paymentStatus;
@@ -395,13 +397,21 @@ export class BookingService {
 
         const [bookings, total] = await Promise.all([
             BookingModel.find(query)
-                .populate('userId', 'firstName lastName email phone')
-                .populate('businessId', 'businessName email phone')
-                .populate('serviceId', 'name price description')
+                .populate('userId', 'firstName lastName email phone role')
+                .populate({
+                    path: 'businessId',
+                    select: 'businessName email phone address userId',
+                    populate: {
+                        path: 'userId',
+                        select: 'firstName lastName email phone'
+                    }
+                })
+                .populate('serviceId', 'name price description category')
                 .populate('quoteId')
                 .sort(sort)
                 .skip(skip)
-                .limit(limit),
+                .limit(limit)
+                .lean(),
             BookingModel.countDocuments(query)
         ]);
 
@@ -417,10 +427,18 @@ export class BookingService {
     }
     static async getBookingById(bookingId: string) {
         const booking = await BookingModel.findById(bookingId)
-            .populate('userId', 'firstName lastName email phone')
-            .populate('businessId', 'businessName email phone')
-            .populate('serviceId', 'name price description')
-            .populate('quoteId');
+            .populate('userId', 'firstName lastName email phone role')
+            .populate({
+                path: 'businessId',
+                select: 'businessName email phone address userId',
+                populate: {
+                    path: 'userId',
+                    select: 'firstName lastName email phone'
+                }
+            })
+            .populate('serviceId', 'name price description category')
+            .populate('quoteId')
+            .lean();
 
         if (!booking) {
             throw new Error('Booking not found');

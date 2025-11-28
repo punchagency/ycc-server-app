@@ -1,6 +1,3 @@
-
-
-
 import BusinessModel from "../models/business.model";
 import ProductModel from "../models/product.model";
 import ServiceModel from "../models/service.model";

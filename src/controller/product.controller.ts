@@ -14,14 +14,60 @@ export class ProductController {
     static async createProduct(req: AuthenticatedRequest, res: Response): Promise<void> {
         const productData: CreateProductDTO = req.body;
         const files = req.files as { [fieldname: string]: IUploadedFile[] } | undefined;
-        const userId = req.user!._id;
-        const businessId = req.user!.businessId;
+        const userRole = req.user!.role;
+        let userId = req.user!._id;
+        let businessId = req.user!.businessId;
 
-        if (!businessId) {
-            res.status(400).json({
+        // Admin flow: validate and fetch business details
+        if (userRole === 'admin') {
+            const adminProvidedBusinessId = req.body.businessId;
+            
+            if (!adminProvidedBusinessId || !Validate.mongoId(adminProvidedBusinessId)) {
+                res.status(400).json({
+                    success: false,
+                    message: 'As an admin, you should provide a business owner.',
+                    code: 'VALIDATION_ERROR'
+                });
+                return;
+            }
+
+            const business = await BusinessModel.findById(adminProvidedBusinessId).populate('userId');
+            if (!business) {
+                res.status(404).json({
+                    success: false,
+                    message: 'Business not found',
+                    code: 'BUSINESS_NOT_FOUND'
+                });
+                return;
+            }
+
+            const businessOwner = business.userId as any;
+            if (!businessOwner || businessOwner.role !== 'distributor') {
+                res.status(400).json({
+                    success: false,
+                    message: 'Business must belong to a distributor',
+                    code: 'VALIDATION_ERROR'
+                });
+                return;
+            }
+
+            userId = businessOwner._id;
+            businessId = business._id.toString();
+        } else if (userRole === 'distributor') {
+            // Distributor flow: use their own businessId
+            if (!businessId) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Business ID is required',
+                    code: 'BUSINESS_REQUIRED'
+                });
+                return;
+            }
+        } else {
+            res.status(403).json({
                 success: false,
-                message: 'Business ID is required',
-                code: 'BUSINESS_REQUIRED'
+                message: 'Only distributors and admins can create products',
+                code: 'FORBIDDEN'
             });
             return;
         }
@@ -243,6 +289,7 @@ export class ProductController {
         const { id } = req.params;
         const updateData: UpdateProductDTO = req.body;
         const files = req.files as { [fieldname: string]: IUploadedFile[] } | undefined;
+        const userRole = req.user!.role;
         const businessId = req.user!.businessId;
 
         if (!Validate.mongoId(id)) {
@@ -254,7 +301,7 @@ export class ProductController {
             return;
         }
 
-        // Check if product exists and belongs to user's business
+        // Check if product exists
         const existingProduct = await ProductService.getProductById(id);
         if (!existingProduct) {
             res.status(404).json({
@@ -265,11 +312,43 @@ export class ProductController {
             return;
         }
 
-        if (existingProduct.businessId.toString() !== businessId) {
+        // Authorization check
+        if (userRole === 'admin') {
+            // Admin can update any distributor's product
+            const business = await BusinessModel.findById(existingProduct.businessId).populate('userId');
+            if (!business) {
+                res.status(404).json({
+                    success: false,
+                    message: 'Business not found',
+                    code: 'BUSINESS_NOT_FOUND'
+                });
+                return;
+            }
+
+            const businessOwner = business.userId as any;
+            if (!businessOwner || businessOwner.role !== 'distributor') {
+                res.status(403).json({
+                    success: false,
+                    message: 'Can only update products for distributors',
+                    code: 'ACCESS_DENIED'
+                });
+                return;
+            }
+        } else if (userRole === 'distributor') {
+            // Distributor can only update their own products
+            if (existingProduct.businessId.toString() !== businessId) {
+                res.status(403).json({
+                    success: false,
+                    message: 'Access denied',
+                    code: 'ACCESS_DENIED'
+                });
+                return;
+            }
+        } else {
             res.status(403).json({
                 success: false,
-                message: 'Access denied',
-                code: 'ACCESS_DENIED'
+                message: 'Only distributors and admins can update products',
+                code: 'FORBIDDEN'
             });
             return;
         }

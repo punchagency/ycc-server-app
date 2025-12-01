@@ -65,10 +65,6 @@ const options: swaggerJSDoc.Options = {
         description: 'Document management endpoints'
       },
       {
-        name: 'Admin Analytics',
-        description: 'Admin analytics and reporting endpoints'
-      },
-      {
         name: 'Distributor Analytics',
         description: 'Distributor analytics and business metrics endpoints'
       },
@@ -79,6 +75,14 @@ const options: swaggerJSDoc.Options = {
       {
         name: 'Users',
         description: 'User management endpoints'
+      },
+      {
+        name: 'Crew Reports',
+        description: 'Crew statistics and report generation endpoints'
+      },
+      {
+        name: 'Admin Reports',
+        description: 'Admin statistics and analytics endpoints'
       }
     ]
   },

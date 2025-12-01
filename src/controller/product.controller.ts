@@ -151,7 +151,6 @@ export class ProductController {
             data: product
         });
     }
-
     static async getProductById(req: AuthenticatedRequest, res: Response): Promise<void> {
         const { id } = req.params;
 
@@ -180,7 +179,6 @@ export class ProductController {
             data: product
         });
     }
-
     static async getBusinessProducts(req: AuthenticatedRequest, res: Response): Promise<void> {
         const businessId = req.user!.businessId;
         const page = parseInt(req.query.page as string) || 1;
@@ -230,7 +228,6 @@ export class ProductController {
             }
         });
     }
-
     static async searchProducts(req: AuthenticatedRequest, res: Response): Promise<void> {
         const query: ProductSearchDTO = req.query;
         const businessId = req.user?.businessId;
@@ -284,7 +281,6 @@ export class ProductController {
             }
         });
     }
-
     static async updateProduct(req: AuthenticatedRequest, res: Response): Promise<void> {
         const { id } = req.params;
         const updateData: UpdateProductDTO = req.body;
@@ -423,7 +419,6 @@ export class ProductController {
             data: updatedProduct
         });
     }
-
     static async deleteProduct(req: AuthenticatedRequest, res: Response): Promise<void> {
         const { id } = req.params;
         const businessId = req.user!.businessId;
@@ -472,7 +467,6 @@ export class ProductController {
             message: 'Product deleted successfully'
         });
     }
-
     static async updateStock(req: AuthenticatedRequest, res: Response): Promise<void> {
         const { id } = req.params;
         const { quantity }: UpdateStockDTO = req.body;
@@ -532,7 +526,6 @@ export class ProductController {
             data: updatedProduct
         });
     }
-
     static async getLowStockProducts(req: AuthenticatedRequest, res: Response): Promise<void> {
         const businessId = req.user!.businessId;
 
@@ -553,7 +546,6 @@ export class ProductController {
             data: products
         });
     }
-
     static async createMultipleProducts(req: Request, res: Response): Promise<void> {
         const { products, userId }: { products: BulkProductInput, userId: string } = req.body;
 

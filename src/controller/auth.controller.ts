@@ -60,7 +60,6 @@ export class AuthController {
             }
 
             if(role !== 'admin'){
-                console.log({address});
                 address = TryParseJSON(address, {street: '', zipcode: '', city: '', state: '', country: ''})
                 // Address validation
                 if (!address || typeof address !== 'object') {

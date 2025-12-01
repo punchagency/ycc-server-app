@@ -15,6 +15,8 @@ interface IInvoice extends Document {
     dueDate: Date;
     paymentDate?: Date;
     stripeInvoiceUrl?: string;
+    createdAt: Date;
+    updatedAt: Date;
 }
 
 const invoiceSchema = new Schema<IInvoice>({

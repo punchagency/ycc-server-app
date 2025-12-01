@@ -76,6 +76,9 @@ import stripeAccountRoutes from './routes/stripe_account.route';
 import distributorAnalyticsRoutes from './routes/distributor-analytics.route';
 import searchRoutes from './routes/search.route';
 import adminDashboardRoutes from './routes/admin-dashboard.route';
+import userRoutes from './routes/user.route';
+import crewReportRoutes from './routes/crew-report.route';
+import adminReportRoutes from './routes/admin-report.route';
 
 // Routes
 app.use('/api/v2/auth', authRoutes);
@@ -94,6 +97,9 @@ app.use('/api/v2/stripe-account', stripeAccountRoutes);
 app.use('/api/v2/admin/dashboard', adminDashboardRoutes);
 app.use('/api/v2/distributor-analytics', distributorAnalyticsRoutes);
 app.use('/api/v2/search', searchRoutes);
+app.use('/api/v2/user', userRoutes);
+app.use('/api/v2/crew-report', crewReportRoutes);
+app.use('/api/v2/admin-report', adminReportRoutes);
 
 app.get('/', (_, res: Response) => {
     res.json({

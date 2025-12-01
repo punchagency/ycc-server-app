@@ -91,7 +91,8 @@
  * /api/v2/product:
  *   post:
  *     tags: [Product]
- *     summary: Create a new product
+ *     summary: Create a new product (Distributor or Admin)
+ *     description: Distributors can create products for their own business. Admins can create products for any distributor business by providing businessId.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -102,6 +103,9 @@
  *             type: object
  *             required: [name, price, category, quantity, minRestockLevel, hsCode, weight, length, width, height, wareHouseAddress]
  *             properties:
+ *               businessId:
+ *                 type: string
+ *                 description: Business ID (Required for admin users only, valid MongoDB ObjectId). Must belong to a distributor.
  *               name:
  *                 type: string
  *                 minLength: 2
@@ -170,6 +174,10 @@
  *         description: Validation error or Business ID required
  *       401:
  *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Only distributors and admins can create products
+ *       404:
+ *         description: Business not found (admin only)
  *       500:
  *         description: Failed to create product
  */
@@ -322,7 +330,8 @@
  * /api/v2/product/{id}:
  *   put:
  *     tags: [Product]
- *     summary: Update product
+ *     summary: Update product (Distributor or Admin)
+ *     description: Distributors can update their own products. Admins can update any distributor's product.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -331,7 +340,7 @@
  *         required: true
  *         schema:
  *           type: string
- *         description: Product ID
+ *         description: Product ID (valid MongoDB ObjectId)
  *     requestBody:
  *       required: true
  *       content:
@@ -341,28 +350,45 @@
  *             properties:
  *               name:
  *                 type: string
+ *                 minLength: 2
+ *                 maxLength: 200
+ *                 description: Product name (2-200 characters)
  *               price:
  *                 type: number
+ *                 minimum: 0.01
+ *                 description: Product price (must be greater than 0)
  *               category:
  *                 type: string
+ *                 description: Category ID (valid MongoDB ObjectId)
  *               sku:
  *                 type: string
+ *                 description: Stock Keeping Unit
  *               quantity:
  *                 type: number
+ *                 minimum: 0
+ *                 description: Stock quantity
  *               minRestockLevel:
  *                 type: number
+ *                 minimum: 0
+ *                 description: Minimum stock level
  *               description:
  *                 type: string
+ *                 description: Product description
  *               hsCode:
  *                 type: string
+ *                 description: Harmonized System code
  *               weight:
  *                 type: number
+ *                 description: Product weight
  *               length:
  *                 type: number
+ *                 description: Product length
  *               width:
  *                 type: number
+ *                 description: Product width
  *               height:
  *                 type: number
+ *                 description: Product height
  *               wareHouseAddress:
  *                 type: object
  *                 properties:
@@ -381,6 +407,7 @@
  *                 items:
  *                   type: string
  *                   format: binary
+ *                 description: Product images
  *     responses:
  *       200:
  *         description: Product updated successfully
@@ -389,9 +416,9 @@
  *       401:
  *         description: Unauthorized
  *       403:
- *         description: Access denied - product belongs to different business
+ *         description: Access denied - Only distributors and admins can update products, or product belongs to different business
  *       404:
- *         description: Product not found
+ *         description: Product not found or Business not found (admin only)
  *       500:
  *         description: Failed to update product
  */

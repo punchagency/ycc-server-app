@@ -192,7 +192,6 @@ export class CategoryController {
         if(isApproved !== undefined){
             updateData.isApproved = isApproved == 'true' ? true : false;
         }
-        console.log({updateData}, {req: req.body});
 
         const updatedCategory = await CategoryService.updateCategory(id, updateData);
         if (!updatedCategory) {

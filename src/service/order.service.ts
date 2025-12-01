@@ -286,7 +286,6 @@ export class OrderService {
             .populate('items.businessId', 'businessName email phone address');
 
         if (!order) throw new Error('Order not found');
-        console.log(order)
         if (userRole === 'user') {
             if (order.userId._id.toString() !== userId) {
                 throw new Error('Unauthorized to view this order');

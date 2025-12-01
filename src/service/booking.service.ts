@@ -306,6 +306,11 @@ export class BookingService {
             } else {
                 booking.declinedAt = new Date();
                 if (reason) booking.declineReason = reason;
+                
+                // If booking is declined and payment is still pending, cancel the payment
+                if (booking.paymentStatus === 'pending') {
+                    booking.paymentStatus = 'cancelled';
+                }
             }
 
             await EventModel.deleteMany({

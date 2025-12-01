@@ -1,4 +1,3 @@
-import mongoose from 'mongoose';
 import Invoice from '../models/invoice.model';
 import Order from '../models/order.model';
 import Booking from '../models/booking.model';

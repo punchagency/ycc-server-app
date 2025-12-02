@@ -40,7 +40,7 @@ export interface IBooking extends Document {
         reason?: string;
         notes?: string;
         changedAt: Date;
-    }
+    }[],
     createdAt: Date;
     updatedAt: Date;
 }

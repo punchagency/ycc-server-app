@@ -26,10 +26,11 @@ const allowedOrigins = [
     'https://ycc-client.netlify.app',
     'https://yachtcrewcenter-dev.netlify.app',
     'https://yachtcrewcenter.com',
+    'https://staging.yachtcrewcenter.com'
 ];
 // CORS Configuration
 const corsOptions: cors.CorsOptions = {
-    origin: process.env.ENV === 'development' ? '*' : allowedOrigins, // Allow all origins in development
+    origin: process.env.NODE_ENV === 'development' ? '*' : allowedOrigins, // Allow all origins in development
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
         'Content-Type',
@@ -48,6 +49,9 @@ const corsOptions: cors.CorsOptions = {
     optionsSuccessStatus: 204,
 };
 
+
+// Webhook route (before body parser middleware)
+app.use('/webhook', webhookRoutes);
 
 // Middleware
 app.use(cors(corsOptions));
@@ -83,6 +87,7 @@ import userRoutes from './routes/user.route';
 import crewReportRoutes from './routes/crew-report.route';
 import adminReportRoutes from './routes/admin-report.route';
 import shipmentRoutes from './routes/shipment.route';
+import webhookRoutes from './routes/webhook.route';
 
 // Routes
 app.use('/api/v2/auth', authRoutes);

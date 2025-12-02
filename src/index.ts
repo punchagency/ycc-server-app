@@ -79,6 +79,7 @@ import adminDashboardRoutes from './routes/admin-dashboard.route';
 import userRoutes from './routes/user.route';
 import crewReportRoutes from './routes/crew-report.route';
 import adminReportRoutes from './routes/admin-report.route';
+import shipmentRoutes from './routes/shipment.route';
 
 // Routes
 app.use('/api/v2/auth', authRoutes);
@@ -100,6 +101,7 @@ app.use('/api/v2/search', searchRoutes);
 app.use('/api/v2/user', userRoutes);
 app.use('/api/v2/crew-report', crewReportRoutes);
 app.use('/api/v2/admin-report', adminReportRoutes);
+app.use('/api/v2/shipments', shipmentRoutes);
 
 app.get('/', (_, res: Response) => {
     res.json({

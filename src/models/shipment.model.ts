@@ -61,14 +61,56 @@ export interface IShippment extends Document {
 
 const ShippmentSchema = new Schema({
     orderId: { type: Schema.Types.ObjectId, ref: 'Order', required: true },
-    trackingNumber: { type: String, required: true },
-    carrier: { type: String, required: true },
-    status: { type: String, enum: ['pending', 'in_transit', 'delivered', 'failed'], default: 'pending' },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    trackingNumber: { type: String },
+    fromAddress: {
+        street: { type: String, required: true },
+        city: { type: String, required: true },
+        state: { type: String, required: true },
+        zip: { type: String, required: true },
+        country: { type: String, required: true }
+    },
+    toAddress: {
+        street: { type: String, required: true },
+        city: { type: String, required: true },
+        state: { type: String, required: true },
+        zip: { type: String, required: true },
+        country: { type: String, required: true }
+    },
+    items: [{
+        productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
+        quantity: { type: Number, required: true },
+        businessId: { type: Schema.Types.ObjectId, ref: 'Business', required: true },
+        discount: { type: Number },
+        pricePerItem: { type: Number, required: true },
+        totalPriceOfItems: { type: Number, required: true }
+    }],
+    rates: [{
+        carrier: { type: String, required: true },
+        rate: { type: Number, required: true },
+        service: { type: String, required: true },
+        estimatedDays: { type: Number },
+        guaranteedDeliveryDate: { type: Boolean },
+        deliveryDate: { type: Date },
+        isSelected: { type: Boolean, default: false },
+        id: { type: String, required: true }
+    }],
+    carrierName: { type: String },
+    labelUrl: { type: String },
+    batchId: { type: String },
+    lastWebhookData: { type: Schema.Types.Mixed },
+    status: { 
+        type: String, 
+        enum: SHIPMENT_STATUSES, 
+        default: 'created' 
+    }
+}, {
+    timestamps: true
 });
 
 ShippmentSchema.index({ orderId: 1 });
+ShippmentSchema.index({ userId: 1 });
 ShippmentSchema.index({ status: 1 });
+ShippmentSchema.index({ trackingNumber: 1 });
 
 export default model<IShippment>('Shippment', ShippmentSchema);

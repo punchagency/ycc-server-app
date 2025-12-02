@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "nodemon --exec ts-node src/index.ts",
     "build": "tsc",
-    "start": "rm -rf ./dist && npm run build && node loader.cjs",
+    "start": "rm -rf ./dist && npm run build && node ./dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

@@ -33,7 +33,13 @@ const allowedOrigins = [
 ];
 // CORS Configuration
 const corsOptions: cors.CorsOptions = {
-    origin: process.env.NODE_ENV === 'development' ? '*' : allowedOrigins, // Allow all origins in development
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
         'Content-Type',

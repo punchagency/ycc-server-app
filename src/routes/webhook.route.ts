@@ -28,7 +28,7 @@ router.use(express.raw({ type: 'application/json' }));
  *       500:
  *         description: Server error
  */
-router.post('/stripe', (req, res, next) => {
+router.post('/stripe', (req, _res, next) => {
     // Store raw body for signature verification
     (req as any).rawBody = req.body;
     next();

@@ -1,14 +1,17 @@
 import express, { Application, Response } from 'express';
+import { createServer } from 'http';
 import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './config/swagger';
 import connectDB from './config/database';
 import { RedisConnect } from './integration/Redis';
 import { healthCheck, readinessCheck, livenessCheck } from './middleware/health.middleware';
+import { initializeWebSocket } from './ws/initialize-ws';
 import './integration/QueueManager';
 import 'dotenv/config';
 
 const app: Application = express();
+const httpServer = createServer(app);
 const PORT = process.env.PORT || 4500;
 
 // Connect to MongoDB and Redis
@@ -117,13 +120,17 @@ app.get('/', (_, res: Response) => {
     });
 });
 
+// Initialize WebSocket
+initializeWebSocket(httpServer, allowedOrigins);
+
 // Start server
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
     console.log(`Health check: http://localhost:${PORT}/health`);
     console.log(`Readiness check: http://localhost:${PORT}/ready`);
     console.log(`Liveness check: http://localhost:${PORT}/live`);
     console.log(`API Documentation: http://localhost:${PORT}/api-docs`);
+    console.log(`WebSocket server initialized`);
 });
 
 export default app;

@@ -12,6 +12,10 @@ const options: swaggerJSDoc.Options = {
       {
         url: 'http://localhost:7000',
         description: 'Development server'
+      },
+      {
+        url: 'https://ycc-server-staging-01b37c996081.herokuapp.com',
+        description: 'Staging server'
       }
     ],
     components: {

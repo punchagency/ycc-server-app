@@ -20,6 +20,7 @@ connectDB();
 RedisConnect();
 
 const allowedOrigins = [
+    process.env.FRONTEND_URL || "",
     'http://localhost:5174',
     'http://localhost:5173',
     'https://ycc-sage.vercel.app',
@@ -27,7 +28,8 @@ const allowedOrigins = [
     'https://ycc-client.netlify.app',
     'https://yachtcrewcenter-dev.netlify.app',
     'https://yachtcrewcenter.com',
-    'https://staging.yachtcrewcenter.com'
+    'https://staging.yachtcrewcenter.com',
+    'https://staging.yachtcrewcenter.com/'
 ];
 // CORS Configuration
 const corsOptions: cors.CorsOptions = {

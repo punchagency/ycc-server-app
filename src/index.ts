@@ -7,6 +7,7 @@ import connectDB from './config/database';
 import { RedisConnect } from './integration/Redis';
 import { healthCheck, readinessCheck, livenessCheck } from './middleware/health.middleware';
 import { initializeWebSocket } from './ws/initialize-ws';
+import webhookRoutes from './routes/webhook.route';
 import './integration/QueueManager';
 import 'dotenv/config';
 
@@ -87,7 +88,6 @@ import userRoutes from './routes/user.route';
 import crewReportRoutes from './routes/crew-report.route';
 import adminReportRoutes from './routes/admin-report.route';
 import shipmentRoutes from './routes/shipment.route';
-import webhookRoutes from './routes/webhook.route';
 
 // Routes
 app.use('/api/v2/auth', authRoutes);

@@ -10,6 +10,7 @@ import { generateUserOrderConfirmationEmail } from "../templates/email-templates
 import { Schema } from "mongoose";
 import CONSTANTS from "../config/constant";
 import StripeService from "../integration/stripe";
+import { ShipmentService } from "./shipment.service";
 import 'dotenv/config';
 
 export interface CreateOrderInput {
@@ -58,7 +59,7 @@ export class OrderService {
             html
         });
     }
-    private static async handleProductOrderEvent(orderId: string, eventType: 'client_cancel_after_confirmation' | 'client_cancel_after_shipment' | 'supplier_cancel') {
+    private static async handleProductOrderEvent(orderId: string, eventType: 'client_cancel_after_confirmation' | 'client_cancel_after_shipment' | 'distributor_cancel') {
         const order = await OrderModel.findById(orderId);
         if (!order) throw new Error('Order not found');
 
@@ -113,7 +114,7 @@ export class OrderService {
                 return { success: true, message: 'No refund - full amount to suppliers' };
             }
 
-            case 'supplier_cancel': {
+            case 'distributor_cancel': {
                 await stripeService.getPaymentIntentAndProcessRefund({
                     invoiceId,
                     refundAmount: order.totalAmount,
@@ -375,6 +376,13 @@ export class OrderService {
 
         await order.save();
 
+        const [shipmentError] = await catchError(
+            ShipmentService.createShipmentsForConfirmedItems(order._id.toString(), item.businessId.toString())
+        );
+        if (shipmentError) {
+            console.error('Shipment creation failed:', shipmentError);
+        }
+
         const user = await UserModel.findById(order.userId);
         const business = await BusinessModel.findById(item.businessId);
 
@@ -456,7 +464,7 @@ export class OrderService {
         const order = await OrderModel.findById(orderId);
         if (!order) throw new Error('Order not found');
 
-        if (order.userId.toString() !== userId) throw new Error('Unauthorized to update this order');
+        // if (order.userId.toString() !== userId) throw new Error('Unauthorized to update this order');
 
         if (userRole === 'user') {
             const validTransitions: Record<string, string[]> = {
@@ -566,7 +574,7 @@ export class OrderService {
             await order.save();
 
             if (status === 'cancelled' && order.paymentStatus === 'paid') {
-                await this.handleProductOrderEvent(order._id.toString(), 'supplier_cancel');
+                await this.handleProductOrderEvent(order._id.toString(), 'distributor_cancel');
             }
 
             const user = await UserModel.findById(order.userId);

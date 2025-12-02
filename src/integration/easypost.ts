@@ -37,11 +37,24 @@ export class EasyPostIntegration {
     }
 
     async createShipmentLogistics({fromAddress, toAddress, parcel}: {fromAddress: FromAddress, toAddress: ToAddress, parcel: Parcel}) {
+        return this.client.Shipment.create({
+            from_address: fromAddress,
+            to_address: toAddress,
+            parcel: parcel
+        });
+    }
+
+    async purchaseLabel(shipmentId: string, rateId: string) {
+        return this.client.Shipment.retrieve(shipmentId).then((shipment: any) => 
+            shipment.buy({ rate: { id: rateId } })
+        );
+    }
+
+    async getTrackingInfo(trackingCode: string, carrier: string) {
         const [error, response] = await catchError(
-            this.client.Shipment.create({
-                from_address: fromAddress,
-                to_address: toAddress,
-                parcel: parcel
+            this.client.Tracker.create({
+                tracking_code: trackingCode,
+                carrier: carrier
             })
         );
         return { error, response };

@@ -83,6 +83,10 @@ const options: swaggerJSDoc.Options = {
       {
         name: 'Admin Reports',
         description: 'Admin statistics and analytics endpoints'
+      },
+      {
+        name: 'Shipments',
+        description: 'Shipment management endpoints'
       }
     ]
   },

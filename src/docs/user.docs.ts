@@ -15,6 +15,18 @@
  *           enum: [distributor, manufacturer]
  *         required: false
  *         description: Filter by business type (distributor or manufacturer). If not provided, returns all business users.
+ *       - in: query
+ *         name: isVerified
+ *         schema:
+ *           type: boolean
+ *         required: false
+ *         description: Filter by user verification status. If not provided, returns users regardless of verification status.
+ *       - in: query
+ *         name: isOnboarded
+ *         schema:
+ *           type: boolean
+ *         required: false
+ *         description: Filter by business onboarding status. If not provided, returns users regardless of onboarding status.
  *     responses:
  *       200:
  *         description: Business users fetched successfully
@@ -106,7 +118,7 @@
  *                           isOnboarded:
  *                             type: boolean
  *       400:
- *         description: Invalid business type
+ *         description: Invalid query parameters
  *         content:
  *           application/json:
  *             schema:
@@ -165,6 +177,139 @@
  *                   example: false
  *                 message:
  *                   type: string
+ *                 code:
+ *                   type: string
+ *                   example: INTERNAL_SERVER_ERROR
+ */
+
+/**
+ * @swagger
+ * /api/v2/user/business-approval:
+ *   post:
+ *     summary: Approve or reject business user registration
+ *     description: Admin endpoint to approve or reject distributor/manufacturer business registration. Sends email notification to the business owner.
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *               - status
+ *               - subject
+ *               - emailBody
+ *             properties:
+ *               userId:
+ *                 type: string
+ *                 description: ID of the user to approve/reject
+ *                 example: 507f1f77bcf86cd799439011
+ *               status:
+ *                 type: string
+ *                 enum: [approved, rejected]
+ *                 description: Approval status
+ *                 example: approved
+ *               subject:
+ *                 type: string
+ *                 description: Email subject line
+ *                 example: Your Business Registration Has Been Approved
+ *               emailBody:
+ *                 type: string
+ *                 description: Custom message body for the email
+ *                 example: We are pleased to inform you that your business registration has been approved.
+ *     responses:
+ *       200:
+ *         description: Business approval processed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Business user responded successfully
+ *                 code:
+ *                   type: string
+ *                   example: SUCCESS
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     userId:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *                       enum: [approved, rejected]
+ *                     email:
+ *                       type: string
+ *                     businessName:
+ *                       type: string
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: User ID and status are required
+ *                 code:
+ *                   type: string
+ *                   example: VALIDATION_ERROR
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Authentication required
+ *                 code:
+ *                   type: string
+ *                   example: AUTH_REQUIRED
+ *       403:
+ *         description: Forbidden - Admin access required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Forbidden
+ *                 code:
+ *                   type: string
+ *                   example: FORBIDDEN
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: User not found
  *                 code:
  *                   type: string
  *                   example: INTERNAL_SERVER_ERROR

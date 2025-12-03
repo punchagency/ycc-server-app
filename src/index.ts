@@ -96,6 +96,7 @@ import userRoutes from './routes/user.route';
 import crewReportRoutes from './routes/crew-report.route';
 import adminReportRoutes from './routes/admin-report.route';
 import shipmentRoutes from './routes/shipment.route';
+import n8nRoutes from './routes/n8n.route';
 
 // Routes
 app.use('/api/v2/auth', authRoutes);
@@ -118,6 +119,7 @@ app.use('/api/v2/user', userRoutes);
 app.use('/api/v2/crew-report', crewReportRoutes);
 app.use('/api/v2/admin-report', adminReportRoutes);
 app.use('/api/v2/shipments', shipmentRoutes);
+app.use('/api/n8n', n8nRoutes);
 
 app.get('/', (_, res: Response) => {
     res.json({

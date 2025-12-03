@@ -27,6 +27,20 @@
  *           type: boolean
  *         required: false
  *         description: Filter by business onboarding status. If not provided, returns users regardless of onboarding status.
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         required: false
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         required: false
+ *         description: Number of items per page
  *     responses:
  *       200:
  *         description: Business users fetched successfully
@@ -117,6 +131,21 @@
  *                                 type: number
  *                           isOnboarded:
  *                             type: boolean
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                       example: 100
+ *                     page:
+ *                       type: integer
+ *                       example: 1
+ *                     limit:
+ *                       type: integer
+ *                       example: 10
+ *                     pages:
+ *                       type: integer
+ *                       example: 10
  *       400:
  *         description: Invalid query parameters
  *         content:

@@ -16,7 +16,7 @@ export class UserController {
             return;
         }
         
-        const { businessType, isVerified, isOnboarded } = req.query;
+        const { businessType, isVerified, isOnboarded, page, limit } = req.query;
 
         if(businessType && !Validate.oneOf({value: businessType as string, allowedValues: ['manufacturer', 'distributor']})){
             res.status(400).json({ success: false, message: 'Invalid business type. Must be either "manufacturer" or "distributor"', code: 'VALIDATION_ERROR' });
@@ -33,11 +33,16 @@ export class UserController {
             return;
         }
 
+        const pageNum = page ? parseInt(page as string) : 1;
+        const limitNum = limit ? parseInt(limit as string) : 10;
+
         const [error, result] = await catchError(
             UserService.getBusinessUsers({ 
                 businessType: businessType as 'manufacturer' | 'distributor',
                 isVerified: isVerified ? isVerified === 'true' : undefined,
-                isOnboarded: isOnboarded ? isOnboarded === 'true' : undefined
+                isOnboarded: isOnboarded ? isOnboarded === 'true' : undefined,
+                page: pageNum,
+                limit: limitNum
             })
         );
 
@@ -46,7 +51,7 @@ export class UserController {
             return;
         }
         
-        res.status(200).json({ success: true, data: result, message: 'Business users fetched successfully', code: 'SUCCESS' });
+        res.status(200).json({ success: true, data: result.data, message: 'Business users fetched successfully', code: 'SUCCESS', pagination: result.pagination });
     }
     static async respondToBusinessApproval(req: AuthenticatedRequest, res: Response) {
         if(!req.user){

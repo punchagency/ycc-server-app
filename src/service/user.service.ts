@@ -6,10 +6,12 @@ import { saveAuditLog } from '../utils/SaveAuditlogs';
 import 'dotenv/config';
 
 export class UserService {
-    static async getBusinessUsers({ businessType, isVerified, isOnboarded }: { 
+    static async getBusinessUsers({ businessType, isVerified, isOnboarded, page = 1, limit = 10 }: { 
         businessType?: 'manufacturer' | 'distributor',
         isVerified?: boolean,
-        isOnboarded?: boolean
+        isOnboarded?: boolean,
+        page?: number,
+        limit?: number
     }) {
         const userFilter: any = { role: { $in: ['distributor', 'manufacturer'] } };
         
@@ -21,8 +23,13 @@ export class UserService {
             userFilter.isVerified = isVerified;
         }
 
+        const total = await UserModel.countDocuments(userFilter);
+        const skip = (page - 1) * limit;
+
         const users = await UserModel.find(userFilter)
             .select('_id firstName lastName email phone profilePicture role isVerified isActive createdAt')
+            .skip(skip)
+            .limit(limit)
             .lean();
 
         const userIds = users.map(user => user._id);
@@ -38,7 +45,7 @@ export class UserService {
 
         const businessMap = new Map(businesses.map(b => [b.userId.toString(), b]));
 
-        return users
+        const data = users
             .filter(user => isOnboarded === undefined || businessMap.has(user._id.toString()))
             .map(user => ({
                 user: {
@@ -55,6 +62,16 @@ export class UserService {
                 },
                 business: businessMap.get(user._id.toString()) || null
             }));
+
+        return {
+            data,
+            pagination: {
+                total,
+                page,
+                limit,
+                pages: Math.ceil(total / limit)
+            }
+        };
     }
     static async respondToBusinessApproval({ userId, status, subject, emailBody }: {
         userId: string,

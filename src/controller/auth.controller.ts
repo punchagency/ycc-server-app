@@ -60,7 +60,10 @@ export class AuthController {
             }
 
             if(role !== 'admin'){
+                console.log("This is address before parsing: ",{address})
                 address = TryParseJSON(address, {street: '', zipcode: '', city: '', state: '', country: ''})
+
+                console.log("This is address after parsing: ",{address})
                 // Address validation
                 if (!address || typeof address !== 'object') {
                     res.status(400).json({ success: false, message: 'Valid address is required', code: "VALIDATION_ERROR" });
@@ -116,6 +119,7 @@ export class AuthController {
 
             const registerData: RegisterInput = {
                 ...req.body,
+                address: address ? address : undefined,
                 phone,
                 businessPhone,
                 profilePicture
@@ -541,10 +545,6 @@ export class AuthController {
                         email: user.email,
                         phone: user.phone,
                         role: user.role,
-                        businessName: user.businessName,
-                        businessEmail: user.businessEmail,
-                        businessPhone: user.businessPhone,
-                        website: user.website,
                         address: user.address,
                         isVerified: user.isVerified,
                         isActive: user.isActive,

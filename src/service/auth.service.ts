@@ -156,6 +156,7 @@ export class AuthService {
           businessName: userData.businessName,
           businessType: userData.businessType || userData.role,
           website: userData.website || '',
+          address: userData.address,
           email: userData.businessEmail || '',
           phone: userData.businessPhone || '',
           taxId: userData.taxId || '',

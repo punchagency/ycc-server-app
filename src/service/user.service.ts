@@ -27,7 +27,7 @@ export class UserService {
         const skip = (page - 1) * limit;
 
         const users = await UserModel.find(userFilter)
-            .select('_id firstName lastName email phone profilePicture role isVerified isActive createdAt')
+            .select('_id firstName lastName email phone profilePicture address role isVerified isActive createdAt')
             .skip(skip)
             .limit(limit)
             .lean();

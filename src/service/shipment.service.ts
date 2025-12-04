@@ -1,5 +1,5 @@
-import ShipmentModel from "../models/shipment.model";
-import OrderModel from "../models/order.model";
+import ShipmentModel, { IShippment } from "../models/shipment.model";
+import OrderModel, { IOrder } from "../models/order.model";
 import ProductModel from "../models/product.model";
 import UserModel from "../models/user.model";
 import { EasyPostIntegration } from "../integration/easypost";
@@ -232,7 +232,7 @@ export class ShipmentService {
         }
     }
 
-    private static async sendTrackingNotification(shipment: any, order: any, trackingData: any) {
+    private static async sendTrackingNotification(shipment: IShippment, order: IOrder, trackingData: any) {
         const user = await UserModel.findById(order.userId);
         if (!user) return;
 

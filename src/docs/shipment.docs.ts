@@ -63,14 +63,3 @@
  *       200:
  *         description: Label purchased successfully
  */
-
-/**
- * @swagger
- * /api/shipments/webhook:
- *   post:
- *     summary: EasyPost webhook endpoint for tracking updates
- *     tags: [Shipments]
- *     responses:
- *       200:
- *         description: Webhook processed
- */

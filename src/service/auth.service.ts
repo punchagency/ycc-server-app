@@ -299,6 +299,13 @@ export class AuthService {
       let business = null;
       if (user.role === 'distributor' || user.role === 'manufacturer') {
         business = await Business.findOne({ userId: user._id });
+
+        if(!user.isVerified){
+          return {
+            success: false,
+            error: 'Your account has not been verified yet. Please check your email for verification instructions.'
+          };
+        }
       }
 
       // Generate new tokens

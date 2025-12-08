@@ -11,6 +11,7 @@ import { Schema } from "mongoose";
 import CONSTANTS from "../config/constant";
 import StripeService from "../integration/stripe";
 import { ShipmentService } from "./shipment.service";
+import ShipmentModel from "../models/shipment.model";
 import 'dotenv/config';
 
 export interface CreateOrderInput {
@@ -281,22 +282,29 @@ export class OrderService {
         return { success: true, order };
     }
     static async getOrderById(id: string, userId: string, userRole: typeof ROLES[number]) {
-        const order: any = await OrderModel.findById(id)
-            .populate('userId', 'firstName lastName email phone')
-            .populate('items.productId', 'name price imageURLs')
-            .populate('items.businessId', 'businessName email phone address');
-
+        const order = await OrderModel.findById(id);
         if (!order) throw new Error('Order not found');
+
+        const productIds = order.items.map(item => item.productId);
+        const businessIds = [...new Set(order.items.map(item => item.businessId))];
+
+        const [user, products, businesses, shipments] = await Promise.all([
+            UserModel.findById(order.userId).select('firstName lastName email phone'),
+            ProductModel.find({ _id: { $in: productIds } }).select('name price imageURLs'),
+            BusinessModel.find({ _id: { $in: businessIds } }).select('businessName email phone address'),
+            ShipmentModel.find({ orderId: id })
+        ]);
+
         if (userRole === 'user') {
-            if (order.userId._id.toString() !== userId) {
+            if (order.userId.toString() !== userId) {
                 throw new Error('Unauthorized to view this order');
             }
         } else if (userRole === 'distributor' || userRole === 'manufacturer') {
             const business = await BusinessModel.findOne({ userId });
             if (!business) throw new Error('Business not found');
 
-            const hasBusinessItems = order.items.some((item: any) => 
-                item.businessId._id.toString() === business._id.toString()
+            const hasBusinessItems = order.items.some(item => 
+                item.businessId.toString() === business._id.toString()
             );
 
             if (!hasBusinessItems) {
@@ -304,7 +312,19 @@ export class OrderService {
             }
         }
 
-        return order;
+        const productMap = new Map(products.map(p => [p._id.toString(), p]));
+        const businessMap = new Map(businesses.map(b => [b._id.toString(), b]));
+
+        const orderObj: Record<string, any> = order.toObject();
+        orderObj.userId = user;
+        orderObj.items = orderObj.items.map((item: any) => ({
+            ...item,
+            productId: productMap.get(item.productId.toString()),
+            businessId: businessMap.get(item.businessId.toString())
+        }));
+        orderObj.shipments = shipments;
+
+        return orderObj;
     }
     static async getOrders({userId, role, page = 1, limit = 10, status, paymentStatus, startDate, endDate, sortBy = 'createdAt', orderBy = 'desc'}:{
         userId: string;
@@ -560,6 +580,15 @@ export class OrderService {
                     notes,
                     changedAt: new Date()
                 });
+            }
+
+            if (status === 'confirmed') {
+                const [shipmentError] = await catchError(
+                    ShipmentService.createShipmentsForConfirmedItems(order._id.toString(), business._id.toString())
+                );
+                if (shipmentError) {
+                    console.error('Shipment creation failed:', shipmentError);
+                }
             }
 
             if (status === 'out_for_delivery' && trackingNumber) {

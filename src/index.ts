@@ -6,6 +6,9 @@ import swaggerSpec from './config/swagger';
 import connectDB from './config/database';
 import { RedisConnect } from './integration/Redis';
 import { healthCheck, readinessCheck, livenessCheck } from './middleware/health.middleware';
+import { generalRateLimit, requestSizeLimit } from './middleware/security.middleware';
+// import { correlationIdMiddleware, requestTiming, requestLogger } from './middleware/logging.middleware';
+import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import { initializeWebSocket } from './ws/initialize-ws';
 import webhookRoutes from './routes/webhook.route';
 import './integration/QueueManager';
@@ -18,6 +21,9 @@ const PORT = process.env.PORT || 4500;
 // Connect to MongoDB and Redis
 connectDB();
 RedisConnect();
+
+// Setup global error handlers
+// setupGlobalErrorHandlers();
 
 const allowedOrigins = [
     process.env.FRONTEND_URL || "",
@@ -62,10 +68,17 @@ const corsOptions: cors.CorsOptions = {
 // Webhook route (before body parser middleware)
 app.use('/webhook', webhookRoutes);
 
+// Security middleware
+// app.use(correlationIdMiddleware);
+// app.use(requestLogger);
+// app.use(requestTiming);
+
 // Middleware
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(requestSizeLimit('150mb'));
+app.use(generalRateLimit);
 
 // Health check routes (before other routes for quick responses)
 app.get('/health', healthCheck);
@@ -81,6 +94,7 @@ import bookingRoutes from './routes/booking.route';
 import cartRoutes from './routes/cart.route';
 import categoryRoutes from './routes/category.route';
 import documentRoutes from './routes/document.route';
+import contactRoutes from './routes/contact.route';
 import eventRoutes from './routes/event.route';
 import invoiceRoutes from './routes/invoice.route';
 import notificationRoutes from './routes/notification.route';
@@ -105,6 +119,7 @@ app.use('/api/v2/booking', bookingRoutes);
 app.use('/api/v2/cart', cartRoutes);
 app.use('/api/v2/category', categoryRoutes);
 app.use('/api/v2/document', documentRoutes);
+app.use('/api/v2/contact', contactRoutes);
 app.use('/api/v2/event', eventRoutes);
 app.use('/api/v2/invoice', invoiceRoutes);
 app.use('/api/v2/notification', notificationRoutes);
@@ -136,6 +151,10 @@ app.get('/', (_, res: Response) => {
         }
     });
 });
+
+// Error handling middleware (must be last)
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 // Initialize WebSocket
 initializeWebSocket(httpServer, allowedOrigins);

@@ -28,7 +28,6 @@ export class StripeAccountController {
                         return;
                 }
         }
-
         static async getStripeAccount(req: Request, res: Response){
                 try {
                         const { userId } = req.body;
@@ -51,7 +50,6 @@ export class StripeAccountController {
                         return;
                 }
         }
-
         static async refreshStripeAccountLink(req: Request, res: Response){
                 try {
                         const { userId } = req.body;

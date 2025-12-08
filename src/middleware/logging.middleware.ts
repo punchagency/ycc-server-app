@@ -24,7 +24,7 @@ interface LogContext {
 
 // Structured logger class
 export class Logger {
-  private static serviceName = 'clientele-api';
+  private static serviceName = 'ycc-server-api';
   private static environment = process.env.NODE_ENV || 'development';
   private static logStreams: { [key: string]: fs.WriteStream } = {};
 
@@ -169,10 +169,7 @@ export const correlationIdMiddleware = (
   next: NextFunction
 ): void => {
   // Generate or extract correlation ID
-  const correlationId = req.headers['x-correlation-id'] as string || 
-                       req.headers['x-request-id'] as string ||
-                       generateCorrelationId();
-  
+  const correlationId = req.headers['x-correlation-id'] as string || req.headers['x-request-id'] as string || generateCorrelationId();
   req.correlationId = correlationId;
   res.setHeader('X-Correlation-ID', correlationId);
   

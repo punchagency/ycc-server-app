@@ -22,6 +22,7 @@ export interface AuthResponse {
       id: string;
       businessName: string;
       businessType: typeof BUSINESS_TYPE[number];
+      isOnboarded: boolean;
     };
   };
   error?: string;
@@ -156,6 +157,7 @@ export class AuthService {
           businessName: userData.businessName,
           businessType: userData.businessType || userData.role,
           website: userData.website || '',
+          address: userData.address,
           email: userData.businessEmail || '',
           phone: userData.businessPhone || '',
           taxId: userData.taxId || '',
@@ -179,7 +181,8 @@ export class AuthService {
           business: business ? {
             id: business._id.toString(),
             businessName: business.businessName,
-            businessType: business.businessType
+            businessType: business.businessType,
+            isOnboarded: business.isOnboarded
           } : undefined
         }
       };
@@ -250,7 +253,8 @@ export class AuthService {
           business: business ? {
             id: business._id.toString(),
             businessName: business.businessName,
-            businessType: business.businessType
+            businessType: business.businessType,
+            isOnboarded: business.isOnboarded
           } : undefined
         }
       };
@@ -298,6 +302,13 @@ export class AuthService {
       let business = null;
       if (user.role === 'distributor' || user.role === 'manufacturer') {
         business = await Business.findOne({ userId: user._id });
+
+        if(!user.isVerified){
+          return {
+            success: false,
+            error: 'Your account has not been verified yet. Please check your email for verification instructions.'
+          };
+        }
       }
 
       // Generate new tokens
@@ -321,7 +332,8 @@ export class AuthService {
           business: business ? {
             id: business._id.toString(),
             businessName: business.businessName,
-            businessType: business.businessType
+            businessType: business.businessType,
+            isOnboarded: business.isOnboarded
           } : undefined
         }
       };
@@ -587,7 +599,8 @@ export class AuthService {
           business: business ? {
             id: business._id.toString(),
             businessName: business.businessName,
-            businessType: business.businessType
+            businessType: business.businessType,
+            isOnboarded: business.isOnboarded
           } : undefined
         }
       };

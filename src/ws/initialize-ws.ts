@@ -1,11 +1,12 @@
 import { Server as HTTPServer } from 'http';
-import { Server as SocketIOServer } from 'socket.io';
+import { Server as SocketIOServer, Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { RedisObject } from '../integration/Redis';
 import Redis from 'ioredis';
 import CONFIG from '../config/config';
 
 let io: SocketIOServer | null = null;
+const connectedSockets = new Map<string, Socket>();
 
 export const initializeWebSocket = (httpServer: HTTPServer, allowedOrigins: string[]): SocketIOServer => {
     io = new SocketIOServer(httpServer, {
@@ -25,16 +26,46 @@ export const initializeWebSocket = (httpServer: HTTPServer, allowedOrigins: stri
             db: CONFIG.redis.db
         });
         const subClient = pubClient.duplicate();
-        
+
         io.adapter(createAdapter(pubClient, subClient));
         console.log('WebSocket using Redis adapter');
     }
 
-    io.on('connection', (socket) => {
-        console.log(`Client connected: ${socket.id}`);
+    io.on('connection', socket => {
+        console.log('New client connected');
 
+        // Handle crew member authentication
+        socket.on('authenticate', async userId => {
+            try {
+                if (!userId) {
+                    socket.emit('error', { message: 'userId is required' });
+                    return;
+                }
+
+                // Close existing connection if user reconnects
+                const existingSocket = connectedSockets.get(userId);
+                if (existingSocket && existingSocket !== socket) {
+                    existingSocket.disconnect();
+                }
+
+                connectedSockets.set(userId, socket);
+                socket.emit('authenticated', { userId });
+                console.log(`User ${userId} authenticated`);
+            } catch (error) {
+                console.error('Socket authentication error:', error);
+                socket.emit('error', { message: 'Authentication failed' });
+            }
+        });
+
+        // Handle disconnection
         socket.on('disconnect', () => {
-            console.log(`Client disconnected: ${socket.id}`);
+            for (const [userId, sock] of connectedSockets.entries()) {
+                if (sock === socket) {
+                    connectedSockets.delete(userId);
+                    console.log(`Crew member ${userId} disconnected`);
+                    break;
+                }
+            }
         });
     });
 
@@ -42,3 +73,4 @@ export const initializeWebSocket = (httpServer: HTTPServer, allowedOrigins: stri
 };
 
 export const getIO = (): SocketIOServer | null => io;
+export const getConnectedSockets = (): Map<string, Socket> => connectedSockets;

@@ -5,5 +5,6 @@ import { authenticateToken } from "../middleware/auth.middleware";
 const router = Router();
 
 router.get('/business-users', authenticateToken, UserController.getBusinessUsers);
+router.post('/business-approval', authenticateToken, UserController.respondToBusinessApproval);
 
 export default router;

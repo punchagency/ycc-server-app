@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AuthController } from '../controller/auth.controller';
 import { authenticateToken } from '../middleware/auth.middleware';
+import { authRateLimit } from '../middleware/security.middleware';
 import { fileUploadService } from '../integration/fileUpload';
 
 const router = Router();
@@ -8,14 +9,14 @@ const router = Router();
 const uploadProfilePicture = fileUploadService.createUploadMiddleware([{ name: 'profilePicture', maxCount: 1 }]);
 
 // Public routes
-router.post('/register', uploadProfilePicture, AuthController.register);
-router.post('/login', AuthController.login);
-router.post('/refresh-token', AuthController.refreshToken);
-router.post('/activate-account', AuthController.activateAccount);
-router.post('/resend-activation-code', AuthController.resendActivationCode);
-router.post('/forgot-password', AuthController.forgotPassword);
-router.post('/reset-password', AuthController.resetPassword);
-router.post('/resend-reset-code', AuthController.resendResetPasswordCode);
+router.post('/register', authRateLimit, uploadProfilePicture, AuthController.register);
+router.post('/login', authRateLimit, AuthController.login);
+router.post('/refresh-token', authRateLimit, AuthController.refreshToken);
+router.post('/activate-account', authRateLimit, AuthController.activateAccount);
+router.post('/resend-activation-code', authRateLimit, AuthController.resendActivationCode);
+router.post('/forgot-password', authRateLimit, AuthController.forgotPassword);
+router.post('/reset-password', authRateLimit, AuthController.resetPassword);
+router.post('/resend-reset-code', authRateLimit, AuthController.resendResetPasswordCode);
 
 // Protected routes
 router.post('/logout', authenticateToken, AuthController.logout);

@@ -6,6 +6,9 @@ import swaggerSpec from './config/swagger';
 import connectDB from './config/database';
 import { RedisConnect } from './integration/Redis';
 import { healthCheck, readinessCheck, livenessCheck } from './middleware/health.middleware';
+import { generalRateLimit, requestSizeLimit } from './middleware/security.middleware';
+// import { correlationIdMiddleware, requestTiming, requestLogger } from './middleware/logging.middleware';
+import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import { initializeWebSocket } from './ws/initialize-ws';
 import webhookRoutes from './routes/webhook.route';
 import './integration/QueueManager';
@@ -18,6 +21,9 @@ const PORT = process.env.PORT || 4500;
 // Connect to MongoDB and Redis
 connectDB();
 RedisConnect();
+
+// Setup global error handlers
+// setupGlobalErrorHandlers();
 
 const allowedOrigins = [
     process.env.FRONTEND_URL || "",
@@ -33,7 +39,13 @@ const allowedOrigins = [
 ];
 // CORS Configuration
 const corsOptions: cors.CorsOptions = {
-    origin: process.env.NODE_ENV === 'development' ? '*' : allowedOrigins, // Allow all origins in development
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
         'Content-Type',
@@ -56,10 +68,17 @@ const corsOptions: cors.CorsOptions = {
 // Webhook route (before body parser middleware)
 app.use('/webhook', webhookRoutes);
 
+// Security middleware
+// app.use(correlationIdMiddleware);
+// app.use(requestLogger);
+// app.use(requestTiming);
+
 // Middleware
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(requestSizeLimit('150mb'));
+app.use(generalRateLimit);
 
 // Health check routes (before other routes for quick responses)
 app.get('/health', healthCheck);
@@ -75,6 +94,7 @@ import bookingRoutes from './routes/booking.route';
 import cartRoutes from './routes/cart.route';
 import categoryRoutes from './routes/category.route';
 import documentRoutes from './routes/document.route';
+import contactRoutes from './routes/contact.route';
 import eventRoutes from './routes/event.route';
 import invoiceRoutes from './routes/invoice.route';
 import notificationRoutes from './routes/notification.route';
@@ -90,6 +110,8 @@ import userRoutes from './routes/user.route';
 import crewReportRoutes from './routes/crew-report.route';
 import adminReportRoutes from './routes/admin-report.route';
 import shipmentRoutes from './routes/shipment.route';
+import n8nRoutes from './routes/n8n.route';
+import chatRoutes from './routes/chat.route';
 
 // Routes
 app.use('/api/v2/auth', authRoutes);
@@ -97,6 +119,7 @@ app.use('/api/v2/booking', bookingRoutes);
 app.use('/api/v2/cart', cartRoutes);
 app.use('/api/v2/category', categoryRoutes);
 app.use('/api/v2/document', documentRoutes);
+app.use('/api/v2/contact', contactRoutes);
 app.use('/api/v2/event', eventRoutes);
 app.use('/api/v2/invoice', invoiceRoutes);
 app.use('/api/v2/notification', notificationRoutes);
@@ -112,6 +135,8 @@ app.use('/api/v2/user', userRoutes);
 app.use('/api/v2/crew-report', crewReportRoutes);
 app.use('/api/v2/admin-report', adminReportRoutes);
 app.use('/api/v2/shipments', shipmentRoutes);
+app.use('/api/n8n', n8nRoutes);
+app.use('/api/v2/chat', chatRoutes);
 
 app.get('/', (_, res: Response) => {
     res.json({
@@ -126,6 +151,10 @@ app.get('/', (_, res: Response) => {
         }
     });
 });
+
+// Error handling middleware (must be last)
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 // Initialize WebSocket
 initializeWebSocket(httpServer, allowedOrigins);

@@ -33,8 +33,8 @@ export class StripeAccountService {
             country: business.address?.country || 'US'
         });
 
-        const return_url = `${process.env.FRONTEND_URL}/vendors/onboarding/${userId}`;
-        const refresh_url = `${process.env.FRONTEND_URL}/vendors/onboarding/refresh-stripe-account`;
+        const return_url = `${process.env.FRONTEND_URL}/distributor/onboarding/${userId}`;
+        const refresh_url = `${process.env.FRONTEND_URL}/distributor/onboarding/refresh-stripe-account`;
 
         const accountLink = await stripeService.createAccountLink({
             accountId: stripeAccount.id,
@@ -70,7 +70,6 @@ export class StripeAccountService {
             expiresAt: accountLink.expires_at
         };
     }
-
     static async getStripeAccount(userId: string) {
         const user = await UserModel.findById(userId);
         if (!user) {
@@ -96,6 +95,11 @@ export class StripeAccountService {
         business.stripeChargesEnabled = stripeAccount.charges_enabled || false;
         business.stripedetailsSubmitted = stripeAccount.details_submitted || false;
         business.stripeTransfersEnabled = stripeAccount.payouts_enabled || false;
+        if(stripeAccount.charges_enabled && stripeAccount.details_submitted && stripeAccount.payouts_enabled){
+            business.isOnboarded = true;
+        }else{
+            business.isOnboarded = false;
+        }
         await business.save();
 
         return {
@@ -118,7 +122,6 @@ export class StripeAccountService {
             }
         };
     }
-
     static async refreshStripeAccountLink(userId: string) {
         const user = await UserModel.findById(userId);
         if (!user) {
@@ -138,8 +141,8 @@ export class StripeAccountService {
             throw new Error('No Stripe account found for this business');
         }
 
-        const return_url = `${process.env.FRONTEND_URL}/vendors/onboarding/${userId}`;
-        const refresh_url = `${process.env.FRONTEND_URL}/vendors/onboarding/refresh-stripe-account`;
+        const return_url = `${process.env.FRONTEND_URL}/distributor/onboarding/${userId}`;
+        const refresh_url = `${process.env.FRONTEND_URL}/distributor/onboarding/${userId}`;
 
         const stripeService = StripeService.getInstance();
         const accountLink = await stripeService.createAccountLink({

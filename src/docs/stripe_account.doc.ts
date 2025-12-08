@@ -112,7 +112,7 @@
 
 /**
   * @swagger
-  * /api/v2/stripe-account/refresh-link:
+  * /api/v2/stripe-account/refresh:
   *   post:
   *     summary: Refresh Stripe account link
   *     tags: [Stripe Account]

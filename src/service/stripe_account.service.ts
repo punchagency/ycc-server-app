@@ -95,6 +95,11 @@ export class StripeAccountService {
         business.stripeChargesEnabled = stripeAccount.charges_enabled || false;
         business.stripedetailsSubmitted = stripeAccount.details_submitted || false;
         business.stripeTransfersEnabled = stripeAccount.payouts_enabled || false;
+        if(stripeAccount.charges_enabled && stripeAccount.details_submitted && stripeAccount.payouts_enabled){
+            business.isOnboarded = true;
+        }else{
+            business.isOnboarded = false;
+        }
         await business.save();
 
         return {

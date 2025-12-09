@@ -29,36 +29,49 @@ export class ShipmentService {
         const productIds = confirmedItems.map(item => item.productId);
         const products = await ProductModel.find({ _id: { $in: productIds } });
 
-        let totalWeight = 0;
-        let maxLength = 0;
-        let maxWidth = 0;
-        let maxHeight = 0;
+        const MAX_WEIGHT = 1120;
+        const MAX_LENGTH = 108;
+
+        const itemGroups: typeof confirmedItems[] = [];
+        let currentGroup: typeof confirmedItems = [];
+        let currentWeight = 0;
+        let currentMaxLength = 0;
 
         for (const item of confirmedItems) {
             const product = products.find(p => p._id.toString() === item.productId.toString());
-            if (product) {
-                totalWeight += product.weight * item.quantity;
-                maxLength = Math.max(maxLength, product.length);
-                maxWidth = Math.max(maxWidth, product.width);
-                maxHeight = Math.max(maxHeight, product.height);
+            if (!product) continue;
+
+            const itemWeight = parseFloat((product.weight * item.quantity).toFixed(1));
+            const itemLength = parseFloat(product.length.toFixed(1));
+
+            if (currentWeight + itemWeight > MAX_WEIGHT || Math.max(currentMaxLength, itemLength) > MAX_LENGTH) {
+                if (currentGroup.length > 0) itemGroups.push(currentGroup);
+                currentGroup = [item];
+                currentWeight = itemWeight;
+                currentMaxLength = itemLength;
+            } else {
+                currentGroup.push(item);
+                currentWeight += itemWeight;
+                currentMaxLength = Math.max(currentMaxLength, itemLength);
             }
         }
+        if (currentGroup.length > 0) itemGroups.push(currentGroup);
 
         const fromAddr = AddressFormatter.formatAddress(confirmedItems[0].fromAddress);
         const toAddr = AddressFormatter.formatAddress(order.deliveryAddress);
-
         const business = await BusinessModel.findById(businessId);
         const user = await UserModel.findById(order.userId);
+
         const parsedFromAddress = {
             street1: fromAddr.street || '',
-            street2: 'FL 5',
+            street2: null,
             city: fromAddr.city || '',
             state: fromAddr.state || '',
             zip: fromAddr.zip || '',
             country: fromAddr.country || '',
             company: business?.businessName || '',
             phone: business?.phone || ''
-        }
+        };
         const parsedToAddress = {
             name: user ? `${user.firstName} ${user.lastName}` : '',
             street1: toAddr.street || '',
@@ -68,49 +81,70 @@ export class ShipmentService {
             country: toAddr.country || '',
             email: user?.email || '',
             phone: user?.phone || ''
-        }
+        };
 
+        const shipments = [];
         const easypost = new EasyPostIntegration();
-        const [error, response] = await catchError(easypost.createShipmentLogistics({
-            fromAddress: parsedFromAddress,
-            toAddress: parsedToAddress,
-            parcel: {
-                length: maxLength,
-                width: maxWidth,
-                height: maxHeight,
-                weight: totalWeight
+
+        for (const group of itemGroups) {
+            let totalWeight = 0;
+            let maxLength = 0;
+            let maxWidth = 0;
+            let maxHeight = 0;
+
+            for (const item of group) {
+                const product = products.find(p => p._id.toString() === item.productId.toString());
+                if (product) {
+                    totalWeight += product.weight * item.quantity;
+                    maxLength = Math.max(maxLength, product.length);
+                    maxWidth = Math.max(maxWidth, product.width);
+                    maxHeight = Math.max(maxHeight, product.height);
+                }
             }
-        }));
 
-        if (error) throw new Error(`EasyPost error: ${error.message}`);
+            const [error, response] = await catchError(easypost.createShipmentLogistics({
+                fromAddress: parsedFromAddress,
+                toAddress: parsedToAddress,
+                parcel: {
+                    length: parseFloat(maxLength.toFixed(1)),
+                    width: parseFloat(maxWidth.toFixed(1)),
+                    height: parseFloat(maxHeight.toFixed(1)),
+                    weight: parseFloat(totalWeight.toFixed(1))
+                }
+            }));
 
-        const rates = response.rates?.map((rate: any) => ({
-            carrier: rate.carrier,
-            rate: parseFloat(rate.rate),
-            service: rate.service,
-            estimatedDays: rate.delivery_days,
-            guaranteedDeliveryDate: rate.delivery_date_guaranteed || false,
-            deliveryDate: rate.est_delivery_date ? new Date(rate.est_delivery_date) : undefined,
-            isSelected: false,
-            id: rate.id
-        })) || [];
+            if (error) throw new Error(`EasyPost error: ${error.message}`);
 
-        const shipment = await ShipmentModel.create({
-            orderId: order._id,
-            userId: order.userId,
-            fromAddress: confirmedItems[0].fromAddress,
-            toAddress: order.deliveryAddress,
-            items: confirmedItems.map(item => ({
-                productId: item.productId,
-                quantity: item.quantity,
-                businessId: item.businessId,
-                discount: item.discount,
-                pricePerItem: item.pricePerItem,
-                totalPriceOfItems: item.totalPriceOfItems
-            })),
-            rates,
-            status: 'rates_fetched'
-        });
+            const rates = response.rates?.map((rate: any) => ({
+                carrier: rate.carrier,
+                rate: parseFloat(rate.rate),
+                service: rate.service,
+                estimatedDays: rate.delivery_days,
+                guaranteedDeliveryDate: rate.delivery_date_guaranteed || false,
+                deliveryDate: rate.est_delivery_date ? new Date(rate.est_delivery_date) : undefined,
+                isSelected: false,
+                id: rate.id
+            })) || [];
+
+            const shipment = await ShipmentModel.create({
+                orderId: order._id,
+                userId: order.userId,
+                fromAddress: confirmedItems[0].fromAddress,
+                toAddress: order.deliveryAddress,
+                items: group.map(item => ({
+                    productId: item.productId,
+                    quantity: item.quantity,
+                    businessId: item.businessId,
+                    discount: item.discount,
+                    pricePerItem: item.pricePerItem,
+                    totalPriceOfItems: item.totalPriceOfItems
+                })),
+                rates,
+                status: 'rates_fetched'
+            });
+
+            shipments.push(shipment);
+        }
 
         await addNotificationJob({
             recipientId: order.userId,
@@ -118,10 +152,10 @@ export class ShipmentService {
             priority: 'high',
             title: 'Shipment Rates Available',
             message: `Shipping rates are now available for your order. Please select a rate to proceed with payment.`,
-            data: { orderId: order._id, shipmentId: shipment._id }
+            data: { orderId: order._id, shipmentId: shipments[0]._id }
         });
 
-        return shipment;
+        return shipments.length === 1 ? shipments[0] : shipments;
     }
 
     static async getShipmentsByOrder(orderId: string, userId: string) {

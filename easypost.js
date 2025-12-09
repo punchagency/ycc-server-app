@@ -1,7 +1,8 @@
 const EasyPostClient = require('@easypost/api');
 const fs = require('fs');
+require('dotenv').config();
 
-const client = new EasyPostClient('EASYPOST_API_KEY');
+const client = new EasyPostClient(process.env.EASYPOST_API_KEY);
 
 (async () => {
     let shipment;
@@ -19,7 +20,7 @@ const client = new EasyPostClient('EASYPOST_API_KEY');
         },
         from_address: {
             street1: '417 montgomery street',
-            street2: 'FL 5',
+            street2: null,
             city: 'San Francisco',
             state: 'CA',
             zip: '94104',
@@ -34,5 +35,6 @@ const client = new EasyPostClient('EASYPOST_API_KEY');
             weight: 65.9,
         },
     });
-    fs.writeFileSync('shipment.json', JSON.stringify(shipment, null, 2));
+    console.log(shipment);
+    // fs.writeFileSync('shipment.json', JSON.stringify(shipment, null, 2));
 })();

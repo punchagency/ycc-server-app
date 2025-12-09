@@ -13,6 +13,7 @@ import StripeService from "../integration/stripe";
 import { ShipmentService } from "./shipment.service";
 import ShipmentModel from "../models/shipment.model";
 import 'dotenv/config';
+import { logCritical } from "../utils/SystemLogs";
 
 export interface CreateOrderInput {
     userId: Schema.Types.ObjectId | string;
@@ -582,15 +583,6 @@ export class OrderService {
                 });
             }
 
-            if (status === 'confirmed') {
-                const [shipmentError] = await catchError(
-                    ShipmentService.createShipmentsForConfirmedItems(order._id.toString(), business._id.toString())
-                );
-                if (shipmentError) {
-                    console.error('Shipment creation failed:', shipmentError);
-                }
-            }
-
             if (status === 'out_for_delivery' && trackingNumber) {
                 order.trackingNumber = trackingNumber;
             }
@@ -604,6 +596,16 @@ export class OrderService {
 
             if (status === 'cancelled' && order.paymentStatus === 'paid') {
                 await this.handleProductOrderEvent(order._id.toString(), 'distributor_cancel');
+            }
+
+            if (status === 'confirmed') {
+                const [shipmentError] = await catchError(
+                    ShipmentService.createShipmentsForConfirmedItems(order._id.toString(), business._id.toString())
+                );
+                if (shipmentError) {
+                    logCritical({message: `Shipment creation failed: ${shipmentError.message}`, error: shipmentError, source: "OrderService.updateOrderStatus"});
+                    throw new Error('Shipment creation failed');
+                }
             }
 
             const user = await UserModel.findById(order.userId);

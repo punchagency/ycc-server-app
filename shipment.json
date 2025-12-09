@@ -1,0 +1,1564 @@
+{
+  "id": "shp_f7dfef0671004b558d182484c64e579e",
+  "created_at": "2025-12-09T08:28:35Z",
+  "is_return": false,
+  "messages": [
+    {
+      "carrier": "DHLExpress",
+      "carrier_account_id": "ca_d5151eb0b0804993a02b6bdca009ee57",
+      "type": "rate_error",
+      "message": "DHL Express default accounts are prohibited for existing DHL Express users.",
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    {
+      "carrier": "DHLExpress",
+      "carrier_account_id": "ca_a79c85f7b11d4b30991d728a99267d75",
+      "type": "rate_error",
+      "message": "Unable to retrieve DHLExpress rates for US domestic shipments.",
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    {
+      "carrier": "CanadaPost",
+      "carrier_account_id": "ca_b0f779502f5040c099ae37f896d0375b",
+      "type": "rate_error",
+      "message": "['Unable to get rates for shipments originating outside of Canada.']",
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    {
+      "carrier": "USAExportPBA",
+      "carrier_account_id": "ca_96c0212f0c764a3296bebe96deb5b5de",
+      "type": "rate_error",
+      "message": "shipment: ['shipment.from_address.country: This carrier only support shipments from US origins to international destinations.']",
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    {
+      "carrier": "DhlEcs",
+      "carrier_account_id": "ca_c3dd3ddb0c3640baa60b0fc929c6f6e4",
+      "type": "rate_error",
+      "message": "shipment.options.merchant_id is required",
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    }
+  ],
+  "mode": "test",
+  "options": {
+    "currency": "USD",
+    "payment": {
+      "type": "SENDER",
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    "date_advance": 0,
+    "_params": {
+      "shipment": {
+        "to_address": {
+          "name": "Dr. Steve Brule",
+          "street1": "179 N Harbor Dr",
+          "city": "Redondo Beach",
+          "state": "CA",
+          "zip": "90277",
+          "country": "US",
+          "email": "dr_steve_brule@gmail.com",
+          "phone": "4155559999"
+        },
+        "from_address": {
+          "street1": "417 montgomery street",
+          "street2": "FL 5",
+          "city": "San Francisco",
+          "state": "CA",
+          "zip": "94104",
+          "country": "US",
+          "company": "EasyPost",
+          "phone": "415-123-4567"
+        },
+        "parcel": {
+          "length": 20.2,
+          "width": 10.9,
+          "height": 5,
+          "weight": 65.9
+        }
+      }
+    }
+  },
+  "reference": null,
+  "status": "unknown",
+  "tracking_code": null,
+  "updated_at": "2025-12-09T08:28:37Z",
+  "batch_id": null,
+  "batch_status": null,
+  "batch_message": null,
+  "customs_info": null,
+  "from_address": {
+    "id": "adr_0e1a2aecd4d911f0bbc83cecef1b359e",
+    "object": "Address",
+    "created_at": "2025-12-09T08:28:35Z",
+    "updated_at": "2025-12-09T08:28:35Z",
+    "name": null,
+    "company": "EasyPost",
+    "street1": "417 montgomery street",
+    "street2": "FL 5",
+    "city": "San Francisco",
+    "state": "CA",
+    "zip": "94104",
+    "country": "US",
+    "phone": "4151234567",
+    "email": null,
+    "mode": "test",
+    "carrier_facility": null,
+    "residential": null,
+    "federal_tax_id": null,
+    "state_tax_id": null,
+    "verifications": {
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    "_params": {
+      "shipment": {
+        "to_address": {
+          "name": "Dr. Steve Brule",
+          "street1": "179 N Harbor Dr",
+          "city": "Redondo Beach",
+          "state": "CA",
+          "zip": "90277",
+          "country": "US",
+          "email": "dr_steve_brule@gmail.com",
+          "phone": "4155559999"
+        },
+        "from_address": {
+          "street1": "417 montgomery street",
+          "street2": "FL 5",
+          "city": "San Francisco",
+          "state": "CA",
+          "zip": "94104",
+          "country": "US",
+          "company": "EasyPost",
+          "phone": "415-123-4567"
+        },
+        "parcel": {
+          "length": 20.2,
+          "width": 10.9,
+          "height": 5,
+          "weight": 65.9
+        }
+      }
+    }
+  },
+  "insurance": null,
+  "order_id": null,
+  "parcel": {
+    "id": "prcl_c1dacdc62059422e911c160cbe370a2a",
+    "object": "Parcel",
+    "created_at": "2025-12-09T08:28:35Z",
+    "updated_at": "2025-12-09T08:28:35Z",
+    "length": 20.2,
+    "width": 10.9,
+    "height": 5,
+    "predefined_package": null,
+    "weight": 65.9,
+    "mode": "test",
+    "_params": {
+      "shipment": {
+        "to_address": {
+          "name": "Dr. Steve Brule",
+          "street1": "179 N Harbor Dr",
+          "city": "Redondo Beach",
+          "state": "CA",
+          "zip": "90277",
+          "country": "US",
+          "email": "dr_steve_brule@gmail.com",
+          "phone": "4155559999"
+        },
+        "from_address": {
+          "street1": "417 montgomery street",
+          "street2": "FL 5",
+          "city": "San Francisco",
+          "state": "CA",
+          "zip": "94104",
+          "country": "US",
+          "company": "EasyPost",
+          "phone": "415-123-4567"
+        },
+        "parcel": {
+          "length": 20.2,
+          "width": 10.9,
+          "height": 5,
+          "weight": 65.9
+        }
+      }
+    }
+  },
+  "postage_label": null,
+  "rates": [
+    {
+      "id": "rate_a9dc0fcdcd744eca825337f78f1bfca5",
+      "object": "Rate",
+      "created_at": "2025-12-09T08:28:37Z",
+      "updated_at": "2025-12-09T08:28:37Z",
+      "mode": "test",
+      "service": "Express",
+      "carrier": "USPS",
+      "rate": "52.70",
+      "currency": "USD",
+      "retail_rate": "61.25",
+      "retail_currency": "USD",
+      "list_rate": "52.70",
+      "list_currency": "USD",
+      "billing_type": "easypost",
+      "delivery_days": 2,
+      "delivery_date": null,
+      "delivery_date_guaranteed": false,
+      "est_delivery_days": 2,
+      "shipment_id": "shp_f7dfef0671004b558d182484c64e579e",
+      "carrier_account_id": "ca_ac73771ccbca4d609c8914990d229fa1",
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    {
+      "id": "rate_ba8640118db04d78b7329dbe804249db",
+      "object": "Rate",
+      "created_at": "2025-12-09T08:28:37Z",
+      "updated_at": "2025-12-09T08:28:37Z",
+      "mode": "test",
+      "service": "Priority",
+      "carrier": "USPS",
+      "rate": "12.07",
+      "currency": "USD",
+      "retail_rate": "16.00",
+      "retail_currency": "USD",
+      "list_rate": "14.01",
+      "list_currency": "USD",
+      "billing_type": "easypost",
+      "delivery_days": 2,
+      "delivery_date": null,
+      "delivery_date_guaranteed": false,
+      "est_delivery_days": 2,
+      "shipment_id": "shp_f7dfef0671004b558d182484c64e579e",
+      "carrier_account_id": "ca_ac73771ccbca4d609c8914990d229fa1",
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    {
+      "id": "rate_5ca8b5c5790c441cae80480f69a5ebaf",
+      "object": "Rate",
+      "created_at": "2025-12-09T08:28:37Z",
+      "updated_at": "2025-12-09T08:28:37Z",
+      "mode": "test",
+      "service": "GroundAdvantage",
+      "carrier": "USPS",
+      "rate": "8.20",
+      "currency": "USD",
+      "retail_rate": "14.45",
+      "retail_currency": "USD",
+      "list_rate": "9.88",
+      "list_currency": "USD",
+      "billing_type": "easypost",
+      "delivery_days": 2,
+      "delivery_date": null,
+      "delivery_date_guaranteed": false,
+      "est_delivery_days": 2,
+      "shipment_id": "shp_f7dfef0671004b558d182484c64e579e",
+      "carrier_account_id": "ca_ac73771ccbca4d609c8914990d229fa1",
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    {
+      "id": "rate_28adf3c8446f4f42b600410e5180e882",
+      "object": "Rate",
+      "created_at": "2025-12-09T08:28:37Z",
+      "updated_at": "2025-12-09T08:28:37Z",
+      "mode": "test",
+      "service": "NextDayAir",
+      "carrier": "UPS",
+      "rate": "172.68",
+      "currency": "USD",
+      "retail_rate": "142.11",
+      "retail_currency": "USD",
+      "list_rate": "172.68",
+      "list_currency": "USD",
+      "billing_type": "carrier",
+      "delivery_days": 1,
+      "delivery_date": "2025-12-10T15:00:00Z",
+      "delivery_date_guaranteed": true,
+      "est_delivery_days": 1,
+      "shipment_id": "shp_f7dfef0671004b558d182484c64e579e",
+      "carrier_account_id": "ca_9d03d3362a874376a0cdb94c97ca0303",
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    {
+      "id": "rate_676b0633270b443791c6f8067c3e5fbb",
+      "object": "Rate",
+      "created_at": "2025-12-09T08:28:37Z",
+      "updated_at": "2025-12-09T08:28:37Z",
+      "mode": "test",
+      "service": "NextDayAirEarlyAM",
+      "carrier": "UPS",
+      "rate": "208.38",
+      "currency": "USD",
+      "retail_rate": "177.81",
+      "retail_currency": "USD",
+      "list_rate": "208.38",
+      "list_currency": "USD",
+      "billing_type": "carrier",
+      "delivery_days": 1,
+      "delivery_date": "2025-12-10T09:30:00Z",
+      "delivery_date_guaranteed": true,
+      "est_delivery_days": 1,
+      "shipment_id": "shp_f7dfef0671004b558d182484c64e579e",
+      "carrier_account_id": "ca_9d03d3362a874376a0cdb94c97ca0303",
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    {
+      "id": "rate_df9ee4ee94df4e2da1a502622694cd78",
+      "object": "Rate",
+      "created_at": "2025-12-09T08:28:37Z",
+      "updated_at": "2025-12-09T08:28:37Z",
+      "mode": "test",
+      "service": "NextDayAirSaver",
+      "carrier": "UPS",
+      "rate": "168.73",
+      "currency": "USD",
+      "retail_rate": "138.24",
+      "retail_currency": "USD",
+      "list_rate": "168.73",
+      "list_currency": "USD",
+      "billing_type": "carrier",
+      "delivery_days": 1,
+      "delivery_date": "2025-12-10T23:00:00Z",
+      "delivery_date_guaranteed": true,
+      "est_delivery_days": 1,
+      "shipment_id": "shp_f7dfef0671004b558d182484c64e579e",
+      "carrier_account_id": "ca_9d03d3362a874376a0cdb94c97ca0303",
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    {
+      "id": "rate_55259e8a37fb4e029d9d7185c9928438",
+      "object": "Rate",
+      "created_at": "2025-12-09T08:28:37Z",
+      "updated_at": "2025-12-09T08:28:37Z",
+      "mode": "test",
+      "service": "2ndDayAir",
+      "carrier": "UPS",
+      "rate": "60.45",
+      "currency": "USD",
+      "retail_rate": "46.77",
+      "retail_currency": "USD",
+      "list_rate": "60.45",
+      "list_currency": "USD",
+      "billing_type": "carrier",
+      "delivery_days": 2,
+      "delivery_date": "2025-12-11T23:00:00Z",
+      "delivery_date_guaranteed": false,
+      "est_delivery_days": 2,
+      "shipment_id": "shp_f7dfef0671004b558d182484c64e579e",
+      "carrier_account_id": "ca_9d03d3362a874376a0cdb94c97ca0303",
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    {
+      "id": "rate_43317ba3fcef44c1b2d86fc84efddff7",
+      "object": "Rate",
+      "created_at": "2025-12-09T08:28:37Z",
+      "updated_at": "2025-12-09T08:28:37Z",
+      "mode": "test",
+      "service": "2ndDayAirAM",
+      "carrier": "UPS",
+      "rate": "71.79",
+      "currency": "USD",
+      "retail_rate": "53.19",
+      "retail_currency": "USD",
+      "list_rate": "71.79",
+      "list_currency": "USD",
+      "billing_type": "carrier",
+      "delivery_days": 2,
+      "delivery_date": "2025-12-11T15:00:00Z",
+      "delivery_date_guaranteed": true,
+      "est_delivery_days": 2,
+      "shipment_id": "shp_f7dfef0671004b558d182484c64e579e",
+      "carrier_account_id": "ca_9d03d3362a874376a0cdb94c97ca0303",
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    {
+      "id": "rate_9a7a521cba844696b30e1b17695032cc",
+      "object": "Rate",
+      "created_at": "2025-12-09T08:28:37Z",
+      "updated_at": "2025-12-09T08:28:37Z",
+      "mode": "test",
+      "service": "3DaySelect",
+      "carrier": "UPS",
+      "rate": "46.33",
+      "currency": "USD",
+      "retail_rate": "35.87",
+      "retail_currency": "USD",
+      "list_rate": "46.33",
+      "list_currency": "USD",
+      "billing_type": "carrier",
+      "delivery_days": 3,
+      "delivery_date": "2025-12-12T23:00:00Z",
+      "delivery_date_guaranteed": false,
+      "est_delivery_days": 3,
+      "shipment_id": "shp_f7dfef0671004b558d182484c64e579e",
+      "carrier_account_id": "ca_9d03d3362a874376a0cdb94c97ca0303",
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    {
+      "id": "rate_db0265d909e646ac88221bed407c0ee6",
+      "object": "Rate",
+      "created_at": "2025-12-09T08:28:37Z",
+      "updated_at": "2025-12-09T08:28:37Z",
+      "mode": "test",
+      "service": "Ground",
+      "carrier": "UPS",
+      "rate": "21.02",
+      "currency": "USD",
+      "retail_rate": "18.00",
+      "retail_currency": "USD",
+      "list_rate": "21.02",
+      "list_currency": "USD",
+      "billing_type": "carrier",
+      "delivery_days": 2,
+      "delivery_date": "2025-12-11T23:00:00Z",
+      "delivery_date_guaranteed": false,
+      "est_delivery_days": 2,
+      "shipment_id": "shp_f7dfef0671004b558d182484c64e579e",
+      "carrier_account_id": "ca_9d03d3362a874376a0cdb94c97ca0303",
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    {
+      "id": "rate_4acad6dbca9d4c9babdce6c483e08e58",
+      "object": "Rate",
+      "created_at": "2025-12-09T08:28:37Z",
+      "updated_at": "2025-12-09T08:28:37Z",
+      "mode": "test",
+      "service": "FIRST_OVERNIGHT",
+      "carrier": "FedEx",
+      "rate": "177.15",
+      "currency": "USD",
+      "retail_rate": null,
+      "retail_currency": null,
+      "list_rate": "177.15",
+      "list_currency": "USD",
+      "billing_type": "carrier",
+      "delivery_days": 1,
+      "delivery_date": "2025-12-10T10:00:00Z",
+      "delivery_date_guaranteed": true,
+      "est_delivery_days": 1,
+      "shipment_id": "shp_f7dfef0671004b558d182484c64e579e",
+      "carrier_account_id": "ca_8cdc51acdb0340e3bde5749cf76495e7",
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    {
+      "id": "rate_571ad577bada4e4489c433a4a0e6440f",
+      "object": "Rate",
+      "created_at": "2025-12-09T08:28:37Z",
+      "updated_at": "2025-12-09T08:28:37Z",
+      "mode": "test",
+      "service": "PRIORITY_OVERNIGHT",
+      "carrier": "FedEx",
+      "rate": "89.25",
+      "currency": "USD",
+      "retail_rate": null,
+      "retail_currency": null,
+      "list_rate": "123.15",
+      "list_currency": "USD",
+      "billing_type": "carrier",
+      "delivery_days": 1,
+      "delivery_date": "2025-12-10T12:00:00Z",
+      "delivery_date_guaranteed": true,
+      "est_delivery_days": 1,
+      "shipment_id": "shp_f7dfef0671004b558d182484c64e579e",
+      "carrier_account_id": "ca_8cdc51acdb0340e3bde5749cf76495e7",
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    {
+      "id": "rate_59acdac51be7482da222c498b44169cb",
+      "object": "Rate",
+      "created_at": "2025-12-09T08:28:37Z",
+      "updated_at": "2025-12-09T08:28:37Z",
+      "mode": "test",
+      "service": "STANDARD_OVERNIGHT",
+      "carrier": "FedEx",
+      "rate": "83.98",
+      "currency": "USD",
+      "retail_rate": null,
+      "retail_currency": null,
+      "list_rate": "88.00",
+      "list_currency": "USD",
+      "billing_type": "carrier",
+      "delivery_days": 1,
+      "delivery_date": "2025-12-10T17:00:00Z",
+      "delivery_date_guaranteed": true,
+      "est_delivery_days": 1,
+      "shipment_id": "shp_f7dfef0671004b558d182484c64e579e",
+      "carrier_account_id": "ca_8cdc51acdb0340e3bde5749cf76495e7",
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    {
+      "id": "rate_0d0aa90273f4463daaf9a2f1414e8f4c",
+      "object": "Rate",
+      "created_at": "2025-12-09T08:28:37Z",
+      "updated_at": "2025-12-09T08:28:37Z",
+      "mode": "test",
+      "service": "FEDEX_2_DAY_AM",
+      "carrier": "FedEx",
+      "rate": "36.38",
+      "currency": "USD",
+      "retail_rate": null,
+      "retail_currency": null,
+      "list_rate": "51.45",
+      "list_currency": "USD",
+      "billing_type": "carrier",
+      "delivery_days": 2,
+      "delivery_date": "2025-12-11T12:00:00Z",
+      "delivery_date_guaranteed": true,
+      "est_delivery_days": 2,
+      "shipment_id": "shp_f7dfef0671004b558d182484c64e579e",
+      "carrier_account_id": "ca_8cdc51acdb0340e3bde5749cf76495e7",
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    {
+      "id": "rate_05635787a57f490cbe9e2a3c3c01d86d",
+      "object": "Rate",
+      "created_at": "2025-12-09T08:28:37Z",
+      "updated_at": "2025-12-09T08:28:37Z",
+      "mode": "test",
+      "service": "FEDEX_2_DAY",
+      "carrier": "FedEx",
+      "rate": "24.50",
+      "currency": "USD",
+      "retail_rate": null,
+      "retail_currency": null,
+      "list_rate": "28.50",
+      "list_currency": "USD",
+      "billing_type": "carrier",
+      "delivery_days": 2,
+      "delivery_date": "2025-12-11T17:00:00Z",
+      "delivery_date_guaranteed": true,
+      "est_delivery_days": 2,
+      "shipment_id": "shp_f7dfef0671004b558d182484c64e579e",
+      "carrier_account_id": "ca_8cdc51acdb0340e3bde5749cf76495e7",
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    {
+      "id": "rate_9015dd3c697040c5abaea92b1556a32b",
+      "object": "Rate",
+      "created_at": "2025-12-09T08:28:37Z",
+      "updated_at": "2025-12-09T08:28:37Z",
+      "mode": "test",
+      "service": "FEDEX_GROUND",
+      "carrier": "FedEx",
+      "rate": "15.69",
+      "currency": "USD",
+      "retail_rate": null,
+      "retail_currency": null,
+      "list_rate": "21.15",
+      "list_currency": "USD",
+      "billing_type": "carrier",
+      "delivery_days": 2,
+      "delivery_date": "2025-12-11T23:59:00Z",
+      "delivery_date_guaranteed": true,
+      "est_delivery_days": 2,
+      "shipment_id": "shp_f7dfef0671004b558d182484c64e579e",
+      "carrier_account_id": "ca_8cdc51acdb0340e3bde5749cf76495e7",
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    {
+      "id": "rate_669338c93a15463fa80d07654c080a0e",
+      "object": "Rate",
+      "created_at": "2025-12-09T08:28:37Z",
+      "updated_at": "2025-12-09T08:28:37Z",
+      "mode": "test",
+      "service": "FEDEX_EXPRESS_SAVER",
+      "carrier": "FedEx",
+      "rate": "24.50",
+      "currency": "USD",
+      "retail_rate": null,
+      "retail_currency": null,
+      "list_rate": "28.50",
+      "list_currency": "USD",
+      "billing_type": "carrier",
+      "delivery_days": 3,
+      "delivery_date": "2025-12-12T17:00:00Z",
+      "delivery_date_guaranteed": true,
+      "est_delivery_days": 3,
+      "shipment_id": "shp_f7dfef0671004b558d182484c64e579e",
+      "carrier_account_id": "ca_8cdc51acdb0340e3bde5749cf76495e7",
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    }
+  ],
+  "refund_status": null,
+  "scan_form": null,
+  "selected_rate": null,
+  "tracker": null,
+  "to_address": {
+    "id": "adr_0e1a2a86d4d911f0bbc73cecef1b359e",
+    "object": "Address",
+    "created_at": "2025-12-09T08:28:35Z",
+    "updated_at": "2025-12-09T08:28:35Z",
+    "name": "Dr. Steve Brule",
+    "company": null,
+    "street1": "179 N Harbor Dr",
+    "street2": null,
+    "city": "Redondo Beach",
+    "state": "CA",
+    "zip": "90277",
+    "country": "US",
+    "phone": "4155559999",
+    "email": "dr_steve_brule@gmail.com",
+    "mode": "test",
+    "carrier_facility": null,
+    "residential": null,
+    "federal_tax_id": null,
+    "state_tax_id": null,
+    "verifications": {
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    "_params": {
+      "shipment": {
+        "to_address": {
+          "name": "Dr. Steve Brule",
+          "street1": "179 N Harbor Dr",
+          "city": "Redondo Beach",
+          "state": "CA",
+          "zip": "90277",
+          "country": "US",
+          "email": "dr_steve_brule@gmail.com",
+          "phone": "4155559999"
+        },
+        "from_address": {
+          "street1": "417 montgomery street",
+          "street2": "FL 5",
+          "city": "San Francisco",
+          "state": "CA",
+          "zip": "94104",
+          "country": "US",
+          "company": "EasyPost",
+          "phone": "415-123-4567"
+        },
+        "parcel": {
+          "length": 20.2,
+          "width": 10.9,
+          "height": 5,
+          "weight": 65.9
+        }
+      }
+    }
+  },
+  "usps_zone": 4,
+  "return_address": {
+    "id": "adr_0e1a2aecd4d911f0bbc83cecef1b359e",
+    "object": "Address",
+    "created_at": "2025-12-09T08:28:35Z",
+    "updated_at": "2025-12-09T08:28:35Z",
+    "name": null,
+    "company": "EasyPost",
+    "street1": "417 montgomery street",
+    "street2": "FL 5",
+    "city": "San Francisco",
+    "state": "CA",
+    "zip": "94104",
+    "country": "US",
+    "phone": "4151234567",
+    "email": null,
+    "mode": "test",
+    "carrier_facility": null,
+    "residential": null,
+    "federal_tax_id": null,
+    "state_tax_id": null,
+    "verifications": {
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    "_params": {
+      "shipment": {
+        "to_address": {
+          "name": "Dr. Steve Brule",
+          "street1": "179 N Harbor Dr",
+          "city": "Redondo Beach",
+          "state": "CA",
+          "zip": "90277",
+          "country": "US",
+          "email": "dr_steve_brule@gmail.com",
+          "phone": "4155559999"
+        },
+        "from_address": {
+          "street1": "417 montgomery street",
+          "street2": "FL 5",
+          "city": "San Francisco",
+          "state": "CA",
+          "zip": "94104",
+          "country": "US",
+          "company": "EasyPost",
+          "phone": "415-123-4567"
+        },
+        "parcel": {
+          "length": 20.2,
+          "width": 10.9,
+          "height": 5,
+          "weight": 65.9
+        }
+      }
+    }
+  },
+  "buyer_address": {
+    "id": "adr_0e1a2a86d4d911f0bbc73cecef1b359e",
+    "object": "Address",
+    "created_at": "2025-12-09T08:28:35Z",
+    "updated_at": "2025-12-09T08:28:35Z",
+    "name": "Dr. Steve Brule",
+    "company": null,
+    "street1": "179 N Harbor Dr",
+    "street2": null,
+    "city": "Redondo Beach",
+    "state": "CA",
+    "zip": "90277",
+    "country": "US",
+    "phone": "4155559999",
+    "email": "dr_steve_brule@gmail.com",
+    "mode": "test",
+    "carrier_facility": null,
+    "residential": null,
+    "federal_tax_id": null,
+    "state_tax_id": null,
+    "verifications": {
+      "_params": {
+        "shipment": {
+          "to_address": {
+            "name": "Dr. Steve Brule",
+            "street1": "179 N Harbor Dr",
+            "city": "Redondo Beach",
+            "state": "CA",
+            "zip": "90277",
+            "country": "US",
+            "email": "dr_steve_brule@gmail.com",
+            "phone": "4155559999"
+          },
+          "from_address": {
+            "street1": "417 montgomery street",
+            "street2": "FL 5",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94104",
+            "country": "US",
+            "company": "EasyPost",
+            "phone": "415-123-4567"
+          },
+          "parcel": {
+            "length": 20.2,
+            "width": 10.9,
+            "height": 5,
+            "weight": 65.9
+          }
+        }
+      }
+    },
+    "_params": {
+      "shipment": {
+        "to_address": {
+          "name": "Dr. Steve Brule",
+          "street1": "179 N Harbor Dr",
+          "city": "Redondo Beach",
+          "state": "CA",
+          "zip": "90277",
+          "country": "US",
+          "email": "dr_steve_brule@gmail.com",
+          "phone": "4155559999"
+        },
+        "from_address": {
+          "street1": "417 montgomery street",
+          "street2": "FL 5",
+          "city": "San Francisco",
+          "state": "CA",
+          "zip": "94104",
+          "country": "US",
+          "company": "EasyPost",
+          "phone": "415-123-4567"
+        },
+        "parcel": {
+          "length": 20.2,
+          "width": 10.9,
+          "height": 5,
+          "weight": 65.9
+        }
+      }
+    }
+  },
+  "forms": [],
+  "fees": [],
+  "object": "Shipment",
+  "_params": {
+    "shipment": {
+      "to_address": {
+        "name": "Dr. Steve Brule",
+        "street1": "179 N Harbor Dr",
+        "city": "Redondo Beach",
+        "state": "CA",
+        "zip": "90277",
+        "country": "US",
+        "email": "dr_steve_brule@gmail.com",
+        "phone": "4155559999"
+      },
+      "from_address": {
+        "street1": "417 montgomery street",
+        "street2": "FL 5",
+        "city": "San Francisco",
+        "state": "CA",
+        "zip": "94104",
+        "country": "US",
+        "company": "EasyPost",
+        "phone": "415-123-4567"
+      },
+      "parcel": {
+        "length": 20.2,
+        "width": 10.9,
+        "height": 5,
+        "weight": 65.9
+      }
+    }
+  }
+}

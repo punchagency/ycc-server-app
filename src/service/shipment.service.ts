@@ -8,6 +8,7 @@ import { addNotificationJob, addEmailJob } from "../integration/QueueManager";
 import { generateShippedEmailTemplate, generateDeliveredEmailTemplate, generateFailedEmailTemplate, generateReturnedEmailTemplate } from "../templates/shipment-email-templates";
 import { logInfo } from "../utils/SystemLogs";
 import { AddressFormatter } from "../utils/StateFormatter";
+import BusinessModel from "../models/business.model";
 
 export class ShipmentService {
     static async createShipmentsForConfirmedItems(orderId: string, businessId: string) {
@@ -46,27 +47,33 @@ export class ShipmentService {
         const fromAddr = AddressFormatter.formatAddress(confirmedItems[0].fromAddress);
         const toAddr = AddressFormatter.formatAddress(order.deliveryAddress);
 
+        const business = await BusinessModel.findById(businessId);
+        const user = await UserModel.findById(order.userId);
+        const parsedFromAddress = {
+            street1: fromAddr.street || '',
+            street2: 'FL 5',
+            city: fromAddr.city || '',
+            state: fromAddr.state || '',
+            zip: fromAddr.zip || '',
+            country: fromAddr.country || '',
+            company: business?.businessName || '',
+            phone: business?.phone || ''
+        }
+        const parsedToAddress = {
+            name: user ? `${user.firstName} ${user.lastName}` : '',
+            street1: toAddr.street || '',
+            city: toAddr.city || '',
+            state: toAddr.state || '',
+            zip: toAddr.zip || '',
+            country: toAddr.country || '',
+            email: user?.email || '',
+            phone: user?.phone || ''
+        }
+
         const easypost = new EasyPostIntegration();
         const [error, response] = await catchError(easypost.createShipmentLogistics({
-            fromAddress: {
-                street1: fromAddr.street || '',
-                street2: '',
-                city: fromAddr.city || '',
-                state: fromAddr.state || '',
-                zip: fromAddr.zip || '',
-                country: fromAddr.country || '',
-                company: '',
-                phone: ''
-            },
-            toAddress: {
-                name: '',
-                street1: toAddr.street || '',
-                city: toAddr.city || '',
-                state: toAddr.state || '',
-                zip: toAddr.zip || '',
-                country: toAddr.country || '',
-                phone: ''
-            },
+            fromAddress: parsedFromAddress,
+            toAddress: parsedToAddress,
             parcel: {
                 length: maxLength,
                 width: maxWidth,

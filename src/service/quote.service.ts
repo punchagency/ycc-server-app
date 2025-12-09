@@ -126,7 +126,6 @@ export class QuoteService {
 
         return { quote, invoiceUrl: stripeInvoice!.hosted_invoice_url };
     }
-
     static async declineQuote({quoteId, userId, reason}: {quoteId: string, userId: string, reason?: string}) {
         const quote = await QuoteModel.findById(quoteId);
         if (!quote) {
@@ -154,6 +153,13 @@ export class QuoteService {
 
         booking.quoteStatus = 'rejected';
         await booking.save();
+
+        // Update invoice status if exists
+        const invoice = await InvoiceModel.findOne({ bookingId: booking._id });
+        if (invoice && invoice.status === 'pending') {
+            invoice.status = 'cancelled';
+            await invoice.save();
+        }
 
         const business = await BusinessModel.findById(booking.businessId);
         if (business) {

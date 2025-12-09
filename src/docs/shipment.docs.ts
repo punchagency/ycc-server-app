@@ -1,6 +1,6 @@
 /**
  * @swagger
- * /api/shipments/order/{orderId}:
+ * /api/v2/shipments/order/{orderId}:
  *   get:
  *     summary: Get all shipments for an order
  *     tags: [Shipments]
@@ -19,7 +19,7 @@
 
 /**
  * @swagger
- * /api/shipments/{shipmentId}/select-rate:
+ * /api/v2/shipments/{shipmentId}/select-rate:
  *   post:
  *     summary: Select shipping rate for a shipment
  *     tags: [Shipments]
@@ -47,7 +47,7 @@
 
 /**
  * @swagger
- * /api/shipments/{shipmentId}/purchase-label:
+ * /api/v2/shipments/{shipmentId}/purchase-label:
  *   post:
  *     summary: Purchase shipping label
  *     tags: [Shipments]

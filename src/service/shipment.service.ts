@@ -157,7 +157,6 @@ export class ShipmentService {
 
         return shipments.length === 1 ? shipments[0] : shipments;
     }
-
     static async getShipmentsByOrder(orderId: string, userId: string) {
         const order = await OrderModel.findById(orderId);
         if (!order) throw new Error('Order not found');
@@ -167,7 +166,6 @@ export class ShipmentService {
             .populate('items.productId', 'name imageURLs')
             .populate('items.businessId', 'businessName');
     }
-
     static async selectShipmentRate(shipmentId: string, rateId: string, userId: string) {
         const shipment = await ShipmentModel.findById(shipmentId);
         if (!shipment) throw new Error('Shipment not found');
@@ -183,7 +181,6 @@ export class ShipmentService {
 
         return shipment;
     }
-
     static async purchaseShipmentLabel(shipmentId: string, userId: string) {
         const shipment = await ShipmentModel.findById(shipmentId);
         if (!shipment) throw new Error('Shipment not found');
@@ -216,7 +213,6 @@ export class ShipmentService {
 
         return shipment;
     }
-
     static async processTrackingWebhook(trackingCode: string, easypostStatus: string, webhookData: any) {
         const shipment = await ShipmentModel.findOne({ trackingNumber: trackingCode });
         if (!shipment) {
@@ -276,7 +272,6 @@ export class ShipmentService {
             await this.sendTrackingNotification(shipment, order, webhookData);
         }
     }
-
     private static async sendTrackingNotification(shipment: IShipment, order: IOrder, trackingData: any) {
         const user = await UserModel.findById(order.userId);
         if (!user) return;

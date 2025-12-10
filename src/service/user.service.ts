@@ -34,7 +34,7 @@ export class UserService {
 
         const userIds = users.map(user => user._id);
         
-        const businessFilter: any = { userId: { $in: userIds }, isRejected: false };
+        const businessFilter: any = { userId: { $in: userIds }, $or: [{ isRejected: null }, { isRejected: false }] };
         if (isOnboarded !== undefined) {
             businessFilter.isOnboarded = isOnboarded;
         }

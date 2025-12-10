@@ -3,7 +3,8 @@
  * /api/v2/service:
  *   post:
  *     tags: [Service]
- *     summary: Create a new service
+ *     summary: Create a new service (Distributor or Admin)
+ *     description: Distributors create services for their own business. Admins can create services for any distributor's business by providing businessId.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -16,24 +17,36 @@
  *             properties:
  *               name:
  *                 type: string
+ *                 minLength: 2
+ *                 maxLength: 50
  *               description:
  *                 type: string
+ *                 maxLength: 500
  *               price:
  *                 type: number
+ *                 minimum: 1
  *               categoryId:
  *                 type: string
  *               isQuotable:
  *                 type: boolean
+ *               businessId:
+ *                 type: string
+ *                 description: Required for admins - the distributor's business ID
  *               serviceImage:
  *                 type: array
  *                 items:
  *                   type: string
  *                   format: binary
+ *                 maxItems: 10
  *     responses:
  *       201:
  *         description: Service created successfully
+ *       400:
+ *         description: Validation error or business not found
  *       401:
  *         description: Unauthorized
+ *       403:
+ *         description: Only distributors and admins can create services
  */
 
 /**
@@ -94,7 +107,8 @@
  * /api/v2/service/{id}:
  *   put:
  *     tags: [Service]
- *     summary: Update service
+ *     summary: Update service (Distributor or Admin)
+ *     description: Distributors can update their own services. Admins can update any distributor's service.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -112,10 +126,14 @@
  *             properties:
  *               name:
  *                 type: string
+ *                 minLength: 2
+ *                 maxLength: 50
  *               description:
  *                 type: string
+ *                 maxLength: 500
  *               price:
  *                 type: number
+ *                 minimum: 0
  *               categoryId:
  *                 type: string
  *               isQuotable:
@@ -125,13 +143,18 @@
  *                 items:
  *                   type: string
  *                   format: binary
+ *                 maxItems: 10
  *     responses:
  *       200:
  *         description: Service updated successfully
+ *       400:
+ *         description: Invalid service ID
  *       401:
  *         description: Unauthorized
+ *       403:
+ *         description: Access denied or only distributors and admins can update services
  *       404:
- *         description: Service not found
+ *         description: Service not found or business not found
  */
 
 /**

@@ -53,15 +53,19 @@ export class ShipmentController {
     }
 
     static async purchaseLabel(req: AuthenticatedRequest, res: Response) {
-        const { shipmentId } = req.params;
         const userId = req.user?._id;
+        const { selections } = req.body;
 
         if (!userId) {
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         }
 
-        const [error, shipment] = await catchError(
-            ShipmentService.purchaseShipmentLabel(shipmentId, userId)
+        if (!selections || !Array.isArray(selections) || selections.length === 0) {
+            return res.status(400).json({ success: false, message: 'Selections array is required' });
+        }
+
+        const [error, result] = await catchError(
+            ShipmentService.purchaseShipmentLabel(selections, userId)
         );
 
         if (error) {
@@ -70,8 +74,8 @@ export class ShipmentController {
 
         return res.status(200).json({ 
             success: true, 
-            message: 'Label purchased successfully',
-            data: shipment 
+            message: result.labelsPurchased ? 'Labels purchased successfully' : 'Some labels failed to purchase',
+            data: result
         });
     }
 }

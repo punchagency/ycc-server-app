@@ -6,9 +6,11 @@ import { EasyPostIntegration } from "../integration/easypost";
 import catchError from "../utils/catchError";
 import { addNotificationJob, addEmailJob } from "../integration/QueueManager";
 import { generateShippedEmailTemplate, generateDeliveredEmailTemplate, generateFailedEmailTemplate, generateReturnedEmailTemplate } from "../templates/shipment-email-templates";
-import { logInfo } from "../utils/SystemLogs";
+import { logInfo, logError } from "../utils/SystemLogs";
 import { AddressFormatter } from "../utils/StateFormatter";
 import BusinessModel from "../models/business.model";
+import InvoiceModel from "../models/invoice.model";
+import StripeService from "../integration/stripe";
 
 export class ShipmentService {
     static async createShipmentsForConfirmedItems(orderId: string, businessId: string) {
@@ -181,37 +183,274 @@ export class ShipmentService {
 
         return shipment;
     }
-    static async purchaseShipmentLabel(shipmentId: string, userId: string) {
-        const shipment = await ShipmentModel.findById(shipmentId);
-        if (!shipment) throw new Error('Shipment not found');
-        if (shipment.userId.toString() !== userId) throw new Error('Unauthorized');
-        if (shipment.status !== 'rate_selected') throw new Error('Rate must be selected first');
+    static async purchaseShipmentLabel(selections: { shipmentId: string; rateId: string }[], userId: string) {
+        if (!selections || !Array.isArray(selections) || selections.length === 0) {
+            throw new Error('Selections array is required');
+        }
 
-        const selectedRate = shipment.rates.find(r => r.isSelected);
-        if (!selectedRate) throw new Error('No rate selected');
+        const firstShipment = await ShipmentModel.findById(selections[0].shipmentId);
+        if (!firstShipment) throw new Error('Shipment not found');
+        const orderId = firstShipment.orderId;
+        if (!orderId) throw new Error('Order ID not found');
 
-        const easypost = new EasyPostIntegration();
-        const [error, response] = await catchError(easypost.purchaseLabel(shipmentId, selectedRate.id));
-        
-        if (error) throw new Error(`Label purchase failed: ${error.message}`);
+        for (const selection of selections) {
+            const shipment = await ShipmentModel.findById(selection.shipmentId);
+            if (!shipment) throw new Error(`Shipment ${selection.shipmentId} not found`);
+            const rate = shipment.rates.find(r => r.id === selection.rateId);
+            if (!rate) throw new Error(`Rate ${selection.rateId} not found`);
+            shipment.rates.forEach(r => r.isSelected = r.id === selection.rateId);
+            shipment.status = 'rate_selected';
+            await shipment.save();
+        }
 
-        shipment.trackingNumber = response.tracking_code;
-        shipment.labelUrl = response.postage_label?.label_url;
-        shipment.status = 'label_purchased';
-        await shipment.save();
-
-        const order = await OrderModel.findById(shipment.orderId);
-        if (order) {
-            for (const shipmentItem of shipment.items) {
-                const orderItem = order.items.find(i => 
-                    i.productId.toString() === shipmentItem.productId.toString()
-                );
-                if (orderItem) orderItem.status = 'processing';
+        let draftInvoice;
+        try {
+            draftInvoice = await this.createDraftInvoice(orderId.toString());
+        } catch (error: any) {
+            for (const selection of selections) {
+                const shipment = await ShipmentModel.findById(selection.shipmentId);
+                if (shipment) {
+                    shipment.rates.forEach(r => r.isSelected = false);
+                    await shipment.save();
+                }
             }
+            throw new Error(`Invoice creation failed: ${error.message}`);
+        }
+
+        const results = await this.buyLabels(userId, selections);
+        const allSuccess = results.every(r => r.success);
+
+        if (allSuccess) {
+            let invoiceUrl;
+            try {
+                invoiceUrl = await this.finalizeAndSendInvoice(draftInvoice.invoice.id, orderId.toString());
+            } catch (error: any) {
+                logError({ message: 'Invoice finalization failed', error, source: 'ShipmentService.purchaseShipmentLabel' });
+            }
+            return { status: true, results, invoiceUrl, labelsPurchased: true };
+        } else {
+            const stripe = StripeService.getInstance();
+            try {
+                await (stripe as any).stripe.invoices.del(draftInvoice.invoice.id);
+            } catch (error: any) {
+                logError({ message: 'Draft invoice deletion failed', error, source: 'ShipmentService.purchaseShipmentLabel' });
+            }
+            for (const result of results) {
+                if (!result.success) {
+                    const shipment = await ShipmentModel.findById(result.shipmentId);
+                    if (shipment) {
+                        shipment.rates.forEach(r => r.isSelected = false);
+                        await shipment.save();
+                    }
+                }
+            }
+            return { status: false, results, labelsPurchased: false };
+        }
+    }
+    private static async buyLabels(userId: string, selections: { shipmentId: string; rateId: string }[]) {
+        const results: any[] = [];
+        const easypost = new EasyPostIntegration();
+
+        for (const selection of selections) {
+            try {
+                const { shipmentId, rateId } = selection;
+                if (!shipmentId || !rateId) {
+                    results.push({ shipmentId, success: false, message: 'Missing shipmentId or rateId' });
+                    continue;
+                }
+
+                const shipment = await ShipmentModel.findById(shipmentId);
+                if (!shipment) throw new Error('Shipment not found');
+                if (shipment.userId.toString() !== userId) throw new Error('Not authorized');
+                if (shipment.status === 'label_purchased') throw new Error('Label already purchased');
+
+                const rate = shipment.rates.find(r => r.id === rateId);
+                if (!rate) throw new Error('Rate not found');
+
+                const newShipmentData = {
+                    from_address: shipment.fromAddress,
+                    to_address: shipment.toAddress,
+                    parcel: {
+                        length: shipment.rates[0]?.id ? undefined : 10,
+                        width: shipment.rates[0]?.id ? undefined : 10,
+                        height: shipment.rates[0]?.id ? undefined : 10,
+                        weight: shipment.rates[0]?.id ? undefined : 10
+                    }
+                };
+
+                const newEpShipment = await easypost.createShipmentLogistics(newShipmentData as any);
+                if (!newEpShipment.rates || newEpShipment.rates.length === 0) {
+                    throw new Error('No rates returned');
+                }
+
+                let matchedRate = newEpShipment.rates.find((r: any) => 
+                    r.carrier === rate.carrier && r.service === rate.service
+                );
+                if (!matchedRate) {
+                    matchedRate = newEpShipment.rates.reduce((lowest: any, current: any) => 
+                        parseFloat(current.rate) < parseFloat(lowest.rate) ? current : lowest
+                    );
+                }
+
+                const purchasedShipment = await easypost.purchaseLabel(newEpShipment.id, matchedRate.id);
+
+                shipment.rates = newEpShipment.rates.map((r: any) => ({
+                    carrier: r.carrier,
+                    rate: parseFloat(r.rate),
+                    service: r.service,
+                    estimatedDays: r.delivery_days,
+                    guaranteedDeliveryDate: r.delivery_date_guaranteed || false,
+                    deliveryDate: r.est_delivery_date ? new Date(r.est_delivery_date) : undefined,
+                    isSelected: r.id === matchedRate.id,
+                    id: r.id
+                }));
+                shipment.fromAddress = newShipmentData.from_address;
+                shipment.toAddress = newShipmentData.to_address;
+                shipment.status = 'label_purchased';
+                shipment.trackingNumber = purchasedShipment.tracking_code;
+                shipment.labelUrl = purchasedShipment.postage_label?.label_url;
+                await shipment.save();
+
+                results.push({
+                    shipmentId,
+                    success: true,
+                    trackingCode: purchasedShipment.tracking_code,
+                    labelUrl: purchasedShipment.postage_label?.label_url
+                });
+            } catch (error: any) {
+                logError({ message: 'Label purchase failed', error, source: 'ShipmentService.buyLabels' });
+                results.push({
+                    shipmentId: selection.shipmentId,
+                    success: false,
+                    message: error.message || 'Unknown error',
+                    errorCode: error.code || error.status
+                });
+            }
+        }
+        return results;
+    }
+    private static async createDraftInvoice(orderId: string) {
+        const stripe = StripeService.getInstance();
+        const order = await OrderModel.findById(orderId).populate('userId');
+        if (!order) throw new Error('Order not found');
+
+        const user: any = order.userId;
+        let stripeCustomerId = user.stripeCustomerId;
+
+        if (!stripeCustomerId) {
+            const customers = await (stripe as any).stripe.customers.list({ email: user.email, limit: 1 });
+            if (customers.data.length > 0) {
+                stripeCustomerId = customers.data[0].id;
+            } else {
+                const customer = await (stripe as any).stripe.customers.create({
+                    email: user.email,
+                    name: `${user.firstName} ${user.lastName}`
+                });
+                stripeCustomerId = customer.id;
+            }
+            user.stripeCustomerId = stripeCustomerId;
+            await user.save();
+        }
+
+        const invoice = await (stripe as any).stripe.invoices.create({
+            customer: stripeCustomerId,
+            collection_method: 'send_invoice',
+            days_until_due: 7,
+            metadata: { orderId: orderId, userId: user._id.toString(), customerEmail: user.email }
+        });
+
+        const businessIds = [...new Set(order.items.map(item => item.businessId.toString()))];
+        const missingStripeAccounts: string[] = [];
+
+        for (const businessId of businessIds) {
+            const business = await BusinessModel.findById(businessId);
+            if (!business?.stripeAccountId) {
+                missingStripeAccounts.push(business?.businessName || businessId);
+                continue;
+            }
+
+            const businessItems = order.items.filter(item => item.businessId.toString() === businessId);
+            const subTotal = businessItems.reduce((sum, item) => sum + item.totalPriceOfItems, 0);
+
+            await (stripe as any).stripe.invoiceItems.create({
+                customer: stripeCustomerId,
+                invoice: invoice.id,
+                amount: Math.round(subTotal * 100),
+                currency: 'usd',
+                description: `Products from ${business.businessName}`,
+                metadata: { supplierId: businessId, supplierUserId: business.userId.toString(), type: 'supplier_product' }
+            });
+        }
+
+        if (missingStripeAccounts.length > 0) {
+            throw new Error(`Suppliers missing Stripe accounts: ${missingStripeAccounts.join(', ')}`);
+        }
+
+        const shipments = await ShipmentModel.find({ orderId });
+        let shippingTotal = 0;
+        for (const shipment of shipments) {
+            const selectedRate = shipment.rates.find(r => r.isSelected);
+            if (selectedRate) shippingTotal += selectedRate.rate;
+        }
+
+        if (shippingTotal > 0) {
+            await (stripe as any).stripe.invoiceItems.create({
+                customer: stripeCustomerId,
+                invoice: invoice.id,
+                amount: Math.round(shippingTotal * 100),
+                currency: 'usd',
+                description: 'Shipping (platform)',
+                metadata: { type: 'shipping' }
+            });
+        }
+
+        const platformFee = order.totalAmount * 0.1;
+        if (platformFee > 0) {
+            await (stripe as any).stripe.invoiceItems.create({
+                customer: stripeCustomerId,
+                invoice: invoice.id,
+                amount: Math.round(platformFee * 100),
+                currency: 'usd',
+                description: 'Platform Fee (10%)',
+                metadata: { type: 'platform_fee' }
+            });
+        }
+
+        return { invoice, stripeCustomerId, order };
+    }
+    private static async finalizeAndSendInvoice(invoiceId: string, orderId: string) {
+        const stripe = StripeService.getInstance();
+        const finalizedInvoice = await (stripe as any).stripe.invoices.finalizeInvoice(invoiceId);
+
+        const order = await OrderModel.findById(orderId).populate('userId');
+        if (order) {
+            order.stripeInvoiceUrl = finalizedInvoice.hosted_invoice_url;
+            order.stripeInvoiceId = invoiceId;
             await order.save();
         }
 
-        return shipment;
+        await (stripe as any).stripe.invoices.sendInvoice(invoiceId);
+
+        const businessIds = [...new Set(order!.items.map(item => item!.businessId))];
+        try {
+            await InvoiceModel.create({
+                stripeInvoiceId: invoiceId,
+                userId: order!.userId,
+                orderId: orderId,
+                businessIds,
+                amount: finalizedInvoice.amount_due / 100,
+                platformFee: order!.platformFee,
+                currency: 'usd',
+                status: 'pending',
+                invoiceDate: new Date(),
+                dueDate: new Date(finalizedInvoice.due_date * 1000),
+                stripeInvoiceUrl: finalizedInvoice.hosted_invoice_url
+            });
+        } catch (error: any) {
+            logError({ message: 'Invoice record creation failed', error, source: 'ShipmentService.finalizeAndSendInvoice' });
+        }
+
+        return finalizedInvoice.hosted_invoice_url;
     }
     static async processTrackingWebhook(trackingCode: string, easypostStatus: string, webhookData: any) {
         const shipment = await ShipmentModel.findOne({ trackingNumber: trackingCode });

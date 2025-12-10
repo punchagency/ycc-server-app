@@ -41,8 +41,8 @@ export interface IOrder extends Document {
     platformFee: number;
     invoiceId?: Schema.Types.ObjectId;
     paymentStatus: typeof ORDER_PAYMENT_STATUSES[number];
-    stripeInvoiceUrl?: string;
-    stripeInvoiceId?: string;
+    stripeInvoiceUrl?: string | null;
+    stripeInvoiceId?: string | null;
     orderHistory: {
         fromStatus: 'pending' | 'declined' | 'confirmed' | 'processing' | 'out_for_delivery' | 'shipped' | 'delivered' | 'cancelled';
         toStatus: 'pending' | 'declined' | 'confirmed' | 'processing' | 'out_for_delivery' | 'shipped' | 'delivered' | 'cancelled';

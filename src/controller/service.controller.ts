@@ -23,8 +23,8 @@ export class ServiceController {
 
             const { name, description, price, categoryId, isQuotable } = req.body;
 
-            if (!name || !Validate.stringLength(name, 2, 50)) {
-                res.status(400).json({ success: false, message: 'Service name must be 2-50 characters', code: 'VALIDATION_ERROR' });
+            if (!name || !Validate.stringLength(name, 2, 100)) {
+                res.status(400).json({ success: false, message: 'Service name must be 2-100 characters', code: 'VALIDATION_ERROR' });
                 return;
             }
 

@@ -22,7 +22,7 @@ export interface AuthResponse {
       id: string;
       businessName: string;
       businessType: typeof BUSINESS_TYPE[number];
-      isOnboarded: boolean
+      isOnboarded: boolean;
     };
   };
   error?: string;

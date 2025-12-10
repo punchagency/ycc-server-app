@@ -4,7 +4,7 @@ import catchError from '../utils/catchError';
 
 interface FromAddress {
     street1: string,
-    street2: string,
+    street2: string | null,
     city: string,
     state: string,
     zip: string,
@@ -19,6 +19,7 @@ interface ToAddress {
     state: string,
     zip: string,
     country: string,
+    email: string,
     phone: string,
 }
 interface Parcel {

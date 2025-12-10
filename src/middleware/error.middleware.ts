@@ -270,7 +270,7 @@ interface ErrorContext {
 
 // Enhanced error response interface
 interface ErrorResponse {
-  error: string;
+  message: string;
   code: string;
   retryable: boolean;
   timestamp: string;
@@ -369,7 +369,7 @@ export const errorHandler = (
 
   // Build error response
   const errorResponse: ErrorResponse = {
-    error: appError.message || 'An unexpected error occurred',
+    message: appError.message || 'An unexpected error occurred',
     code,
     retryable,
     timestamp: new Date().toISOString(),
@@ -708,7 +708,7 @@ export const notFoundHandler = (req: Request, res: Response): void => {
   });
 
   res.status(404).json({
-    error: `Route ${req.method} ${req.path} not found`,
+    message: `Route ${req.method} ${req.path} not found`,
     code: 'ROUTE_NOT_FOUND',
     retryable: false,
     timestamp: new Date().toISOString(),

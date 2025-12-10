@@ -12,7 +12,7 @@ export const SHIPMENT_STATUSES = [
 ] as const;
 
 
-export interface IShippment extends Document {
+export interface IShipment extends Document {
     _id: Schema.Types.ObjectId;
     orderId: Schema.Types.ObjectId;
     userId: Schema.Types.ObjectId;
@@ -59,7 +59,7 @@ export interface IShippment extends Document {
 }
 
 
-const ShippmentSchema = new Schema({
+const ShipmentSchema = new Schema({
     orderId: { type: Schema.Types.ObjectId, ref: 'Order', required: true },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     trackingNumber: { type: String },
@@ -108,9 +108,9 @@ const ShippmentSchema = new Schema({
     timestamps: true
 });
 
-ShippmentSchema.index({ orderId: 1 });
-ShippmentSchema.index({ userId: 1 });
-ShippmentSchema.index({ status: 1 });
-ShippmentSchema.index({ trackingNumber: 1 });
+ShipmentSchema.index({ orderId: 1 });
+ShipmentSchema.index({ userId: 1 });
+ShipmentSchema.index({ status: 1 });
+ShipmentSchema.index({ trackingNumber: 1 });
 
-export default model<IShippment>('Shippment', ShippmentSchema);
+export default model<IShipment>('Shipment', ShipmentSchema);

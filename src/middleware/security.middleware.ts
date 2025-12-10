@@ -17,7 +17,7 @@ export const createRateLimit = (windowMs: number, max: number, message?: string)
     legacyHeaders: false,
     handler: (_req: Request, res: Response) => {
       res.status(429).json({
-        error: message || 'Too many requests from this IP, please try again later',
+        message: message || 'Too many requests from this IP, please try again later',
         code: 'RATE_LIMIT_EXCEEDED',
         retryable: true,
         timestamp: new Date().toISOString()
@@ -28,16 +28,16 @@ export const createRateLimit = (windowMs: number, max: number, message?: string)
 
 // General API rate limit
 export const generalRateLimit = createRateLimit(
-  15 * 60 * 1000, // 15 minutes
+  1 * 60 * 1000, // 1 minutes
   100, // limit each IP to 100 requests per windowMs
-  'Too many API requests from this IP, please try again later'
+  'Too many API requests from this IP, please try again after 1 minute'
 );
 
 // Auth endpoints rate limit (more restrictive)
 export const authRateLimit = createRateLimit(
   15 * 60 * 1000, // 15 minutes
   5, // limit each IP to 5 auth requests per windowMs
-  'Too many authentication attempts from this IP, please try again later'
+  'Too many authentication attempts from this IP, please try again after 15 minutes'
 );
 
 // Message sending rate limit
@@ -58,7 +58,7 @@ export const requestSizeLimit = (maxSize: string = '10mb') => {
       
       if (sizeInMB > maxSizeInMB) {
         res.status(413).json({
-          error: `Request size too large. Maximum allowed size is ${maxSize}`,
+          message: `Request size too large. Maximum allowed size is ${maxSize}`,
           code: 'REQUEST_TOO_LARGE',
           retryable: false,
           timestamp: new Date().toISOString()
@@ -82,7 +82,7 @@ export const validateContentType = (allowedTypes: string[] = ['application/json'
     
     if (!contentType) {
       res.status(400).json({
-        error: 'Content-Type header is required',
+        message: 'Content-Type header is required',
         code: 'CONTENT_TYPE_MISSING',
         retryable: false,
         timestamp: new Date().toISOString()
@@ -96,7 +96,7 @@ export const validateContentType = (allowedTypes: string[] = ['application/json'
     
     if (!isValidType) {
       res.status(415).json({
-        error: `Unsupported content type. Allowed types: ${allowedTypes.join(', ')}`,
+        message: `Unsupported content type. Allowed types: ${allowedTypes.join(', ')}`,
         code: 'UNSUPPORTED_CONTENT_TYPE',
         retryable: false,
         timestamp: new Date().toISOString()
@@ -116,7 +116,7 @@ export const validateApiKey = (req: Request, res: Response, next: NextFunction) 
   if (!expectedApiKey) {
     console.error('WEBHOOK_API_KEY not configured');
     res.status(500).json({
-      error: 'Server configuration error',
+      message: 'Server configuration error',
       code: 'SERVER_CONFIG_ERROR',
       retryable: false,
       timestamp: new Date().toISOString()
@@ -126,7 +126,7 @@ export const validateApiKey = (req: Request, res: Response, next: NextFunction) 
   
   if (!apiKey || apiKey !== expectedApiKey) {
     res.status(401).json({
-      error: 'Invalid or missing API key',
+      message: 'Invalid or missing API key',
       code: 'INVALID_API_KEY',
       retryable: false,
       timestamp: new Date().toISOString()

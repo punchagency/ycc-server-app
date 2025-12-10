@@ -22,6 +22,7 @@ export interface AuthResponse {
       id: string;
       businessName: string;
       businessType: typeof BUSINESS_TYPE[number];
+      isOnboarded: boolean
     };
   };
   error?: string;
@@ -180,7 +181,8 @@ export class AuthService {
           business: business ? {
             id: business._id.toString(),
             businessName: business.businessName,
-            businessType: business.businessType
+            businessType: business.businessType,
+            isOnboarded: business.isOnboarded
           } : undefined
         }
       };
@@ -251,7 +253,8 @@ export class AuthService {
           business: business ? {
             id: business._id.toString(),
             businessName: business.businessName,
-            businessType: business.businessType
+            businessType: business.businessType,
+            isOnboarded: business.isOnboarded
           } : undefined
         }
       };
@@ -329,7 +332,8 @@ export class AuthService {
           business: business ? {
             id: business._id.toString(),
             businessName: business.businessName,
-            businessType: business.businessType
+            businessType: business.businessType,
+            isOnboarded: business.isOnboarded
           } : undefined
         }
       };
@@ -595,7 +599,8 @@ export class AuthService {
           business: business ? {
             id: business._id.toString(),
             businessName: business.businessName,
-            businessType: business.businessType
+            businessType: business.businessType,
+            isOnboarded: business.isOnboarded
           } : undefined
         }
       };

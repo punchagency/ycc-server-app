@@ -27,6 +27,7 @@
  *                 minimum: 1
  *               categoryId:
  *                 type: string
+ *                 description: Category ID (valid MongoDB ObjectId) or category name. If name provided and doesn't exist, a new unapproved category will be created.
  *               isQuotable:
  *                 type: boolean
  *               businessId:
@@ -136,6 +137,7 @@
  *                 minimum: 0
  *               categoryId:
  *                 type: string
+ *                 description: Category ID (valid MongoDB ObjectId) or category name. If name provided and doesn't exist, a new unapproved category will be created.
  *               isQuotable:
  *                 type: boolean
  *               serviceImage:

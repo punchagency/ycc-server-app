@@ -4,7 +4,7 @@
  *   post:
  *     tags: [Product]
  *     summary: Create multiple products in bulk with category names
- *     description: Upload multiple products at once. Categories will be created automatically if they don't exist. No authentication required.
+ *     description: Upload multiple products at once for distributors or manufacturers. Categories will be created automatically if they don't exist. No authentication required.
  *     requestBody:
  *       required: true
  *       content:
@@ -15,7 +15,7 @@
  *             properties:
  *               userId:
  *                 type: string
- *                 description: User ID (valid MongoDB ObjectId)
+ *                 description: User ID (valid MongoDB ObjectId) - must be a distributor or manufacturer
  *               products:
  *                 type: array
  *                 items:
@@ -82,6 +82,8 @@
  *         description: Products created successfully with summary including new categories
  *       400:
  *         description: Validation error or User ID/Business not found
+ *       403:
+ *         description: User must be a distributor or manufacturer
  *       500:
  *         description: Failed to create products
  */
@@ -91,8 +93,8 @@
  * /api/v2/product:
  *   post:
  *     tags: [Product]
- *     summary: Create a new product (Distributor or Admin)
- *     description: Distributors can create products for their own business. Admins can create products for any distributor business by providing businessId.
+ *     summary: Create a new product (Distributor, Manufacturer or Admin)
+ *     description: Distributors and manufacturers can create products for their own business. Admins can create products for any distributor or manufacturer business by providing businessId.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -105,7 +107,7 @@
  *             properties:
  *               businessId:
  *                 type: string
- *                 description: Business ID (Required for admin users only, valid MongoDB ObjectId). Must belong to a distributor.
+ *                 description: Business ID (Required for admin users only, valid MongoDB ObjectId). Must belong to a distributor or manufacturer.
  *               name:
  *                 type: string
  *                 minLength: 2
@@ -117,7 +119,7 @@
  *                 description: Product price (must be greater than 0)
  *               category:
  *                 type: string
- *                 description: Category ID (valid MongoDB ObjectId)
+ *                 description: Category ID (valid MongoDB ObjectId) or category name. If name provided and doesn't exist, a new unapproved category will be created.
  *               sku:
  *                 type: string
  *                 description: Stock Keeping Unit (optional)
@@ -175,7 +177,7 @@
  *       401:
  *         description: Unauthorized
  *       403:
- *         description: Forbidden - Only distributors and admins can create products
+ *         description: Forbidden - Only distributors, manufacturers and admins can create products
  *       404:
  *         description: Business not found (admin only)
  *       500:
@@ -188,6 +190,7 @@
  *   get:
  *     tags: [Product]
  *     summary: Search products with filters
+ *     description: Regular users only see distributor products. Distributors and admins can see all products.
  *     parameters:
  *       - in: query
  *         name: name
@@ -287,6 +290,49 @@
 
 /**
  * @swagger
+ * /api/v2/product/manufacturers:
+ *   get:
+ *     tags: [Product]
+ *     summary: Get all manufacturer products (Distributor or Admin only)
+ *     description: Returns all products created by manufacturers. Only accessible by distributors and admins.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Items per page
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search products by name
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *         description: Filter by category ID
+ *     responses:
+ *       200:
+ *         description: Manufacturer products retrieved successfully
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Only distributors and admins can view manufacturer products
+ */
+
+/**
+ * @swagger
  * /api/v2/product/low-stock:
  *   get:
  *     tags: [Product]
@@ -330,8 +376,8 @@
  * /api/v2/product/{id}:
  *   put:
  *     tags: [Product]
- *     summary: Update product (Distributor or Admin)
- *     description: Distributors can update their own products. Admins can update any distributor's product.
+ *     summary: Update product (Distributor, Manufacturer or Admin)
+ *     description: Distributors and manufacturers can update their own products. Admins can update any distributor or manufacturer product.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -359,7 +405,7 @@
  *                 description: Product price (must be greater than 0)
  *               category:
  *                 type: string
- *                 description: Category ID (valid MongoDB ObjectId)
+ *                 description: Category ID (valid MongoDB ObjectId) or category name. If name provided and doesn't exist, a new unapproved category will be created.
  *               sku:
  *                 type: string
  *                 description: Stock Keeping Unit
@@ -416,7 +462,7 @@
  *       401:
  *         description: Unauthorized
  *       403:
- *         description: Access denied - Only distributors and admins can update products, or product belongs to different business
+ *         description: Access denied - Only distributors, manufacturers and admins can update products, or product belongs to different business
  *       404:
  *         description: Product not found or Business not found (admin only)
  *       500:

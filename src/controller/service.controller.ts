@@ -398,7 +398,7 @@ export class ServiceController {
 
     static async fetchServicesForCrew(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
-            if (!req.user || req.user.role !== 'user') {
+            if (!req.user) {
                 res.status(403).json({ success: false, message: 'Only crew members can access services', code: 'FORBIDDEN' });
                 return;
             }

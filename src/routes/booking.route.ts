@@ -41,5 +41,9 @@ router.patch('/:id/quote-items/:itemId', authenticateToken, BookingController.up
 // Delete quote item (distributor)
 router.delete('/:id/quote-items/:itemId', authenticateToken, BookingController.deleteQuoteItem);
 
+// Payment routes
+router.post('/:id/payment', authenticateToken, BookingController.createPayment);
+router.post('/webhooks/stripe', BookingController.handleStripeWebhook);
+
 
 export default router;

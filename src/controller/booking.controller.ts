@@ -31,13 +31,29 @@ export class BookingController {
                 return;
             }
 
+            // Get businessId from serviceId
+            const ServiceModel = (await import('../models/service.model')).default;
+            const service = await ServiceModel.findById(serviceId);
+            if (!service || !service.businessId) {
+                res.status(404).json({ success: false, message: 'Service not found or has no associated business', code: 'SERVICE_NOT_FOUND' });
+                return;
+            }
+
+            // Parse dateTime to bookingDate and startTime
+            const parsedDateTime = new Date(dateTime);
+            const bookingDate = new Date(parsedDateTime.getFullYear(), parsedDateTime.getMonth(), parsedDateTime.getDate());
+            const startTime = parsedDateTime;
+
             const [error, result] = await catchError(BookingService.createBooking({
                 userId: req.user._id.toString(),
+                businessId: service.businessId.toString(),
                 serviceId,
                 serviceLocation,
-                dateTime,
+                bookingDate,
+                startTime,
+                customerEmail: contact?.email,
+                customerPhone: contact?.phone,
                 notes,
-                contact,
                 attachments
             }));
 
@@ -590,6 +606,58 @@ export class BookingController {
         } catch (error) {
             logError({ message: "Deleting quote item failed!", source: "BookingController.deleteQuoteItem", error });
             res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
+        }
+    }
+
+    // ==================== PAYMENT INTEGRATION ====================
+
+    static async createPayment(req: AuthenticatedRequest, res: Response) {
+        try {
+            if (!req.user) {
+                res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
+                return;
+            }
+
+            const { id } = req.params;
+
+            if (!Validate.mongoId(id)) {
+                res.status(400).json({ success: false, message: 'Invalid booking ID', code: 'INVALID_BOOKING_ID' });
+                return;
+            }
+
+            const [error, result] = await catchError(BookingService.createBookingPayment({
+                bookingId: id,
+                userId: req.user._id.toString()
+            }));
+
+            if (error) {
+                logError({ message: "Creating booking payment failed!", source: "BookingController.createPayment", error });
+                res.status(400).json({ success: false, message: error.message || 'Failed to create payment', code: 'PAYMENT_CREATION_FAILED' });
+                return;
+            }
+
+            res.status(200).json({ 
+                success: true, 
+                message: 'Payment invoice created successfully', 
+                data: result 
+            });
+        } catch (error) {
+            logError({ message: "Creating booking payment failed!", source: "BookingController.createPayment", error });
+            res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
+        }
+    }
+
+    static async handleStripeWebhook(req: AuthenticatedRequest, res: Response) {
+        try {
+            const event = req.body;
+
+            // Process the webhook event
+            await BookingService.processBookingPaymentWebhook(event);
+
+            res.status(200).json({ received: true });
+        } catch (error) {
+            logError({ message: "Processing Stripe webhook failed!", source: "BookingController.handleStripeWebhook", error });
+            res.status(400).json({ success: false, message: 'Webhook processing failed' });
         }
     }
 }

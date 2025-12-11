@@ -36,6 +36,9 @@ export interface IBooking extends Document {
     declineReason?: string;
     crewAcceptedQuoteAt?: Date;
     crewRejectedQuoteAt?: Date;
+    stripeInvoiceId?: string;
+    stripeInvoiceUrl?: string;
+    paidAt?: Date;
     notes?: string;
     statusHistory?: {
         fromStatus: string;
@@ -84,6 +87,9 @@ const bookingSchema = new Schema<IBooking>({
     declineReason: { type: String },
     crewAcceptedQuoteAt: { type: Date },
     crewRejectedQuoteAt: { type: Date },
+    stripeInvoiceId: { type: String },
+    stripeInvoiceUrl: { type: String },
+    paidAt: { type: Date },
     notes: { type: String },
     statusHistory: [{
         fromStatus: { type: String, required: true },

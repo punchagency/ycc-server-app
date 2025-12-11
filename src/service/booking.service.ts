@@ -1,50 +1,42 @@
 import BookingModel, { BOOKING_STATUSES } from "../models/booking.model";
-// import { Schema, Types } from "mongoose";
 import ServiceModel from "../models/service.model";
 import BusinessModel from "../models/business.model";
 import UserModel from "../models/user.model";
 import EventModel from "../models/event.model";
 import QuoteModel from "../models/quote.model";
-import InvoiceModel from "../models/invoice.model";
 import uuid from "../utils/uuid";
 import { addEmailJob, addNotificationJob } from "../integration/QueueManager";
 import { generateVendorBookingEmail, generateCrewBookingConfirmationEmail } from "../templates/email-templates";
 import { DateTime } from 'luxon';
-import { logError } from "../utils/SystemLogs"
+import { logError } from "../utils/SystemLogs";
 import CONSTANTS from "../config/constant";
+import StripeService from "../integration/stripe";
+import InvoiceModel from "../models/invoice.model";
 import 'dotenv/config';
 
 export class BookingService {
-    static async createBooking({ userId, serviceId, serviceLocation, dateTime, notes, contact, attachments }: { userId: string, serviceId: string, serviceLocation: { street: string, city: string, state: string, zip: string, country: string }, dateTime: string, notes?: string, contact?: { email?: string, phone?: string }, attachments?: string[] }) {
+    static async createBooking({ userId, businessId, serviceId, serviceLocation, bookingDate, startTime, customerEmail, customerPhone, attachments, notes }: { userId: string; businessId: string; serviceId: string; serviceLocation: { street: string; city: string; state: string;zip: string; country: string }; bookingDate: Date; startTime: Date; customerEmail?: string; customerPhone?: string; attachments?: string[]; notes?: string }) {
+        const business = await BusinessModel.findById(businessId);
+        if (!business) throw new Error('Business not found');
 
         const service = await ServiceModel.findById(serviceId);
-        if (!service) {
-            throw new Error('Service not found');
-        }
-
-        const business = await BusinessModel.findById(service.businessId);
-        if (!business) {
-            throw new Error('Business not found');
-        }
+        if (!service) throw new Error('Service not found');
 
         const user = await UserModel.findById(userId);
-        if (!user) {
-            throw new Error('User not found');
-        }
+        if (!user) throw new Error('User not found');
 
         const confirmationToken = uuid();
-        const confirmationExpires = DateTime.now().plus({ days: 7 }).toJSDate();
-        const bookingDateTime = DateTime.fromISO(dateTime).toJSDate();
+        const confirmationExpires = new Date(Date.now() + (7 * 24 * 60 * 60 * 1000));
 
-        const booking = new BookingModel({
+        const booking = await BookingModel.create({
             userId,
-            businessId: service.businessId,
+            businessId,
             serviceId,
             serviceLocation,
-            bookingDate: bookingDateTime,
-            startTime: bookingDateTime,
-            customerEmail: contact?.email || user.email,
-            customerPhone: contact?.phone || user.phone,
+            bookingDate,
+            startTime,
+            customerEmail: customerEmail || user.email,
+            customerPhone: customerPhone || user.phone,
             status: 'pending',
             paymentStatus: 'pending',
             attachments: attachments || [],
@@ -56,49 +48,21 @@ export class BookingService {
             notes
         });
 
-        await booking.save();
+        const dateTimeFormatted = DateTime.fromJSDate(startTime).toFormat('MMMM d, yyyy, h:mm a');
+        const serviceLocationString = `${serviceLocation.street}, ${serviceLocation.city}, ${serviceLocation.state}, ${serviceLocation.zip}`;
 
-        await EventModel.create({
-            userId,
-            title: `Booking: ${service.name}`,
-            description: notes || `Service booking at ${serviceLocation.street}, ${serviceLocation.city}`,
-            start: bookingDateTime,
-            end: bookingDateTime,
-            allDay: false,
-            type: 'booking',
-            location: `${serviceLocation.street}, ${serviceLocation.city}, ${serviceLocation.state}, ${serviceLocation.zip}, ${serviceLocation.country}`,
-            guestIds: [],
-            guestEmails: []
-        });
-
-        const confirmationUrl = `${process.env.FRONTEND_URL}/bookings/confirm/${confirmationToken}`;
-        const serviceLocationStr = `${serviceLocation.street}, ${serviceLocation.city}, ${serviceLocation.state}, ${serviceLocation.zip}, ${serviceLocation.country}`;
-
-        await addNotificationJob({
-            recipientId: business.userId,
-            type: 'booking',
-            priority: 'high',
-            title: 'New Booking Request',
-            message: `${user.firstName} ${user.lastName} has requested a booking for ${service.name}`,
-            data: { bookingId: booking._id, serviceId: service._id }
-        });
+        const confirmationUrl = `${process.env.FRONTEND_URL}/distributor/bookings/confirm/${confirmationToken}`;
 
         const vendorEmailHtml = await generateVendorBookingEmail({
             vendor: business,
             crew: user,
             servicesList: [service],
             totalPrice: service.price,
-            dateTime: bookingDateTime,
-            serviceLocation: serviceLocationStr,
-            contactPhone: contact?.phone || user.phone,
+            dateTime: startTime,
+            serviceLocation: serviceLocationString,
+            contactPhone: customerPhone || user.phone || 'N/A',
             internalNotes: notes || '',
             confirmationUrl
-        });
-
-        await addEmailJob({
-            email: business.email,
-            subject: 'New Booking Request - Confirmation Required',
-            html: vendorEmailHtml
         });
 
         const crewEmailHtml = await generateCrewBookingConfirmationEmail({
@@ -106,66 +70,104 @@ export class BookingService {
             vendorUser: business,
             servicesList: [service],
             totalPrice: service.price,
-            dateTime: bookingDateTime,
-            serviceLocation: serviceLocationStr,
-            contactPhone: contact?.phone || user.phone,
+            dateTime: startTime,
+            serviceLocation: serviceLocationString,
+            contactPhone: customerPhone || user.phone || 'N/A',
             internalNotes: notes || ''
         });
 
         await addEmailJob({
+            email: business.email,
+            subject: `New Booking Request for ${service.name}`,
+            html: vendorEmailHtml
+        });
+
+        await addEmailJob({
             email: user.email,
-            subject: 'Booking Confirmation - Pending Vendor Approval',
+            subject: `Booking Confirmation for ${service.name}`,
             html: crewEmailHtml
+        });
+
+        await addNotificationJob({
+            recipientId: business.userId,
+            type: 'booking',
+            priority: 'high',
+            title: 'New Booking',
+            message: `You have a new booking request for ${service.name} on ${dateTimeFormatted}.`,
+            data: { bookingId: booking._id, serviceId: service._id, userRole: 'distributor' }
+        });
+
+        await addNotificationJob({
+            recipientId: user._id,
+            type: 'booking',
+            priority: 'medium',
+            title: 'Booking Created',
+            message: `Your booking for ${service.name} has been successfully created and is awaiting confirmation.`,
+            data: { bookingId: booking._id, serviceId: service._id, userRole: 'user' }
         });
 
         return booking;
     }
-    static async confirmBooking(token: string) {
-        try {
-            const booking = await BookingModel.findOne({ confirmationToken: token, isTokenUsed: false });
 
-            if (!booking) {
-                throw new Error('Invalid or expired token');
-            }
+    static async confirmBooking(confirmationToken: string) {
+        const booking = await BookingModel.findOne({ confirmationToken, isTokenUsed: false });
 
-            if (!booking.confirmationExpires || booking.confirmationExpires < new Date()) {
-                throw new Error('Token has expired');
-            }
-
-            booking.isTokenUsed = true;
-            booking.status = 'confirmed';
-            booking.confirmationExpires = undefined;
-            booking.confirmationToken = undefined;
-            await booking.save();
-
-            const user = await UserModel.findById(booking.userId);
-
-            if (user) {
-                await addEmailJob({
-                    email: user.email,
-                    subject: 'Booking Confirmed',
-                    html: `
-                <h1>Your Booking Has Been Confirmed</h1>
-                <p>Dear ${user.firstName} ${user.lastName},</p>
-                <p>Your booking #${booking._id.toString()} has been confirmed by the vendor.</p>
-                <p>Scheduled date and time: ${new Date(booking.bookingDate).toLocaleString()}</p>
-                <p>You can view your booking details in your account.</p>
-                <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'
-                        }/crew/bookings/${booking._id
-                        }" style="display:inline-block;background-color:#4CAF50;color:white;padding:14px 20px;text-align:center;text-decoration:none;font-size:16px;margin:4px 2px;cursor:pointer;border-radius:4px;">
-                View Booking
-                </a>
-                <p>Thank you for your booking!</p>
-            `
-                });
-            }
-
-            return booking;
-        } catch (error) {
-            logError({ message: "Confirming a booking failed!", source: "BookingService.confirmBooking", error });
-            throw new Error('Error confirming booking.');
+        if (!booking) {
+            throw new Error('Invalid or expired confirmation link');
         }
+
+        if (booking.confirmationExpires && booking.confirmationExpires < new Date()) {
+            throw new Error('Confirmation link has expired');
+        }
+
+        booking.status = 'confirmed';
+        booking.isTokenUsed = true;
+        booking.confirmedAt = new Date();
+        await booking.save();
+
+        const business = await BusinessModel.findById(booking.businessId);
+        if (!business) throw new Error('Business not found');
+
+        const service = await ServiceModel.findById(booking.serviceId);
+        if (!service) throw new Error('Service not found');
+
+        const user = await UserModel.findById(booking.userId);
+        if (!user) throw new Error('User not found');
+
+        await addNotificationJob({
+            recipientId: booking.userId,
+            type: 'booking',
+            priority: 'high',
+            title: 'Booking Confirmed',
+            message: `Your booking for ${service.name} has been confirmed!`,
+            data: { bookingId: booking._id }
+        });
+
+        await EventModel.create({
+            userId: business.userId,
+            type: 'booking',
+            title: `Confirmed: ${service.name}`,
+            description: `Booking for ${service.name} with ${user.firstName} ${user.lastName}`,
+            start: booking.startTime,
+            end: new Date(booking.startTime.getTime() + (2 * 60 * 60 * 1000)),
+            status: 'confirmed',
+            bookingId: booking._id
+        });
+
+        await EventModel.create({
+            userId: booking.userId,
+            type: 'booking',
+            title: `Confirmed: ${service.name}`,
+            description: `Booking confirmed with ${business.businessName}`,
+            start: booking.startTime,
+            end: new Date(booking.startTime.getTime() + (2 * 60 * 60 * 1000)),
+            status: 'confirmed',
+            bookingId: booking._id
+        });
+
+        return booking;
     }
+
     static async updateBookingStatus({bookingId, userId, userRole, status, notes, reason, quoteItems}:{bookingId: string; userId: string; userRole: string; status: typeof BOOKING_STATUSES[number]; notes?: string; reason?: string; quoteItems?: {name: string; price: number; quantity?: number}[]}) {
         const USER_BOOKING_STATUS_RULES: Record<string, {allowedTransitions: string[]; canBeChangedBy: string[]}> = {
             pending: {
@@ -176,56 +178,44 @@ export class BookingService {
                 allowedTransitions: ['completed', 'cancelled'],
                 canBeChangedBy: ['distributor', 'admin', 'manufacturer']
             },
+            cancelled: {
+                allowedTransitions: [],
+                canBeChangedBy: []
+            },
             completed: {
                 allowedTransitions: [],
-                canBeChangedBy: ['admin', 'manufacturer']
+                canBeChangedBy: []
             },
             declined: {
                 allowedTransitions: [],
-                canBeChangedBy: ['admin', 'manufacturer']
-            },
-            cancelled: {
-                allowedTransitions: [],
-                canBeChangedBy: ['admin', 'manufacturer']
+                canBeChangedBy: []
             }
         };
 
         const booking = await BookingModel.findById(bookingId);
-        if (!booking) {
-            throw new Error('Booking not found');
+        if (!booking) throw new Error('Booking not found');
+
+        const currentStatus = booking.status;
+        const rules = USER_BOOKING_STATUS_RULES[currentStatus];
+
+        if (!rules) {
+            throw new Error(`Cannot transition from status: ${currentStatus}`);
         }
 
-        const user = await UserModel.findById(userId);
-        if (!user) {
-            throw new Error('User not found');
+        if (!rules.allowedTransitions.includes(status)) {
+            throw new Error(`Cannot transition from ${currentStatus} to ${status}`);
         }
 
-        const currentStatusRules = USER_BOOKING_STATUS_RULES[booking.status];
-        
-        if (!currentStatusRules.allowedTransitions.includes(status)) {
-            throw new Error(`Cannot transition from ${booking.status} to ${status}`);
-        }
-
-        if (!currentStatusRules.canBeChangedBy.includes(userRole)) {
-            throw new Error(`User role ${userRole} is not allowed to change status from ${booking.status}`);
+        if (!rules.canBeChangedBy.includes(userRole)) {
+            throw new Error(`Role ${userRole} cannot change booking status`);
         }
 
         const service = await ServiceModel.findById(booking.serviceId);
-        if (!service) {
-            throw new Error('Service not found');
-        }
+        if (!service) throw new Error('Service not found');
 
         const business = await BusinessModel.findById(booking.businessId);
-        if (!business) {
-            throw new Error('Business not found');
-        }
+        if (!business) throw new Error('Business not found');
 
-        const bookingUser = await UserModel.findById(booking.userId);
-        if (!bookingUser) {
-            throw new Error('Booking user not found');
-        }
-
-        const oldStatus = booking.status;
         booking.status = status;
 
         if (status === 'confirmed') {
@@ -286,15 +276,24 @@ export class BookingService {
 
             await EventModel.create({
                 userId: business.userId,
-                title: `Booking: ${service.name}`,
-                description: `Confirmed booking with ${bookingUser.firstName} ${bookingUser.lastName}`,
-                start: booking.startTime,
-                end: booking.startTime,
-                allDay: false,
                 type: 'booking',
-                location: `${booking.serviceLocation.street}, ${booking.serviceLocation.city}, ${booking.serviceLocation.state}`,
-                guestIds: [booking.userId],
-                guestEmails: [bookingUser.email]
+                title: `Confirmed: ${service.name}`,
+                description: notes || `Booking confirmed`,
+                start: booking.startTime,
+                end: new Date(booking.startTime.getTime() + (2 * 60 * 60 * 1000)),
+                status: 'confirmed',
+                bookingId: booking._id
+            });
+
+            await EventModel.create({
+                userId: booking.userId,
+                type: 'booking',
+                title: `Confirmed: ${service.name}`,
+                description: notes || `Booking confirmed`,
+                start: booking.startTime,
+                end: new Date(booking.startTime.getTime() + (2 * 60 * 60 * 1000)),
+                status: 'confirmed',
+                bookingId: booking._id
             });
         }
 
@@ -331,66 +330,47 @@ export class BookingService {
             }
 
             await EventModel.deleteMany({
-                userId: { $in: [booking.userId, business.userId] },
-                type: 'booking',
-                start: booking.startTime
+                bookingId: booking._id,
+                type: 'booking'
             });
         }
 
         if (notes) {
-            booking.notes = notes;
+            if (!booking.notes) {
+                booking.notes = notes;
+            } else {
+                booking.notes += ` | ${notes}`;
+            }
         }
 
         if (!booking.statusHistory) {
-            booking.statusHistory = [] as any;
+            booking.statusHistory = [];
         }
-        (booking.statusHistory as any).push({
-            fromStatus: oldStatus,
+
+        booking.statusHistory.push({
+            fromStatus: currentStatus,
             toStatus: status,
-            changedBy: `${user.firstName} ${user.lastName}`,
+            changedBy: userId,
             userRole,
             reason,
             notes,
             changedAt: new Date()
-        });
+        } as any);
 
         await booking.save();
-
-        const statusMessages: Record<string, string> = {
-            confirmed: 'Your booking has been confirmed',
-            completed: 'Your booking has been completed',
-            cancelled: 'Your booking has been cancelled',
-            declined: 'Your booking has been declined'
-        };
 
         await addNotificationJob({
             recipientId: booking.userId,
             type: 'booking',
             priority: 'high',
-            title: 'Booking Status Update',
-            message: statusMessages[status] || `Booking status updated to ${status}`,
-            data: { bookingId: booking._id, status }
-        });
-
-        await addEmailJob({
-            email: bookingUser.email,
-            subject: `Booking ${status.charAt(0).toUpperCase() + status.slice(1)} - ${service.name}`,
-            html: `
-                <h1>Booking Status Update</h1>
-                <p>Dear ${bookingUser.firstName} ${bookingUser.lastName},</p>
-                <p>Your booking #${booking._id.toString()} has been <strong>${status}</strong>.</p>
-                <p>Service: ${service.name}</p>
-                <p>Date: ${new Date(booking.bookingDate).toLocaleString()}</p>
-                ${reason ? `<p>Reason: ${reason}</p>` : ''}
-                ${notes ? `<p>Notes: ${notes}</p>` : ''}
-                <a href="${process.env.FRONTEND_URL}/bookings/${booking._id}" style="display:inline-block;background-color:#4CAF50;color:white;padding:14px 20px;text-align:center;text-decoration:none;font-size:16px;margin:4px 2px;cursor:pointer;border-radius:4px;">
-                    View Booking
-                </a>
-            `
+            title: `Booking ${status}`,
+            message: `Your booking has been ${status}.${reason ? ` Reason: ${reason}` : ''}`,
+            data: { bookingId: booking._id }
         });
 
         return booking;
     }
+
     static async getBookings({userId, role, page = 1, limit = 10, status, paymentStatus, startDate, endDate, sortBy = 'createdAt', sortOrder = 'desc' }: {userId: string; role: string; page?: number; limit?: number; status?: string; paymentStatus?: string; startDate?: Date; endDate?: Date; sortBy?: string; sortOrder?: string}) {
         const query: any = {};
 
@@ -400,7 +380,7 @@ export class BookingService {
         } else if (role === 'distributor' || role === 'manufacturer') {
             const business = await BusinessModel.findOne({ userId });
             if (!business) {
-                throw new Error('Business not found');
+                throw new Error('Business not found for this user');
             }
             query.businessId = business._id;
         }
@@ -409,13 +389,14 @@ export class BookingService {
         if (status) query.status = status;
         if (paymentStatus) query.paymentStatus = paymentStatus;
         if (startDate || endDate) {
-            query.bookingDate = {};
-            if (startDate) query.bookingDate.$gte = startDate;
-            if (endDate) query.bookingDate.$lte = endDate;
+            query.createdAt = {};
+            if (startDate) query.createdAt.$gte = startDate;
+            if (endDate) query.createdAt.$lte = endDate;
         }
 
         const skip = (page - 1) * limit;
-        const sort: any = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
+        const sort: any = {};
+        sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
         const [bookings, total] = await Promise.all([
             BookingModel.find(query)
@@ -1136,5 +1117,321 @@ export class BookingService {
 
         // Default: provided (all pending or mixed)
         return 'provided';
+    }
+
+    // ==================== STRIPE PAYMENT INTEGRATION ====================
+
+    /**
+     * Create Stripe payment for booking
+     */
+    static async createBookingPayment({ bookingId, userId }: { bookingId: string; userId: string }) {
+        // Validation: Booking exists and belongs to user
+        const booking = await BookingModel.findById(bookingId)
+            .populate('serviceId')
+            .populate('quoteId')
+            .populate('businessId');
+        
+        if (!booking) throw new Error('Booking not found');
+        if (booking.userId.toString() !== userId) throw new Error('Unauthorized: This booking does not belong to you');
+
+        // Validation: Booking must be confirmed
+        if (booking.status !== 'confirmed') {
+            throw new Error('Booking must be confirmed before payment');
+        }
+
+        // Validation: Payment must be pending
+        if (booking.paymentStatus === 'paid') {
+            throw new Error('This booking has already been paid');
+        }
+
+        // Validation: For quotable services, quote must be accepted
+        if (booking.requiresQuote && booking.quoteStatus !== 'accepted') {
+            throw new Error('Quote must be accepted before payment');
+        }
+
+        // Check if invoice already exists (idempotency)
+        if (booking.stripeInvoiceId) {
+            const stripe = StripeService.getInstance();
+            try {
+                const existingInvoice = await stripe.getInvoice(booking.stripeInvoiceId);
+                if (existingInvoice.status !== 'void') {
+                    return {
+                        invoiceUrl: existingInvoice.hosted_invoice_url,
+                        invoiceId: existingInvoice.id,
+                        status: existingInvoice.status
+                    };
+                }
+            } catch (error) {
+                // Invoice doesn't exist or errored, create new one
+                logError({ message: 'Existing invoice retrieval failed', error, source: 'BookingService.createBookingPayment' });
+            }
+        }
+
+        const user = await UserModel.findById(userId);
+        if (!user) throw new Error('User not found');
+
+        const service: any = booking.serviceId;
+        if (!service) throw new Error('Service not found');
+
+        const business: any = booking.businessId;
+        if (!business) throw new Error('Business not found');
+
+        // Ensure business has Stripe account
+        if (!business.stripeAccountId) {
+            throw new Error('Distributor has not set up payment processing. Please contact support.');
+        }
+
+        const stripe = StripeService.getInstance();
+
+        // Get or create Stripe customer
+        let stripeCustomerId = user.stripeCustomerId;
+        if (!stripeCustomerId) {
+            const customers = await stripe.listCustomers({ email: user.email, limit: 1 });
+            if (customers.data.length > 0) {
+                stripeCustomerId = customers.data[0].id;
+            } else {
+                const customer = await stripe.createCustomer({
+                    email: user.email,
+                    name: `${user.firstName} ${user.lastName}`
+                });
+                stripeCustomerId = customer.id;
+            }
+            user.stripeCustomerId = stripeCustomerId;
+            await user.save();
+        }
+
+        // Create draft invoice
+        const invoice = await stripe.createinvoices({
+            customer: stripeCustomerId,
+            collection_method: 'send_invoice',
+            days_until_due: 7,
+            metadata: {
+                bookingId: booking._id.toString(),
+                userId: user._id.toString(),
+                serviceId: service._id.toString(),
+                businessId: business._id.toString(),
+                customerEmail: user.email,
+                type: 'booking_payment'
+            }
+        });
+
+        // Add invoice items based on booking type
+        if (booking.requiresQuote && booking.quoteId) {
+            const quote: any = booking.quoteId;
+            
+            // Add each quote item
+            for (const quoteService of quote.services) {
+                await stripe.createInvoiceItems({
+                    customer: stripeCustomerId,
+                    invoice: invoice.id,
+                    amount: Math.round(quoteService.totalPrice * 100),
+                    currency: 'usd',
+                    description: `${quoteService.item}${quoteService.description ? ` - ${quoteService.description}` : ''}`,
+                    metadata: {
+                        bookingId: booking._id.toString(),
+                        quoteItemId: quoteService._id.toString(),
+                        type: 'quote_item'
+                    }
+                });
+            }
+
+            // Add service price
+            await stripe.createInvoiceItems({
+                customer: stripeCustomerId,
+                invoice: invoice.id,
+                amount: Math.round(service.price * 100),
+                currency: 'usd',
+                description: `${service.name} - Base Service`,
+                metadata: {
+                    bookingId: booking._id.toString(),
+                    serviceId: service._id.toString(),
+                    businessId: business._id.toString(),
+                    type: 'service_fee'
+                }
+            });
+        } else {
+            // Non-quotable service - just add service price
+            await stripe.createInvoiceItems({
+                customer: stripeCustomerId,
+                invoice: invoice.id,
+                amount: Math.round(service.price * 100),
+                currency: 'usd',
+                description: service.name,
+                metadata: {
+                    bookingId: booking._id.toString(),
+                    serviceId: service._id.toString(),
+                    businessId: business._id.toString(),
+                    type: 'service_fee'
+                }
+            });
+        }
+
+        // Add platform fee (10%)
+        const platformFee = booking.platformFee || (booking.totalAmount! * 0.1);
+        await stripe.createInvoiceItems({
+            customer: stripeCustomerId,
+            invoice: invoice.id,
+            amount: Math.round(platformFee * 100),
+            currency: 'usd',
+            description: 'Platform Fee (10%)',
+            metadata: {
+                bookingId: booking._id.toString(),
+                type: 'platform_fee'
+            }
+        });
+
+        // Finalize invoice
+        const finalizedInvoice = await stripe.finalizeInvoice(invoice.id);
+
+        // Update booking with invoice details
+        booking.stripeInvoiceUrl = finalizedInvoice.hosted_invoice_url || undefined;
+        booking.stripeInvoiceId = invoice.id;
+        await booking.save();
+
+        // Send invoice email
+        await stripe.sendInvoice(invoice.id);
+
+        // Create invoice record in database
+        try {
+            await InvoiceModel.create({
+                stripeInvoiceId: invoice.id,
+                userId: user._id,
+                bookingId: booking._id,
+                businessIds: [business._id],
+                amount: finalizedInvoice.amount_due / 100,
+                platformFee,
+                currency: 'usd',
+                status: 'pending',
+                invoiceDate: new Date(),
+                dueDate: finalizedInvoice.due_date ? new Date(finalizedInvoice.due_date * 1000) : null,
+                stripeInvoiceUrl: finalizedInvoice.hosted_invoice_url
+            });
+        } catch (error) {
+            logError({ message: 'Invoice record creation failed', error, source: 'BookingService.createBookingPayment' });
+        }
+
+        // Notify crew
+        await addNotificationJob({
+            recipientId: user._id,
+            type: 'booking',
+            priority: 'high',
+            title: 'Payment Invoice Ready',
+            message: `Your payment invoice for ${service.name} is ready. Please complete payment to confirm your booking.`,
+            data: { bookingId: booking._id, invoiceId: invoice.id }
+        });
+
+        return {
+            invoiceUrl: finalizedInvoice.hosted_invoice_url,
+            invoiceId: invoice.id,
+            status: 'pending',
+            dueDate: finalizedInvoice.due_date,
+            amount: finalizedInvoice.amount_due / 100
+        };
+    }
+
+    /**
+     * Process Stripe webhook for booking payment
+     */
+    static async processBookingPaymentWebhook(event: any) {
+        if (event.type !== 'invoice.paid' && event.type !== 'invoice.payment_failed') {
+            return; // Ignore other event types
+        }
+
+        const invoice = event.data.object;
+        const metadata = invoice.metadata;
+
+        if (metadata.type !== 'booking_payment') {
+            return; // Not a booking payment
+        }
+
+        const bookingId = metadata.bookingId;
+        if (!bookingId) {
+            logError({ message: 'No bookingId in webhook metadata', error: new Error('Missing bookingId'), source: 'BookingService.processBookingPaymentWebhook' });
+            return;
+        }
+
+        const booking = await BookingModel.findById(bookingId)
+            .populate('serviceId')
+            .populate('userId')
+            .populate('businessId');
+
+        if (!booking) {
+            logError({ message: 'Booking not found for webhook', error: new Error(`Booking ${bookingId} not found`), source: 'BookingService.processBookingPaymentWebhook' });
+            return;
+        }
+
+        if (event.type === 'invoice.paid') {
+            // Update booking payment status
+            booking.paymentStatus = 'paid';
+            booking.paidAt = new Date();
+            await booking.save();
+
+            // Update invoice record
+            await InvoiceModel.updateOne(
+                { stripeInvoiceId: invoice.id },
+                { status: 'paid', paidAt: new Date() }
+            );
+
+            const user: any = booking.userId;
+            const service: any = booking.serviceId;
+            const business: any = booking.businessId;
+
+            // Notify crew
+            await addNotificationJob({
+                recipientId: user._id,
+                type: 'booking',
+                priority: 'high',
+                title: 'Payment Received!',
+                message: `Your payment for ${service.name} has been received. Your booking is now confirmed.`,
+                data: { bookingId: booking._id }
+            });
+
+            // Notify distributor
+            if (business?.userId) {
+                await addNotificationJob({
+                    recipientId: business.userId,
+                    type: 'booking',
+                    priority: 'high',
+                    title: 'Payment Received',
+                    message: `Payment received for booking ${service.name}. You can now proceed with service delivery.`,
+                    data: { bookingId: booking._id }
+                });
+            }
+
+            // Send confirmation emails
+            await addEmailJob({
+                email: user.email,
+                subject: `Payment Confirmed - ${service.name}`,
+                html: `
+                    <h2>Payment Confirmed!</h2>
+                    <p>Hi ${user.firstName},</p>
+                    <p>Your payment for <strong>${service.name}</strong> has been successfully processed.</p>
+                    <p><strong>Amount Paid:</strong> $${(invoice.amount_paid / 100).toFixed(2)}</p>
+                    <p><strong>Booking ID:</strong> ${booking._id}</p>
+                    <p>The distributor has been notified and will proceed with your service.</p>
+                    <p>Thank you for your business!</p>
+                `
+            });
+
+        } else if (event.type === 'invoice.payment_failed') {
+            // Update invoice record
+            await InvoiceModel.updateOne(
+                { stripeInvoiceId: invoice.id },
+                { status: 'failed' }
+            );
+
+            const user: any = booking.userId;
+            const service: any = booking.serviceId;
+
+            // Notify crew of payment failure
+            await addNotificationJob({
+                recipientId: user._id,
+                type: 'booking',
+                priority: 'urgent',
+                title: 'Payment Failed',
+                message: `Payment for ${service.name} failed. Please update your payment method and try again.`,
+                data: { bookingId: booking._id, invoiceId: invoice.id }
+            });
+        }
     }
 }

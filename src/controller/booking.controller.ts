@@ -208,4 +208,388 @@ export class BookingController {
             res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
         }
     }
+
+    static async addQuotes(req: AuthenticatedRequest, res: Response) {
+        try {
+            if (!req.user) {
+                res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
+                return;
+            }
+
+            const { id } = req.params;
+            const { quoteItems } = req.body;
+
+            if (!Validate.mongoId(id)) {
+                res.status(400).json({ success: false, message: 'Invalid booking id', code: 'INVALID_BOOKING_ID' });
+                return;
+            }
+
+            if (!quoteItems || !Array.isArray(quoteItems) || quoteItems.length === 0) {
+                res.status(400).json({ success: false, message: 'Quote items are required', code: 'INVALID_QUOTE_ITEMS' });
+                return;
+            }
+
+            const [error, result] = await catchError(BookingService.addQuotesToBooking({
+                bookingId: id,
+                userId: req.user._id.toString(),
+                userRole: req.user.role,
+                quoteItems
+            }));
+
+            if (error) {
+                logError({ message: "Adding quotes failed!", source: "BookingController.addQuotes", error });
+                res.status(400).json({ success: false, message: error.message || 'Failed to add quotes', code: 'ADD_QUOTES_FAILED' });
+                return;
+            }
+
+            res.status(200).json({ success: true, message: 'Quotes added successfully', data: result });
+        } catch (error) {
+            logError({ message: "Adding quotes failed!", source: "BookingController.addQuotes", error });
+            res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
+        }
+    }
+
+    static async acceptQuote(req: AuthenticatedRequest, res: Response) {
+        try {
+            if (!req.user) {
+                res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
+                return;
+            }
+
+            const { id } = req.params;
+
+            if (!Validate.mongoId(id)) {
+                res.status(400).json({ success: false, message: 'Invalid booking id', code: 'INVALID_BOOKING_ID' });
+                return;
+            }
+
+            const [error, result] = await catchError(BookingService.acceptQuote({
+                bookingId: id,
+                userId: req.user._id.toString()
+            }));
+
+            if (error) {
+                logError({ message: "Accepting quote failed!", source: "BookingController.acceptQuote", error });
+                res.status(400).json({ success: false, message: error.message || 'Failed to accept quote', code: 'ACCEPT_QUOTE_FAILED' });
+                return;
+            }
+
+            res.status(200).json({ success: true, message: 'Quote accepted successfully', data: result });
+        } catch (error) {
+            logError({ message: "Accepting quote failed!", source: "BookingController.acceptQuote", error });
+            res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
+        }
+    }
+
+    static async rejectQuote(req: AuthenticatedRequest, res: Response) {
+        try {
+            if (!req.user) {
+                res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
+                return;
+            }
+
+            const { id } = req.params;
+            const { reason } = req.body;
+
+            if (!Validate.mongoId(id)) {
+                res.status(400).json({ success: false, message: 'Invalid booking id', code: 'INVALID_BOOKING_ID' });
+                return;
+            }
+
+            const [error, result] = await catchError(BookingService.rejectQuote({
+                bookingId: id,
+                userId: req.user._id.toString(),
+                reason
+            }));
+
+            if (error) {
+                logError({ message: "Rejecting quote failed!", source: "BookingController.rejectQuote", error });
+                res.status(400).json({ success: false, message: error.message || 'Failed to reject quote', code: 'REJECT_QUOTE_FAILED' });
+                return;
+            }
+
+            res.status(200).json({ success: true, message: 'Quote rejected successfully', data: result });
+        } catch (error) {
+            logError({ message: "Rejecting quote failed!", source: "BookingController.rejectQuote", error });
+            res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
+        }
+    }
+
+    static async confirmCompletion(req: AuthenticatedRequest, res: Response) {
+        try {
+            if (!req.user) {
+                res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
+                return;
+            }
+
+            const { id } = req.params;
+
+            if (!Validate.mongoId(id)) {
+                res.status(400).json({ success: false, message: 'Invalid booking id', code: 'INVALID_BOOKING_ID' });
+                return;
+            }
+
+            const [error, result] = await catchError(BookingService.confirmJobCompletion({
+                bookingId: id,
+                userId: req.user._id.toString()
+            }));
+
+            if (error) {
+                logError({ message: "Confirming job completion failed!", source: "BookingController.confirmCompletion", error });
+                res.status(400).json({ success: false, message: error.message || 'Failed to confirm job completion', code: 'CONFIRM_COMPLETION_FAILED' });
+                return;
+            }
+
+            res.status(200).json({ success: true, message: 'Job completion confirmed successfully', data: result });
+        } catch (error) {
+            logError({ message: "Confirming job completion failed!", source: "BookingController.confirmCompletion", error });
+            res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
+        }
+    }
+
+    // ==================== GRANULAR QUOTE ITEM MANAGEMENT ====================
+
+    static async acceptQuoteItem(req: AuthenticatedRequest, res: Response) {
+        try {
+            if (!req.user) {
+                res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
+                return;
+            }
+
+            const { id, itemId } = req.params;
+
+            if (!Validate.mongoId(id) || !Validate.mongoId(itemId)) {
+                res.status(400).json({ success: false, message: 'Invalid ID', code: 'INVALID_ID' });
+                return;
+            }
+
+            const [error, result] = await catchError(BookingService.acceptQuoteItem({
+                bookingId: id,
+                itemId,
+                userId: req.user._id.toString()
+            }));
+
+            if (error) {
+                logError({ message: "Accepting quote item failed!", source: "BookingController.acceptQuoteItem", error });
+                res.status(400).json({ success: false, message: error.message || 'Failed to accept quote item', code: 'ACCEPT_ITEM_FAILED' });
+                return;
+            }
+
+            res.status(200).json({ success: true, message: 'Quote item accepted successfully', data: result });
+        } catch (error) {
+            logError({ message: "Accepting quote item failed!", source: "BookingController.acceptQuoteItem", error });
+            res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
+        }
+    }
+
+    static async rejectQuoteItem(req: AuthenticatedRequest, res: Response) {
+        try {
+            if (!req.user) {
+                res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
+                return;
+            }
+
+            const { id, itemId } = req.params;
+            const { reason } = req.body;
+
+            if (!Validate.mongoId(id) || !Validate.mongoId(itemId)) {
+                res.status(400).json({ success: false, message: 'Invalid ID', code: 'INVALID_ID' });
+                return;
+            }
+
+            const [error, result] = await catchError(BookingService.rejectQuoteItem({
+                bookingId: id,
+                itemId,
+                userId: req.user._id.toString(),
+                reason
+            }));
+
+            if (error) {
+                logError({ message: "Rejecting quote item failed!", source: "BookingController.rejectQuoteItem", error });
+                res.status(400).json({ success: false, message: error.message || 'Failed to reject quote item', code: 'REJECT_ITEM_FAILED' });
+                return;
+            }
+
+            res.status(200).json({ success: true, message: 'Quote item rejected successfully', data: result });
+        } catch (error) {
+            logError({ message: "Rejecting quote item failed!", source: "BookingController.rejectQuoteItem", error });
+            res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
+        }
+    }
+
+    static async requestQuoteItemEdit(req: AuthenticatedRequest, res: Response) {
+        try {
+            if (!req.user) {
+                res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
+                return;
+            }
+
+            const { id, itemId } = req.params;
+            const { reason } = req.body;
+
+            if (!Validate.mongoId(id) || !Validate.mongoId(itemId)) {
+                res.status(400).json({ success: false, message: 'Invalid ID', code: 'INVALID_ID' });
+                return;
+            }
+
+            if (!reason || !reason.trim()) {
+                res.status(400).json({ success: false, message: 'Edit reason is required', code: 'REASON_REQUIRED' });
+                return;
+            }
+
+            const [error, result] = await catchError(BookingService.requestQuoteItemEdit({
+                bookingId: id,
+                itemId,
+                userId: req.user._id.toString(),
+                reason: reason.trim()
+            }));
+
+            if (error) {
+                logError({ message: "Requesting quote item edit failed!", source: "BookingController.requestQuoteItemEdit", error });
+                res.status(400).json({ success: false, message: error.message || 'Failed to request edit', code: 'REQUEST_EDIT_FAILED' });
+                return;
+            }
+
+            res.status(200).json({ success: true, message: 'Edit request submitted successfully', data: result });
+        } catch (error) {
+            logError({ message: "Requesting quote item edit failed!", source: "BookingController.requestQuoteItemEdit", error });
+            res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
+        }
+    }
+
+    static async acceptAllQuoteItems(req: AuthenticatedRequest, res: Response) {
+        try {
+            if (!req.user) {
+                res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
+                return;
+            }
+
+            const { id } = req.params;
+
+            if (!Validate.mongoId(id)) {
+                res.status(400).json({ success: false, message: 'Invalid booking ID', code: 'INVALID_ID' });
+                return;
+            }
+
+            const [error, result] = await catchError(BookingService.acceptAllQuoteItems({
+                bookingId: id,
+                userId: req.user._id.toString()
+            }));
+
+            if (error) {
+                logError({ message: "Accepting all quote items failed!", source: "BookingController.acceptAllQuoteItems", error });
+                res.status(400).json({ success: false, message: error.message || 'Failed to accept all items', code: 'ACCEPT_ALL_FAILED' });
+                return;
+            }
+
+            res.status(200).json({ success: true, message: 'All quote items accepted successfully', data: result });
+        } catch (error) {
+            logError({ message: "Accepting all quote items failed!", source: "BookingController.acceptAllQuoteItems", error });
+            res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
+        }
+    }
+
+    static async rejectAllQuoteItems(req: AuthenticatedRequest, res: Response) {
+        try {
+            if (!req.user) {
+                res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
+                return;
+            }
+
+            const { id } = req.params;
+            const { reason } = req.body;
+
+            if (!Validate.mongoId(id)) {
+                res.status(400).json({ success: false, message: 'Invalid booking ID', code: 'INVALID_ID' });
+                return;
+            }
+
+            const [error, result] = await catchError(BookingService.rejectAllQuoteItems({
+                bookingId: id,
+                userId: req.user._id.toString(),
+                reason
+            }));
+
+            if (error) {
+                logError({ message: "Rejecting all quote items failed!", source: "BookingController.rejectAllQuoteItems", error });
+                res.status(400).json({ success: false, message: error.message || 'Failed to reject all items', code: 'REJECT_ALL_FAILED' });
+                return;
+            }
+
+            res.status(200).json({ success: true, message: 'All quote items rejected successfully', data: result });
+        } catch (error) {
+            logError({ message: "Rejecting all quote items failed!", source: "BookingController.rejectAllQuoteItems", error });
+            res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
+        }
+    }
+
+    static async updateQuoteItem(req: AuthenticatedRequest, res: Response) {
+        try {
+            if (!req.user) {
+                res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
+                return;
+            }
+
+            const { id, itemId } = req.params;
+            const { name, description, quantity, price } = req.body;
+
+            if (!Validate.mongoId(id) || !Validate.mongoId(itemId)) {
+                res.status(400).json({ success: false, message: 'Invalid ID', code: 'INVALID_ID' });
+                return;
+            }
+
+            const [error, result] = await catchError(BookingService.updateQuoteItem({
+                bookingId: id,
+                itemId,
+                userId: req.user._id.toString(),
+                userRole: req.user.role,
+                updatedItem: { name, description, quantity, price }
+            }));
+
+            if (error) {
+                logError({ message: "Updating quote item failed!", source: "BookingController.updateQuoteItem", error });
+                res.status(400).json({ success: false, message: error.message || 'Failed to update quote item', code: 'UPDATE_ITEM_FAILED' });
+                return;
+            }
+
+            res.status(200).json({ success: true, message: 'Quote item updated successfully', data: result });
+        } catch (error) {
+            logError({ message: "Updating quote item failed!", source: "BookingController.updateQuoteItem", error });
+            res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
+        }
+    }
+
+    static async deleteQuoteItem(req: AuthenticatedRequest, res: Response) {
+        try {
+            if (!req.user) {
+                res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
+                return;
+            }
+
+            const { id, itemId } = req.params;
+
+            if (!Validate.mongoId(id) || !Validate.mongoId(itemId)) {
+                res.status(400).json({ success: false, message: 'Invalid ID', code: 'INVALID_ID' });
+                return;
+            }
+
+            const [error, result] = await catchError(BookingService.deleteQuoteItem({
+                bookingId: id,
+                itemId,
+                userId: req.user._id.toString(),
+                userRole: req.user.role
+            }));
+
+            if (error) {
+                logError({ message: "Deleting quote item failed!", source: "BookingController.deleteQuoteItem", error });
+                res.status(400).json({ success: false, message: error.message || 'Failed to delete quote item', code: 'DELETE_ITEM_FAILED' });
+                return;
+            }
+
+            res.status(200).json({ success: true, message: 'Quote item deleted successfully', data: result });
+        } catch (error) {
+            logError({ message: "Deleting quote item failed!", source: "BookingController.deleteQuoteItem", error });
+            res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
+        }
+    }
 }

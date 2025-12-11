@@ -11,7 +11,16 @@ export interface IQuote extends Document {
         unitPrice: number,
         discount?: number,
         tax?: number,
-        totalPrice: number
+        totalPrice: number,
+        // Item-level tracking fields
+        itemStatus?: 'pending' | 'accepted' | 'rejected' | 'edit_requested' | 'edited',
+        editReason?: string,
+        editedBy?: Schema.Types.ObjectId,
+        editedAt?: Date,
+        acceptedBy?: Schema.Types.ObjectId,
+        acceptedAt?: Date,
+        rejectedBy?: Schema.Types.ObjectId,
+        rejectedAt?: Date
     }[],
     status: 'pending' | 'quoted' | 'accepted' | 'declined' | 'deposit_paid' | "final_payment_due" | 'completed' | 'cancelled',
     stripeInvoiceId?: string,
@@ -45,7 +54,16 @@ const quoteSchema = new Schema<IQuote>({
         unitPrice: { type: Number, required: true },
         discount: { type: Number },
         tax: { type: Number },
-        totalPrice: { type: Number, required: true }
+        totalPrice: { type: Number, required: true },
+        // Item-level tracking fields
+        itemStatus: { type: String, enum: ['pending', 'accepted', 'rejected', 'edit_requested', 'edited'], default: 'pending' },
+        editReason: { type: String },
+        editedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+        editedAt: { type: Date },
+        acceptedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+        acceptedAt: { type: Date },
+        rejectedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+        rejectedAt: { type: Date }
     }],
     status: {
         type: String,

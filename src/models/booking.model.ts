@@ -7,7 +7,10 @@ export interface IBooking extends Document {
     businessId: Schema.Types.ObjectId;
     serviceId: Schema.Types.ObjectId;
     quoteId?: Schema.Types.ObjectId;
-    quoteStatus?: 'not_required' | 'pending' | 'provided' | 'accepted' | 'rejected';
+    quoteStatus?: 'not_required' | 'pending' | 'provided' | 'accepted' | 'rejected' | 'edit_requested' | 'edited' | 'partially_accepted';
+    requiresQuote?: boolean;
+    totalAmount?: number;
+    platformFee?: number;
     serviceLocation: {
         street: string;
         city: string;
@@ -31,6 +34,8 @@ export interface IBooking extends Document {
     declinedAt?: Date;
     cancellationReason?: string;
     declineReason?: string;
+    crewAcceptedQuoteAt?: Date;
+    crewRejectedQuoteAt?: Date;
     notes?: string;
     statusHistory?: {
         fromStatus: string;
@@ -50,7 +55,10 @@ const bookingSchema = new Schema<IBooking>({
     businessId: { type: Schema.Types.ObjectId, ref: 'Business', required: true },
     serviceId: { type: Schema.Types.ObjectId, ref: 'Service', required: true },
     quoteId: { type: Schema.Types.ObjectId, ref: 'Quote' },
-    quoteStatus: { type: String, enum: ['not_required', 'pending', 'provided', 'accepted', 'rejected'] },
+    quoteStatus: { type: String, enum: ['not_required', 'pending', 'provided', 'accepted', 'rejected', 'edit_requested', 'edited', 'partially_accepted'] },
+    requiresQuote: { type: Boolean, default: false },
+    totalAmount: { type: Number },
+    platformFee: { type: Number },
     serviceLocation: {
         street: { type: String, required: true },
         city: { type: String, required: true },
@@ -74,6 +82,8 @@ const bookingSchema = new Schema<IBooking>({
     declinedAt: { type: Date },
     cancellationReason: { type: String },
     declineReason: { type: String },
+    crewAcceptedQuoteAt: { type: Date },
+    crewRejectedQuoteAt: { type: Date },
     notes: { type: String },
     statusHistory: [{
         fromStatus: { type: String, required: true },

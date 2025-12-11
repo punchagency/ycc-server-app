@@ -1,4 +1,4 @@
-import ShipmentModel, { IShippment } from "../models/shipment.model";
+import ShipmentModel, { IShipment } from "../models/shipment.model";
 import OrderModel, { IOrder } from "../models/order.model";
 import ProductModel from "../models/product.model";
 import UserModel from "../models/user.model";
@@ -6,7 +6,11 @@ import { EasyPostIntegration } from "../integration/easypost";
 import catchError from "../utils/catchError";
 import { addNotificationJob, addEmailJob } from "../integration/QueueManager";
 import { generateShippedEmailTemplate, generateDeliveredEmailTemplate, generateFailedEmailTemplate, generateReturnedEmailTemplate } from "../templates/shipment-email-templates";
-import { logInfo } from "../utils/SystemLogs";
+import { logInfo, logError } from "../utils/SystemLogs";
+import { AddressFormatter } from "../utils/StateFormatter";
+import BusinessModel from "../models/business.model";
+import InvoiceModel from "../models/invoice.model";
+import StripeService from "../integration/stripe";
 
 export class ShipmentService {
     static async createShipmentsForConfirmedItems(orderId: string, businessId: string) {
@@ -27,79 +31,122 @@ export class ShipmentService {
         const productIds = confirmedItems.map(item => item.productId);
         const products = await ProductModel.find({ _id: { $in: productIds } });
 
-        let totalWeight = 0;
-        let maxLength = 0;
-        let maxWidth = 0;
-        let maxHeight = 0;
+        const MAX_WEIGHT = 1120;
+        const MAX_LENGTH = 108;
+
+        const itemGroups: typeof confirmedItems[] = [];
+        let currentGroup: typeof confirmedItems = [];
+        let currentWeight = 0;
+        let currentMaxLength = 0;
 
         for (const item of confirmedItems) {
             const product = products.find(p => p._id.toString() === item.productId.toString());
-            if (product) {
-                totalWeight += product.weight * item.quantity;
-                maxLength = Math.max(maxLength, product.length);
-                maxWidth = Math.max(maxWidth, product.width);
-                maxHeight = Math.max(maxHeight, product.height);
+            if (!product) continue;
+
+            const itemWeight = parseFloat((product.weight * item.quantity).toFixed(1));
+            const itemLength = parseFloat(product.length.toFixed(1));
+
+            if (currentWeight + itemWeight > MAX_WEIGHT || Math.max(currentMaxLength, itemLength) > MAX_LENGTH) {
+                if (currentGroup.length > 0) itemGroups.push(currentGroup);
+                currentGroup = [item];
+                currentWeight = itemWeight;
+                currentMaxLength = itemLength;
+            } else {
+                currentGroup.push(item);
+                currentWeight += itemWeight;
+                currentMaxLength = Math.max(currentMaxLength, itemLength);
             }
         }
+        if (currentGroup.length > 0) itemGroups.push(currentGroup);
 
+        const fromAddr = AddressFormatter.formatAddress(confirmedItems[0].fromAddress);
+        const toAddr = AddressFormatter.formatAddress(order.deliveryAddress);
+        const business = await BusinessModel.findById(businessId);
+        const user = await UserModel.findById(order.userId);
+
+        const parsedFromAddress = {
+            street1: fromAddr.street || '',
+            street2: null,
+            city: fromAddr.city || '',
+            state: fromAddr.state || '',
+            zip: fromAddr.zip || '',
+            country: fromAddr.country || '',
+            company: business?.businessName || '',
+            phone: business?.phone || ''
+        };
+        const parsedToAddress = {
+            name: user ? `${user.firstName} ${user.lastName}` : '',
+            street1: toAddr.street || '',
+            city: toAddr.city || '',
+            state: toAddr.state || '',
+            zip: toAddr.zip || '',
+            country: toAddr.country || '',
+            email: user?.email || '',
+            phone: user?.phone || ''
+        };
+
+        const shipments = [];
         const easypost = new EasyPostIntegration();
-        const [error, response] = await catchError(easypost.createShipmentLogistics({
-            fromAddress: {
-                street1: confirmedItems[0].fromAddress.street,
-                street2: '',
-                city: confirmedItems[0].fromAddress.city,
-                state: confirmedItems[0].fromAddress.state,
-                zip: confirmedItems[0].fromAddress.zip,
-                country: confirmedItems[0].fromAddress.country,
-                company: '',
-                phone: ''
-            },
-            toAddress: {
-                name: '',
-                street1: order.deliveryAddress.street,
-                city: order.deliveryAddress.city,
-                state: order.deliveryAddress.state,
-                zip: order.deliveryAddress.zip,
-                country: order.deliveryAddress.country,
-                phone: ''
-            },
-            parcel: {
-                length: maxLength,
-                width: maxWidth,
-                height: maxHeight,
-                weight: totalWeight
+
+        for (const group of itemGroups) {
+            let totalWeight = 0;
+            let maxLength = 0;
+            let maxWidth = 0;
+            let maxHeight = 0;
+
+            for (const item of group) {
+                const product = products.find(p => p._id.toString() === item.productId.toString());
+                if (product) {
+                    totalWeight += product.weight * item.quantity;
+                    maxLength = Math.max(maxLength, product.length);
+                    maxWidth = Math.max(maxWidth, product.width);
+                    maxHeight = Math.max(maxHeight, product.height);
+                }
             }
-        }));
 
-        if (error) throw new Error(`EasyPost error: ${error.message}`);
+            const [error, response] = await catchError(easypost.createShipmentLogistics({
+                fromAddress: parsedFromAddress,
+                toAddress: parsedToAddress,
+                parcel: {
+                    length: parseFloat(maxLength.toFixed(1)),
+                    width: parseFloat(maxWidth.toFixed(1)),
+                    height: parseFloat(maxHeight.toFixed(1)),
+                    weight: parseFloat(totalWeight.toFixed(1))
+                }
+            }));
 
-        const rates = response.rates?.map((rate: any) => ({
-            carrier: rate.carrier,
-            rate: parseFloat(rate.rate),
-            service: rate.service,
-            estimatedDays: rate.delivery_days,
-            guaranteedDeliveryDate: rate.delivery_date_guaranteed || false,
-            deliveryDate: rate.est_delivery_date ? new Date(rate.est_delivery_date) : undefined,
-            isSelected: false,
-            id: rate.id
-        })) || [];
+            if (error) throw new Error(`EasyPost error: ${error.message}`);
 
-        const shipment = await ShipmentModel.create({
-            orderId: order._id,
-            userId: order.userId,
-            fromAddress: confirmedItems[0].fromAddress,
-            toAddress: order.deliveryAddress,
-            items: confirmedItems.map(item => ({
-                productId: item.productId,
-                quantity: item.quantity,
-                businessId: item.businessId,
-                discount: item.discount,
-                pricePerItem: item.pricePerItem,
-                totalPriceOfItems: item.totalPriceOfItems
-            })),
-            rates,
-            status: 'rates_fetched'
-        });
+            const rates = response.rates?.map((rate: any) => ({
+                carrier: rate.carrier,
+                rate: parseFloat(rate.rate),
+                service: rate.service,
+                estimatedDays: rate.delivery_days,
+                guaranteedDeliveryDate: rate.delivery_date_guaranteed || false,
+                deliveryDate: rate.est_delivery_date ? new Date(rate.est_delivery_date) : undefined,
+                isSelected: false,
+                id: rate.id
+            })) || [];
+
+            const shipment = await ShipmentModel.create({
+                orderId: order._id,
+                userId: order.userId,
+                fromAddress: confirmedItems[0].fromAddress,
+                toAddress: order.deliveryAddress,
+                items: group.map(item => ({
+                    productId: item.productId,
+                    quantity: item.quantity,
+                    businessId: item.businessId,
+                    discount: item.discount,
+                    pricePerItem: item.pricePerItem,
+                    totalPriceOfItems: item.totalPriceOfItems
+                })),
+                rates,
+                status: 'rates_fetched'
+            });
+
+            shipments.push(shipment);
+        }
 
         await addNotificationJob({
             recipientId: order.userId,
@@ -107,12 +154,11 @@ export class ShipmentService {
             priority: 'high',
             title: 'Shipment Rates Available',
             message: `Shipping rates are now available for your order. Please select a rate to proceed with payment.`,
-            data: { orderId: order._id, shipmentId: shipment._id }
+            data: { orderId: order._id, shipmentId: shipments[0]._id }
         });
 
-        return shipment;
+        return shipments.length === 1 ? shipments[0] : shipments;
     }
-
     static async getShipmentsByOrder(orderId: string, userId: string) {
         const order = await OrderModel.findById(orderId);
         if (!order) throw new Error('Order not found');
@@ -122,56 +168,332 @@ export class ShipmentService {
             .populate('items.productId', 'name imageURLs')
             .populate('items.businessId', 'businessName');
     }
+    static async purchaseShipmentLabel(selections: { shipmentId: string; rateId: string }[], userId: string) {
+        if (!selections || !Array.isArray(selections) || selections.length === 0) {
+            throw new Error('Selections array is required');
+        }
 
-    static async selectShipmentRate(shipmentId: string, rateId: string, userId: string) {
-        const shipment = await ShipmentModel.findById(shipmentId);
-        if (!shipment) throw new Error('Shipment not found');
-        if (shipment.userId.toString() !== userId) throw new Error('Unauthorized');
+        const firstShipment = await ShipmentModel.findById(selections[0].shipmentId);
+        if (!firstShipment) throw new Error('Shipment not found');
+        const orderId = firstShipment.orderId;
+        if (!orderId) throw new Error('Order ID not found');
 
-        const selectedRate = shipment.rates.find(r => r.id === rateId);
-        if (!selectedRate) throw new Error('Rate not found');
+        for (const selection of selections) {
+            const shipment = await ShipmentModel.findById(selection.shipmentId);
+            if (!shipment) throw new Error(`Shipment ${selection.shipmentId} not found`);
+            const rate = shipment.rates.find(r => r.id === selection.rateId);
+            if (!rate) throw new Error(`Rate ${selection.rateId} not found`);
+            shipment.rates.forEach(r => r.isSelected = r.id === selection.rateId);
+            shipment.status = 'rate_selected';
+            await shipment.save();
+        }
 
-        shipment.rates.forEach(r => r.isSelected = r.id === rateId);
-        shipment.carrierName = selectedRate.carrier;
-        shipment.status = 'rate_selected';
-        await shipment.save();
-
-        return shipment;
-    }
-
-    static async purchaseShipmentLabel(shipmentId: string, userId: string) {
-        const shipment = await ShipmentModel.findById(shipmentId);
-        if (!shipment) throw new Error('Shipment not found');
-        if (shipment.userId.toString() !== userId) throw new Error('Unauthorized');
-        if (shipment.status !== 'rate_selected') throw new Error('Rate must be selected first');
-
-        const selectedRate = shipment.rates.find(r => r.isSelected);
-        if (!selectedRate) throw new Error('No rate selected');
-
-        const easypost = new EasyPostIntegration();
-        const [error, response] = await catchError(easypost.purchaseLabel(shipmentId, selectedRate.id));
-        
-        if (error) throw new Error(`Label purchase failed: ${error.message}`);
-
-        shipment.trackingNumber = response.tracking_code;
-        shipment.labelUrl = response.postage_label?.label_url;
-        shipment.status = 'label_purchased';
-        await shipment.save();
-
-        const order = await OrderModel.findById(shipment.orderId);
-        if (order) {
-            for (const shipmentItem of shipment.items) {
-                const orderItem = order.items.find(i => 
-                    i.productId.toString() === shipmentItem.productId.toString()
-                );
-                if (orderItem) orderItem.status = 'processing';
+        let draftInvoice;
+        try {
+            draftInvoice = await this.createDraftInvoice(orderId.toString());
+        } catch (error: any) {
+            for (const selection of selections) {
+                const shipment = await ShipmentModel.findById(selection.shipmentId);
+                if (shipment) {
+                    shipment.rates.forEach(r => r.isSelected = false);
+                    await shipment.save();
+                }
             }
+            logError({ message: 'Draft invoice creation failed', error, source: 'ShipmentService.purchaseShipmentLabel' });
+            throw new Error(`Invoice creation failed: ${error.message}`);
+        }
+
+        const [error, results] = await catchError(
+            this.buyLabels(userId, selections)
+        );
+        if(error){
+            logError({message: 'Label purchase failed', error, source: 'ShipmentService.purchaseShipmentLabel'})
+        }
+        const allSuccess = results && results.every(r => r.success);
+
+        if (allSuccess) {
+            let invoiceUrl;
+            try {
+                invoiceUrl = await this.finalizeAndSendInvoice(draftInvoice.invoice.id, orderId.toString());
+            } catch (error: any) {
+                logError({ message: 'Invoice finalization failed', error, source: 'ShipmentService.purchaseShipmentLabel' });
+            }
+            return { status: true, results, invoiceUrl, labelsPurchased: true };
+        } else {
+            const stripe = StripeService.getInstance();
+            try {
+                await stripe.deleteInvoice(draftInvoice.invoice.id);
+            } catch (error: any) {
+                logError({ message: 'Draft invoice deletion failed', error, source: 'ShipmentService.purchaseShipmentLabel' });
+            }
+            for (const result of results as any[]){
+                if (!result.success) {
+                    const shipment = await ShipmentModel.findById(result.shipmentId);
+                    if (shipment) {
+                        shipment.rates.forEach(r => r.isSelected = false);
+                        await shipment.save();
+                    }
+                }
+            }
+            return { status: false, results, labelsPurchased: false };
+        }
+    }
+    private static async buyLabels(userId: string, selections: { shipmentId: string; rateId: string }[]) {
+        const results: any[] = [];
+        const easypost = new EasyPostIntegration();
+
+        for (const selection of selections) {
+            try {
+                const { shipmentId, rateId } = selection;
+                if (!shipmentId || !rateId) {
+                    results.push({ shipmentId, success: false, message: 'Missing shipmentId or rateId' });
+                    continue;
+                }
+
+                const shipment = await ShipmentModel.findById(shipmentId).populate('items.productId');
+                if (!shipment) throw new Error('Shipment not found');
+                if (shipment.userId.toString() !== userId) throw new Error('Not authorized');
+                if (shipment.status === 'label_purchased') throw new Error('Label already purchased');
+
+                const rate = shipment.rates.find(r => r.id === rateId);
+                if (!rate) throw new Error('Rate not found');
+
+                const order = await OrderModel.findById(shipment.orderId);
+                if (!order) throw new Error('Order not found');
+
+                const businessId = shipment.items[0].businessId;
+                const business = await BusinessModel.findById(businessId);
+                const user = await UserModel.findById(order.userId);
+
+                const fromAddr = AddressFormatter.formatAddress(shipment.fromAddress);
+                const toAddr = AddressFormatter.formatAddress(shipment.toAddress);
+
+                const parsedFromAddress = {
+                    street1: fromAddr.street || '',
+                    street2: null,
+                    city: fromAddr.city || '',
+                    state: fromAddr.state || '',
+                    zip: fromAddr.zip || '',
+                    country: fromAddr.country || '',
+                    company: business?.businessName || '',
+                    phone: business?.phone || ''
+                };
+                const parsedToAddress = {
+                    name: user ? `${user.firstName} ${user.lastName}` : '',
+                    street1: toAddr.street || '',
+                    city: toAddr.city || '',
+                    state: toAddr.state || '',
+                    zip: toAddr.zip || '',
+                    country: toAddr.country || '',
+                    email: user?.email || '',
+                    phone: user?.phone || ''
+                };
+
+                let totalWeight = 0;
+                let maxLength = 0;
+                let maxWidth = 0;
+                let maxHeight = 0;
+
+                for (const item of shipment.items) {
+                    const product: any = item.productId;
+                    if (product) {
+                        totalWeight += product.weight * item.quantity;
+                        maxLength = Math.max(maxLength, product.length);
+                        maxWidth = Math.max(maxWidth, product.width);
+                        maxHeight = Math.max(maxHeight, product.height);
+                    }
+                }
+
+                const [epError, newEpShipment] = await catchError(easypost.createShipmentLogistics({
+                    fromAddress: parsedFromAddress,
+                    toAddress: parsedToAddress,
+                    parcel: {
+                        length: parseFloat(maxLength.toFixed(1)),
+                        width: parseFloat(maxWidth.toFixed(1)),
+                        height: parseFloat(maxHeight.toFixed(1)),
+                        weight: parseFloat(totalWeight.toFixed(1))
+                    }
+                }));
+
+                if (epError) throw new Error(`EasyPost error: ${epError.message}`);
+                if (!newEpShipment.rates || newEpShipment.rates.length === 0) {
+                    throw new Error('No rates returned');
+                }
+
+                let matchedRate = newEpShipment.rates.find((r: any) => 
+                    r.carrier === rate.carrier && r.service === rate.service
+                );
+                if (!matchedRate) {
+                    matchedRate = newEpShipment.rates.reduce((lowest: any, current: any) => 
+                        parseFloat(current.rate) < parseFloat(lowest.rate) ? current : lowest
+                    );
+                }
+
+                const [error, purchasedShipment] = await catchError(
+                    easypost.purchaseLabel(newEpShipment.id, matchedRate.id)
+                );
+                if(error){
+                    logError({message: 'Label purchase failed', error, source: 'ShipmentService.buyLabels.purchaseLabel'})
+                    throw new Error(`Label purchase failed: ${error.message}`);
+                }
+
+                shipment.rates = newEpShipment.rates.map((r: any) => ({
+                    carrier: r.carrier || '',
+                    rate: parseFloat(r.rate),
+                    service: r.service || '',
+                    estimatedDays: r.delivery_days || 0,
+                    guaranteedDeliveryDate: r.delivery_date_guaranteed || false,
+                    deliveryDate: r.est_delivery_date ? new Date(r.est_delivery_date) : new Date(),
+                    isSelected: r.id === matchedRate.id,
+                    id: r.id || ''
+                })) as any;
+
+                shipment.status = 'label_purchased';
+                shipment.trackingNumber = purchasedShipment.tracking_code;
+                shipment.labelUrl = purchasedShipment.postage_label?.label_url;
+                await shipment.save();
+
+                results.push({
+                    shipmentId,
+                    success: true,
+                    trackingCode: purchasedShipment.tracking_code,
+                    labelUrl: purchasedShipment.postage_label?.label_url
+                });
+            } catch (error: any) {
+                logError({ message: 'Label purchase failed', error, source: 'ShipmentService.buyLabels' });
+                results.push({
+                    shipmentId: selection.shipmentId,
+                    success: false,
+                    message: error.message || 'Unknown error',
+                    errorCode: error.code || error.status
+                });
+            }
+        }
+        return results;
+    }
+    private static async createDraftInvoice(orderId: string) {
+        const stripe = StripeService.getInstance();
+        const order = await OrderModel.findById(orderId).populate('userId');
+        if (!order) throw new Error('Order not found');
+
+        const user: any = order.userId;
+        let stripeCustomerId = user.stripeCustomerId;
+
+        if (!stripeCustomerId) {
+            const customers = await stripe.listCustomers({ email: user.email, limit: 1 });
+            if (customers.data.length > 0) {
+                stripeCustomerId = customers.data[0].id;
+            } else {
+                const customer = await stripe.createCustomer({
+                    email: user.email,
+                    name: `${user.firstName} ${user.lastName}`
+                });
+                stripeCustomerId = customer.id;
+            }
+            user.stripeCustomerId = stripeCustomerId;
+            await user.save();
+        }
+
+        const invoice = await stripe.createinvoices({
+            customer: stripeCustomerId,
+            collection_method: 'send_invoice',
+            days_until_due: 7,
+            metadata: { orderId: orderId, userId: user._id.toString(), customerEmail: user.email }
+        });
+
+        const businessIds = [...new Set(order.items.map(item => item.businessId.toString()))];
+        const missingStripeAccounts: string[] = [];
+
+        for (const businessId of businessIds) {
+            const business = await BusinessModel.findById(businessId);
+            if (!business?.stripeAccountId) {
+                missingStripeAccounts.push(business?.businessName || businessId);
+                continue;
+            }
+
+            const businessItems = order.items.filter(item => item.businessId.toString() === businessId);
+            const subTotal = businessItems.reduce((sum, item) => sum + item.totalPriceOfItems, 0);
+
+            await stripe.createInvoiceItems({
+                customer: stripeCustomerId,
+                invoice: invoice.id,
+                amount: Math.round(subTotal * 100),
+                currency: 'usd',
+                description: `Products from ${business.businessName}`,
+                metadata: { supplierId: businessId, supplierUserId: business.userId.toString(), type: 'supplier_product' }
+            });
+        }
+
+        if (missingStripeAccounts.length > 0) {
+            throw new Error(`Suppliers missing Stripe accounts: ${missingStripeAccounts.join(', ')}`);
+        }
+
+        const shipments = await ShipmentModel.find({ orderId });
+        let shippingTotal = 0;
+        for (const shipment of shipments) {
+            const selectedRate = shipment.rates.find(r => r.isSelected);
+            if (selectedRate) shippingTotal += selectedRate.rate;
+        }
+
+        if (shippingTotal > 0) {
+            await stripe.createInvoiceItems({
+                customer: stripeCustomerId,
+                invoice: invoice.id,
+                amount: Math.round(shippingTotal * 100),
+                currency: 'usd',
+                description: 'Shipping (platform)',
+                metadata: { type: 'shipping' }
+            });
+        }
+
+        const platformFee = order.totalAmount * 0.1;
+        if (platformFee > 0) {
+            await stripe.createInvoiceItems({
+                customer: stripeCustomerId,
+                invoice: invoice.id,
+                amount: Math.round(platformFee * 100),
+                currency: 'usd',
+                description: 'Platform Fee (10%)',
+                metadata: { type: 'platform_fee' }
+            });
+        }
+
+        return { invoice, stripeCustomerId, order };
+    }
+    private static async finalizeAndSendInvoice(invoiceId: string, orderId: string) {
+        const stripe = StripeService.getInstance();
+        const finalizedInvoice = await stripe.finalizeInvoice(invoiceId);
+
+        const order = await OrderModel.findById(orderId).populate('userId');
+        if (order) {
+            order.stripeInvoiceUrl = finalizedInvoice.hosted_invoice_url;
+            order.stripeInvoiceId = invoiceId;
             await order.save();
         }
 
-        return shipment;
-    }
+        await stripe.sendInvoice(invoiceId);
 
+        const businessIds = [...new Set(order!.items.map(item => item!.businessId))];
+        try {
+            await InvoiceModel.create({
+                stripeInvoiceId: invoiceId,
+                userId: order!.userId,
+                orderId: orderId,
+                businessIds,
+                amount: finalizedInvoice.amount_due / 100,
+                platformFee: order!.platformFee,
+                currency: 'usd',
+                status: 'pending',
+                invoiceDate: new Date(),
+                dueDate: finalizedInvoice.due_date ? new Date(finalizedInvoice.due_date * 1000) : null,
+                stripeInvoiceUrl: finalizedInvoice.hosted_invoice_url
+            });
+        } catch (error: any) {
+            logError({ message: 'Invoice record creation failed', error, source: 'ShipmentService.finalizeAndSendInvoice' });
+        }
+
+        return finalizedInvoice.hosted_invoice_url;
+    }
     static async processTrackingWebhook(trackingCode: string, easypostStatus: string, webhookData: any) {
         const shipment = await ShipmentModel.findOne({ trackingNumber: trackingCode });
         if (!shipment) {
@@ -231,8 +553,7 @@ export class ShipmentService {
             await this.sendTrackingNotification(shipment, order, webhookData);
         }
     }
-
-    private static async sendTrackingNotification(shipment: IShippment, order: IOrder, trackingData: any) {
+    private static async sendTrackingNotification(shipment: IShipment, order: IOrder, trackingData: any) {
         const user = await UserModel.findById(order.userId);
         if (!user) return;
 

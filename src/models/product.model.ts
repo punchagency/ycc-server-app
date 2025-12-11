@@ -4,6 +4,7 @@ export interface IProduct extends Document {
     _id: Schema.Types.ObjectId;
     userId: Schema.Types.ObjectId;
     businessId: Schema.Types.ObjectId;
+    businessType: 'distributor' | "manufacturer"
     stripeProductId?: string
     stripePriceId?: string
     name: string;
@@ -31,6 +32,7 @@ export interface IProduct extends Document {
 const productSchema = new Schema<IProduct>({
     userId: { type: Schema.Types.ObjectId, required: true, ref: 'User' },
     businessId: { type: Schema.Types.ObjectId, required: true, ref: 'Business' },
+    businessType: { type: String, required: true, enum: ['distributor', 'manufacturer'] },
     stripeProductId: { type: String, required: false },
     stripePriceId: { type: String, required: false },
     name: { type: String, required: true },

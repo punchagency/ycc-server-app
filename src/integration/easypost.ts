@@ -1,10 +1,11 @@
 import EastPost from '@easypost/api';
 import 'dotenv/config';
 import catchError from '../utils/catchError';
+import EasyPost from '@easypost/api/types/EasyPost';
 
 interface FromAddress {
     street1: string,
-    street2: string,
+    street2: string | null,
     city: string,
     state: string,
     zip: string,
@@ -19,6 +20,7 @@ interface ToAddress {
     state: string,
     zip: string,
     country: string,
+    email: string,
     phone: string,
 }
 interface Parcel {
@@ -29,7 +31,7 @@ interface Parcel {
 }
 export class EasyPostIntegration {
     private apiKey: string;
-    private client: any;
+    private client: EasyPost;
 
     constructor() {
         this.apiKey = process.env.EASYPOST_API_KEY || '';
@@ -45,9 +47,7 @@ export class EasyPostIntegration {
     }
 
     async purchaseLabel(shipmentId: string, rateId: string) {
-        return this.client.Shipment.retrieve(shipmentId).then((shipment: any) => 
-            shipment.buy({ rate: { id: rateId } })
-        );
+        return this.client.Shipment.buy(shipmentId, rateId)
     }
 
     async getTrackingInfo(trackingCode: string, carrier: string) {

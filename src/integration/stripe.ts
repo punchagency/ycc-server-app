@@ -145,7 +145,7 @@ class StripeService {
 
             return refund;
         } catch (error) {
-            logError({message: 'Stripe refund failed', error, source: 'StripeService.getPaymentIntentAndProcessRefund'})
+            logError({ message: 'Stripe refund failed', error, source: 'StripeService.getPaymentIntentAndProcessRefund' })
             if (error instanceof Error) {
                 throw new Error(`Stripe refund failed: ${error.message}`);
             }
@@ -232,7 +232,7 @@ class StripeService {
 
             return transfer;
         } catch (error) {
-            logError({message: 'Stripe transfer failed', error, source: 'StripeService.createTransfer'})
+            logError({ message: 'Stripe transfer failed', error, source: 'StripeService.createTransfer' })
             if (error instanceof Error) {
                 throw new Error(`Stripe transfer failed: ${error.message}`);
             }
@@ -285,6 +285,122 @@ class StripeService {
             logError({ message: 'Stripe price creation failed', error, source: 'StripeService.createPrice' });
             if (error instanceof Error) {
                 throw new Error(`Stripe price creation failed: ${error.message}`);
+            }
+            throw error;
+        }
+    }
+
+    public async createCustomer({
+        email,
+        name,
+        description
+    }: {
+        email: string,
+        name?: string,
+        description?: string
+    }): Promise<Stripe.Customer> {
+        try {
+            const customer = await StripeService.stripe.customers.create({
+                email,
+                name,
+                description
+            });
+            return customer;
+        } catch (error) {
+            logError({ message: 'Stripe customer creation failed', error, source: 'StripeService.createCustomer' });
+            if (error instanceof Error) {
+                throw new Error(`Stripe customer creation failed: ${error.message}`);
+            }
+            throw error;
+        }
+    }
+
+    public async listCustomers({ email, limit = 100 }: { email?: string, limit?: number }): Promise<Stripe.ApiList<Stripe.Customer>> {
+        try {
+            const customers = await StripeService.stripe.customers.list({ email, limit });
+            return customers;
+        } catch (error) {
+            logError({ message: 'Stripe customer listing failed', error, source: 'StripeService.listCustomers' });
+            if (error instanceof Error) {
+                throw new Error(`Stripe customer listing failed: ${error.message}`);
+            }
+            throw error;
+        }
+    }
+
+    public async createinvoices({ customer, collection_method, days_until_due, metadata }: {
+        customer: string,
+        collection_method: 'send_invoice' | 'charge_automatically',
+        days_until_due: number,
+        metadata: { [key: string]: string }
+    }): Promise<Stripe.Invoice> {
+        try {
+            const invoice = await StripeService.stripe.invoices.create({
+                customer,
+                collection_method,
+                days_until_due,
+                metadata
+            });
+            return invoice;
+        } catch (error) {
+            logError({ message: 'Stripe invoice creation failed', error, source: 'StripeService.createinvoices' });
+            if (error instanceof Error) {
+                throw new Error(`Stripe invoice creation failed: ${error.message}`);
+            }
+            throw error;
+        }
+    }
+    public async createInvoiceItems({ customer, invoice, amount, currency, description, metadata }: { customer: string, invoice: string, amount: number, currency: string, description: string, metadata: { [key: string]: string } }): Promise<Stripe.InvoiceItem> {
+        try {
+            const invoiceItem = await StripeService.stripe.invoiceItems.create({
+                customer,
+                invoice,
+                amount,
+                currency,
+                description,
+                metadata
+            });
+            return invoiceItem;
+        } catch (error) {
+            logError({ message: 'Stripe invoice item creation failed', error, source: 'StripeService.createInvoiceItems' });
+            if (error instanceof Error) {
+                throw new Error(`Stripe invoice item creation failed: ${error.message}`);
+            }
+            throw error;
+        }
+    }
+    public async deleteInvoice(invoiceId: string){
+        try {
+            const deletedInvoice = await StripeService.stripe.invoices.del(invoiceId);
+            return deletedInvoice;
+        } catch (error) {
+            logError({ message: 'Stripe invoice deletion failed', error, source: 'StripeService.deleteInvoice' });
+            if (error instanceof Error) {
+                throw new Error(`Stripe invoice deletion failed: ${error.message}`);
+            }
+            throw error;
+        }
+    }
+    public async finalizeInvoice(invoiceId: string): Promise<Stripe.Invoice>{
+        try {
+            const finalizedInvoice = await StripeService.stripe.invoices.finalizeInvoice(invoiceId);
+            return finalizedInvoice;
+        } catch (error) {
+            logError({ message: 'Stripe invoice finalization failed', error, source: 'StripeService.finalizeInvoice' });
+            if (error instanceof Error) {
+                throw new Error(`Stripe invoice finalization failed: ${error.message}`);
+            }
+            throw error;
+        }
+    }
+    public async sendInvoice(invoiceId: string){
+        try {
+            const sentInvoice = await StripeService.stripe.invoices.sendInvoice(invoiceId);
+            return sentInvoice;
+        } catch (error) {
+            logError({ message: 'Stripe invoice sending failed', error, source: 'StripeService.sendInvoice' });
+            if (error instanceof Error) {
+                throw new Error(`Stripe invoice sending failed: ${error.message}`);
             }
             throw error;
         }

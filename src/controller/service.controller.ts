@@ -10,14 +10,59 @@ import { Types } from 'mongoose';
 export class ServiceController {
     static async createService(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
-            if (!req.user || req.user.role !== 'distributor') {
-                res.status(403).json({ success: false, message: 'Only distributors can create services', code: 'FORBIDDEN' });
-                return;
-            }
+            const userRole = req.user!.role;
+            let businessId = req.user!.businessId;
 
-            const businessId = req.user.businessId;
-            if (!businessId) {
-                res.status(400).json({ success: false, message: 'Business not found for user', code: 'BUSINESS_NOT_FOUND' });
+            // Admin flow: validate and fetch business details
+            if (userRole === 'admin') {
+                const adminProvidedBusinessId = req.body.businessId;
+                
+                if (!adminProvidedBusinessId || !Validate.mongoId(adminProvidedBusinessId)) {
+                    res.status(400).json({
+                        success: false,
+                        message: 'As an admin, you should provide a business owner.',
+                        code: 'VALIDATION_ERROR'
+                    });
+                    return;
+                }
+
+                const business = await BusinessModel.findById(adminProvidedBusinessId).populate('userId');
+                if (!business) {
+                    res.status(404).json({
+                        success: false,
+                        message: 'Business not found',
+                        code: 'BUSINESS_NOT_FOUND'
+                    });
+                    return;
+                }
+
+                const businessOwner = business.userId as any;
+                if (!businessOwner || businessOwner.role !== 'distributor') {
+                    res.status(400).json({
+                        success: false,
+                        message: 'Business must belong to a distributor',
+                        code: 'VALIDATION_ERROR'
+                    });
+                    return;
+                }
+
+                businessId = business._id.toString();
+            } else if (userRole === 'distributor') {
+                // Distributor flow: use their own businessId
+                if (!businessId) {
+                    res.status(400).json({
+                        success: false,
+                        message: 'Business ID is required',
+                        code: 'BUSINESS_REQUIRED'
+                    });
+                    return;
+                }
+            } else {
+                res.status(403).json({
+                    success: false,
+                    message: 'Only distributors and admins can create services',
+                    code: 'FORBIDDEN'
+                });
                 return;
             }
 
@@ -39,7 +84,7 @@ export class ServiceController {
             }
 
             if (!categoryId || !Validate.string(categoryId)) {
-                res.status(400).json({ success: false, message: 'Category ID is required', code: 'VALIDATION_ERROR' });
+                res.status(400).json({ success: false, message: 'Category is required', code: 'VALIDATION_ERROR' });
                 return;
             }
 
@@ -60,7 +105,7 @@ export class ServiceController {
                 isQuotable: isQuotable || false
             };
 
-            const service = await ServiceService.createService(serviceData, imageURLs);
+            const service = await ServiceService.createService(serviceData, imageURLs, categoryId);
 
             if (!service) {
                 res.status(400).json({ success: false, message: 'Failed to create service. Category may not exist.' });
@@ -197,18 +242,79 @@ export class ServiceController {
 
     static async updateService(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
-            if (!req.user || req.user.role !== 'distributor') {
-                res.status(403).json({ success: false, message: 'Only distributors can update services', code: 'FORBIDDEN' });
-                return;
-            }
-
-            const businessId = req.user.businessId;
-            if (!businessId) {
-                res.status(400).json({ success: false, message: 'Business not found for user', code: 'BUSINESS_NOT_FOUND' });
-                return;
-            }
-
             const { id } = req.params;
+            const userRole = req.user!.role;
+            const businessId = req.user!.businessId;
+
+            if (!Validate.mongoId(id)) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Invalid service ID',
+                    code: 'VALIDATION_ERROR'
+                });
+                return;
+            }
+
+            // Check if service exists
+            const existingService = await ServiceService.getServiceById(id);
+            if (!existingService) {
+                res.status(404).json({
+                    success: false,
+                    message: 'Service not found',
+                    code: 'SERVICE_NOT_FOUND'
+                });
+                return;
+            }
+
+            // Authorization check
+            if (userRole === 'admin') {
+                // Admin can update any distributor's service
+                const business = await BusinessModel.findById(existingService.businessId).populate('userId');
+                if (!business) {
+                    res.status(404).json({
+                        success: false,
+                        message: 'Business not found',
+                        code: 'BUSINESS_NOT_FOUND'
+                    });
+                    return;
+                }
+
+                const businessOwner = business.userId as any;
+                if (!businessOwner || businessOwner.role !== 'distributor') {
+                    res.status(403).json({
+                        success: false,
+                        message: 'Can only update services for distributors',
+                        code: 'ACCESS_DENIED'
+                    });
+                    return;
+                }
+            } else if (userRole === 'distributor') {
+                // Distributor can only update their own services
+                if (!businessId) {
+                    res.status(400).json({
+                        success: false,
+                        message: 'Business ID is required',
+                        code: 'BUSINESS_REQUIRED'
+                    });
+                    return;
+                }
+
+                if (existingService.businessId.toString() !== businessId) {
+                    res.status(403).json({
+                        success: false,
+                        message: 'Access denied',
+                        code: 'ACCESS_DENIED'
+                    });
+                    return;
+                }
+            } else {
+                res.status(403).json({
+                    success: false,
+                    message: 'Only distributors and admins can update services',
+                    code: 'FORBIDDEN'
+                });
+                return;
+            }
             const { name, description, price, categoryId, isQuotable } = req.body;
 
             if (name && !Validate.stringLength(name, 2, 50)) {
@@ -241,7 +347,8 @@ export class ServiceController {
             if (categoryId) updateData.categoryId = categoryId;
             if (isQuotable !== undefined) updateData.isQuotable = isQuotable;
 
-            const service = await ServiceService.updateService(id, businessId, updateData, imageURLs);
+            const serviceBusinessId = userRole === 'admin' ? existingService.businessId.toString() : businessId!;
+            const service = await ServiceService.updateService(id, serviceBusinessId, updateData, imageURLs, categoryId);
 
             if (!service) {
                 res.status(404).json({ success: false, message: 'Service not found or unauthorized', code: 'SERVICE_NOT_FOUND' });
@@ -291,7 +398,7 @@ export class ServiceController {
 
     static async fetchServicesForCrew(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
-            if (!req.user || req.user.role !== 'user') {
+            if (!req.user) {
                 res.status(403).json({ success: false, message: 'Only crew members can access services', code: 'FORBIDDEN' });
                 return;
             }

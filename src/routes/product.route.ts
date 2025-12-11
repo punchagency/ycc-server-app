@@ -11,6 +11,7 @@ router.post('/', authenticateToken, productUpload, ProductController.createProdu
 router.post('/bulk', ProductController.createMultipleProducts);
 router.get('/search', ProductController.searchProducts);
 router.get('/business', authenticateToken, ProductController.getBusinessProducts);
+router.get('/manufacturers', authenticateToken, ProductController.getManufacturerProducts);
 router.get('/low-stock', authenticateToken, ProductController.getLowStockProducts);
 router.get('/:id', ProductController.getProductById);
 router.put('/:id', authenticateToken, productUpload, ProductController.updateProduct);

@@ -28,6 +28,7 @@ export interface IBusiness extends Document {
     stripeTransfersEnabled?: boolean;
     license: string;
     isOnboarded: boolean;
+    isRejected: boolean;
     businessType: typeof BUSINESS_TYPE[number];
 }
 
@@ -106,6 +107,10 @@ const businessSchema = new Schema<IBusiness>({
         required: true
     },
     isOnboarded: {
+        type: Boolean,
+        default: false
+    },
+    isRejected: {
         type: Boolean,
         default: false
     }

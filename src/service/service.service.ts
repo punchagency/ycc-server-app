@@ -8,19 +8,47 @@ import { Types } from 'mongoose';
 import { pineconeService } from '../integration/pinecone';
 
 export class ServiceService {
-    static async createService(serviceData: CreateServiceDTO, imageURLs?: string[]): Promise<IService | null> {
-        const category = await CategoryService.getCategoryById(serviceData.categoryId);
+    static async createService(serviceData: CreateServiceDTO, imageURLs?: string[], categoryInput?: string): Promise<IService | null> {
+        let categoryId: string;
+        
+        if (categoryInput) {
+            if (Types.ObjectId.isValid(categoryInput)) {
+                categoryId = categoryInput;
+            } else {
+                let category = await CategoryService.getCategoryByName(categoryInput);
+                if (!category) {
+                    category = await CategoryService.createCategory({
+                        name: categoryInput,
+                        type: 'service',
+                        isApproved: false
+                    });
+                }
+                if (!category) {
+                    await logError({
+                        message: 'Failed to create category',
+                        source: 'ServiceService.createService',
+                        additionalData: { categoryInput }
+                    });
+                    return null;
+                }
+                categoryId = category._id.toString();
+            }
+        } else {
+            categoryId = serviceData.categoryId;
+        }
+
+        const category = await CategoryService.getCategoryById(categoryId);
         if (!category) {
             await logError({
                 message: 'Category not found',
                 source: 'ServiceService.createService',
-                additionalData: { categoryId: serviceData.categoryId }
+                additionalData: { categoryId }
             });
             return null;
         }
 
         const [error, service] = await catchError(
-            ServiceModel.create({ ...serviceData, imageURLs: imageURLs || [] })
+            ServiceModel.create({ ...serviceData, categoryId, imageURLs: imageURLs || [] })
         );
 
         if (error) {
@@ -170,13 +198,39 @@ export class ServiceService {
         return { services, total, page, pages: Math.ceil(total / limit) };
     }
 
-    static async updateService(id: string, businessId: string, updateData: UpdateServiceDTO, imageURLs?: string[]): Promise<IService | null> {
+    static async updateService(id: string, businessId: string, updateData: UpdateServiceDTO, imageURLs?: string[], categoryInput?: string): Promise<IService | null> {
         if (!Types.ObjectId.isValid(id)) return null;
 
         const service = await ServiceModel.findOne({ _id: id, businessId });
         if (!service) return null;
 
-        if (updateData.categoryId) {
+        const finalUpdateData = { ...updateData };
+
+        if (categoryInput) {
+            let categoryId: string;
+            if (Types.ObjectId.isValid(categoryInput)) {
+                categoryId = categoryInput;
+            } else {
+                let category = await CategoryService.getCategoryByName(categoryInput);
+                if (!category) {
+                    category = await CategoryService.createCategory({
+                        name: categoryInput,
+                        type: 'service',
+                        isApproved: false
+                    });
+                }
+                if (!category) {
+                    await logError({
+                        message: 'Failed to create category during service update',
+                        source: 'ServiceService.updateService',
+                        additionalData: { serviceId: id, categoryInput }
+                    });
+                    return null;
+                }
+                categoryId = category._id.toString();
+            }
+            finalUpdateData.categoryId = categoryId;
+        } else if (updateData.categoryId) {
             const category = await CategoryService.getCategoryById(updateData.categoryId);
             if (!category) {
                 await logError({
@@ -188,7 +242,7 @@ export class ServiceService {
             }
         }
 
-        const updates: any = { ...updateData };
+        const updates: any = { ...finalUpdateData };
         if (imageURLs) updates.imageURLs = imageURLs;
 
         const [error, updatedService] = await catchError(

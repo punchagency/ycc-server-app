@@ -4,6 +4,7 @@ import BusinessModel from "../models/business.model";
 import UserModel from "../models/user.model";
 import EventModel from "../models/event.model";
 import QuoteModel from "../models/quote.model";
+import InvoiceModel from "../models/invoice.model";
 import uuid from "../utils/uuid";
 import { addEmailJob, addNotificationJob } from "../integration/QueueManager";
 import { generateVendorBookingEmail, generateCrewBookingConfirmationEmail } from "../templates/email-templates";
@@ -311,6 +312,13 @@ export class BookingService {
                 if (booking.paymentStatus === 'pending') {
                     booking.paymentStatus = 'cancelled';
                 }
+            }
+
+            // Update invoice status if exists
+            const invoice = await InvoiceModel.findOne({ bookingId: booking._id });
+            if (invoice && invoice.status === 'pending') {
+                invoice.status = 'cancelled';
+                await invoice.save();
             }
 
             await EventModel.deleteMany({

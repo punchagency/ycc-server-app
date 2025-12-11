@@ -34,7 +34,7 @@ export class UserService {
 
         const userIds = users.map(user => user._id);
         
-        const businessFilter: any = { userId: { $in: userIds } };
+        const businessFilter: any = { userId: { $in: userIds }, $or: [{ isRejected: null }, { isRejected: false }] };
         if (isOnboarded !== undefined) {
             businessFilter.isOnboarded = isOnboarded;
         }
@@ -123,6 +123,9 @@ export class UserService {
             user.isVerified = false;
             user.isActive = false;
             await user.save();
+
+            business.isRejected = true;
+            await business.save();
 
             const emailHtml = vendorRejectionEmailTemplate
                 .replace(/{{businessName}}/g, business.businessName)

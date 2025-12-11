@@ -96,6 +96,9 @@ export class AuthService {
   }
 
   static async register(userData: RegisterInput): Promise<AuthResponse> {
+    let savedUser: any = null;
+    let business: any = null;
+
     try {
       // Check if user already exists
       const existingUser = await User.findOne({ email: userData.email });
@@ -132,42 +135,50 @@ export class AuthService {
         isActive: false
       });
 
-      const savedUser = await newUser.save();
+      savedUser = await newUser.save();
 
       // Send activation email
-      await addEmailJob({
-        email: savedUser.email,
-        subject: 'Activate Your Account',
-        html: `
-          <h1>Welcome ${savedUser.firstName}!</h1>
-          <p>Your activation code is: <strong>${activationCode}</strong></p>
-          <p>This code will expire in 20 minutes.</p>
-        `
-      });
+      try {
+        await addEmailJob({
+          email: savedUser.email,
+          subject: 'Activate Your Account',
+          html: `
+            <h1>Welcome ${savedUser.firstName}!</h1>
+            <p>Your activation code is: <strong>${activationCode}</strong></p>
+            <p>This code will expire in 20 minutes.</p>
+          `
+        });
+      } catch (emailError) {
+        await User.findByIdAndDelete(savedUser._id);
+        throw new Error('Failed to send activation email');
+      }
 
       // If role is distributor or manufacturer, create business record
-      let business = null;
       if (
         (userData.role === 'distributor' || userData.role === 'manufacturer') &&
         userData.businessName
       ) {
-        // For simplicity, creating placeholder Stripe account details
-        const newBusiness = new Business({
-          userId: savedUser._id,
-          businessName: userData.businessName,
-          businessType: userData.businessType || userData.role,
-          website: userData.website || '',
-          address: userData.address,
-          email: userData.businessEmail || '',
-          phone: userData.businessPhone || '',
-          taxId: userData.taxId || '',
-          stripeAccountId: '',
-          stripeAccountLink: '',
-          license: userData.license || '',
-          isOnboarded: false
-        });
+        try {
+          const newBusiness = new Business({
+            userId: savedUser._id,
+            businessName: userData.businessName,
+            businessType: userData.businessType || userData.role,
+            website: userData.website || '',
+            address: userData.address,
+            email: userData.businessEmail || '',
+            phone: userData.businessPhone || '',
+            taxId: userData.taxId || '',
+            stripeAccountId: '',
+            stripeAccountLink: '',
+            license: userData.license || '',
+            isOnboarded: false
+          });
 
-        business = await newBusiness.save();
+          business = await newBusiness.save();
+        } catch (businessError) {
+          await User.findByIdAndDelete(savedUser._id);
+          throw new Error('Failed to create business record');
+        }
       }
 
       return {

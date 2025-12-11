@@ -60,10 +60,7 @@ export class AuthController {
             }
 
             if(role !== 'admin'){
-                console.log("This is address before parsing: ",{address})
                 address = TryParseJSON(address, {street: '', zipcode: '', city: '', state: '', country: ''})
-
-                console.log("This is address after parsing: ",{address})
                 // Address validation
                 if (!address || typeof address !== 'object') {
                     res.status(400).json({ success: false, message: 'Valid address is required', code: "VALIDATION_ERROR" });

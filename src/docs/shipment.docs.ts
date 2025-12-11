@@ -19,34 +19,6 @@
 
 /**
  * @swagger
- * /api/v2/shipments/{shipmentId}/select-rate:
- *   post:
- *     summary: Select shipping rate for a shipment
- *     tags: [Shipments]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: shipmentId
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               rateId:
- *                 type: string
- *     responses:
- *       200:
- *         description: Rate selected successfully
- */
-
-/**
- * @swagger
  * /api/v2/shipments/purchase-label:
  *   post:
  *     summary: Purchase shipping labels for multiple shipments and create invoice

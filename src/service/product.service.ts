@@ -7,6 +7,7 @@ import { logError, logInfo } from '../utils/SystemLogs';
 import { Types } from 'mongoose';
 import { pineconeService } from '../integration/pinecone';
 import StripeService from '../integration/stripe';
+import { CategoryService } from "../service/category.service"
 
 export interface IProductInput {
     name: string;
@@ -38,6 +39,7 @@ export interface IProductSearchQuery {
     maxPrice?: number;
     businessId?: string;
     businessName?: string;
+    userRole?: string;
     page?: number;
     limit?: number;
     random?: boolean;
@@ -45,8 +47,31 @@ export interface IProductSearchQuery {
 
 export class ProductService {
 
-    static async createProduct(userId: string, businessId: string, productData: IProductInput): Promise<IProduct | null> {
+    static async createProduct(userId: string, businessId: string, productData: IProductInput, categoryInput: string): Promise<IProduct | null> {
         const stripeService = StripeService.getInstance();
+        const BusinessModel = require('../models/business.model').default;
+
+        const business = await BusinessModel.findById(businessId).populate('userId');
+        if (!business) throw new Error('Business not found');
+
+        const businessOwner = business.userId as any;
+        const businessType = businessOwner.role === 'manufacturer' ? 'manufacturer' : 'distributor';
+
+        let categoryId: string;
+        if (Types.ObjectId.isValid(categoryInput)) {
+            categoryId = categoryInput;
+        } else {
+            let category = await CategoryService.getCategoryByName(categoryInput);
+            if (!category) {
+                category = await CategoryService.createCategory({
+                    name: categoryInput,
+                    type: 'product',
+                    isApproved: false
+                });
+            }
+            if (!category) throw new Error('Failed to create category');
+            categoryId = category._id.toString();
+        }
 
         const [stripeError, stripeProduct] = await catchError(
             stripeService.createProduct({
@@ -84,8 +109,10 @@ export class ProductService {
         const [error, product] = await catchError(
             ProductModel.create({
                 ...productData,
+                category: new Types.ObjectId(categoryId),
                 userId: new Types.ObjectId(userId),
                 businessId: new Types.ObjectId(businessId),
+                businessType,
                 stripeProductId: stripeProduct.id,
                 stripePriceId: stripePrice.id
             })
@@ -100,7 +127,7 @@ export class ProductService {
             throw new Error('Failed to create product');
         }
 
-        await this.addToInventory(businessId, product._id.toString());
+        await this.addToInventory(businessId, product._id.toString(), businessType);
 
         const category = product.category as any;
         pineconeEmitter.emit('indexProduct', {
@@ -114,7 +141,7 @@ export class ProductService {
         await logInfo({
             message: 'Product created successfully',
             source: 'ProductService.createProduct',
-            additionalData: { productId: product._id, name: product.name }
+            additionalData: { productId: product._id, name: product.name, businessType }
         });
 
         return product;
@@ -161,10 +188,12 @@ export class ProductService {
             if (stockLevel === 'low') {
                 mongoQuery.$expr = { $lte: ['$quantity', '$minRestockLevel'] };
             } else if (stockLevel === 'medium') {
-                mongoQuery.$expr = { $and: [
-                    { $gt: ['$quantity', '$minRestockLevel'] },
-                    { $lte: ['$quantity', { $multiply: ['$minRestockLevel', 2] }] }
-                ]};
+                mongoQuery.$expr = {
+                    $and: [
+                        { $gt: ['$quantity', '$minRestockLevel'] },
+                        { $lte: ['$quantity', { $multiply: ['$minRestockLevel', 2] }] }
+                    ]
+                };
             } else if (stockLevel === 'high') {
                 mongoQuery.$expr = { $gt: ['$quantity', { $multiply: ['$minRestockLevel', 2] }] };
             }
@@ -191,10 +220,14 @@ export class ProductService {
     }
 
     static async searchProducts(query: IProductSearchQuery): Promise<{ products: IProduct[]; total: number }> {
-        const { name, category, minPrice, maxPrice, businessId, page = 1, limit = 20, random = false } = query;
+        const { name, category, minPrice, maxPrice, businessId, userRole, page = 1, limit = 20, random = false } = query;
         const skip = (page - 1) * limit;
 
         const mongoQuery: any = {};
+
+        if (userRole === 'user') {
+            mongoQuery.businessType = 'distributor';
+        }
 
         if (businessId && Types.ObjectId.isValid(businessId)) {
             mongoQuery.businessId = new Types.ObjectId(businessId);
@@ -251,7 +284,7 @@ export class ProductService {
     }
 
     static async vectorSearchProducts(query: string, limit: number = 20): Promise<IProduct[]> {
-        
+
         const productIds = await pineconeService.searchProducts(query, limit);
 
         if (!productIds.length) return [];
@@ -272,13 +305,41 @@ export class ProductService {
         return products || [];
     }
 
-    static async updateProduct(id: string, updateData: Partial<IProductInput>): Promise<IProduct | null> {
+    static async updateProduct(id: string, updateData: Partial<IProductInput>, categoryInput?: string): Promise<IProduct | null> {
         if (!Types.ObjectId.isValid(id)) {
             return null;
         }
 
+        const finalUpdateData = { ...updateData };
+
+        if (categoryInput) {
+            let categoryId: string;
+            if (Types.ObjectId.isValid(categoryInput)) {
+                categoryId = categoryInput;
+            } else {
+                let category = await CategoryService.getCategoryByName(categoryInput);
+                if (!category) {
+                    category = await CategoryService.createCategory({
+                        name: categoryInput,
+                        type: 'product',
+                        isApproved: false
+                    });
+                }
+                if (!category) {
+                    await logError({
+                        message: 'Failed to create category during product update',
+                        source: 'ProductService.updateProduct',
+                        additionalData: { productId: id, categoryInput }
+                    });
+                    return null;
+                }
+                categoryId = category._id.toString();
+            }
+            finalUpdateData.category = categoryId as any;
+        }
+
         const [error, product] = await catchError(
-            ProductModel.findByIdAndUpdate(id, updateData, { new: true }).populate('category', 'name')
+            ProductModel.findByIdAndUpdate(id, finalUpdateData, { new: true }).populate('category', 'name')
         );
 
         if (error) {
@@ -376,6 +437,38 @@ export class ProductService {
         return product;
     }
 
+    static async getManufacturerProducts(page: number = 1, limit: number = 20, searchQuery?: string, category?: string): Promise<{ products: IProduct[]; total: number }> {
+        const skip = (page - 1) * limit;
+        const mongoQuery: any = { businessType: 'manufacturer' };
+
+        if (searchQuery) {
+            mongoQuery.name = { $regex: searchQuery, $options: 'i' };
+        }
+
+        if (category && Types.ObjectId.isValid(category)) {
+            mongoQuery.category = new Types.ObjectId(category);
+        }
+
+        const [error, result] = await catchError(
+            Promise.all([
+                ProductModel.find(mongoQuery).populate('category', 'name').populate('businessId', 'businessName').skip(skip).limit(limit).sort({ createdAt: -1 }),
+                ProductModel.countDocuments(mongoQuery)
+            ])
+        );
+
+        if (error) {
+            await logError({
+                message: 'Failed to fetch manufacturer products',
+                source: 'ProductService.getManufacturerProducts',
+                additionalData: { error: error.message }
+            });
+            return { products: [], total: 0 };
+        }
+
+        const [products, total] = result;
+        return { products: products || [], total: total || 0 };
+    }
+
     static async getLowStockProducts(businessId: string): Promise<IProduct[]> {
         if (!Types.ObjectId.isValid(businessId)) {
             return [];
@@ -400,11 +493,11 @@ export class ProductService {
         return products || [];
     }
 
-    private static async addToInventory(businessId: string, productId: string): Promise<void> {
+    private static async addToInventory(businessId: string, productId: string, businessType: 'distributor' | 'manufacturer'): Promise<void> {
         const [error] = await catchError(
             InventoryModel.findOneAndUpdate(
                 { businessId },
-                { $addToSet: { products: { productId } } },
+                { $addToSet: { products: { productId } }, $setOnInsert: { businessType } },
                 { upsert: true }
             )
         );
@@ -413,7 +506,7 @@ export class ProductService {
             await logError({
                 message: 'Failed to add product to inventory',
                 source: 'ProductService.addToInventory',
-                additionalData: { businessId, productId, error: error.message }
+                additionalData: { businessId, productId, businessType, error: error.message }
             });
         }
     }
@@ -496,6 +589,11 @@ export class ProductService {
                     continue;
                 }
 
+                const BusinessModel = require('../models/business.model').default;
+                const business = await BusinessModel.findById(businessId).populate('userId');
+                const businessOwner = business?.userId as any;
+                const businessType = businessOwner?.role === 'manufacturer' ? 'manufacturer' : 'distributor';
+
                 const [error, product] = await catchError(
                     ProductModel.create({
                         name: productData.name,
@@ -514,6 +612,7 @@ export class ProductService {
                         height: productData.height,
                         userId: new Types.ObjectId(userId),
                         businessId: new Types.ObjectId(businessId),
+                        businessType,
                         stripeProductId: stripeProduct.id,
                         stripePriceId: stripePrice.id
                     })
@@ -524,7 +623,7 @@ export class ProductService {
                     continue;
                 }
 
-                await this.addToInventory(businessId, product._id.toString());
+                await this.addToInventory(businessId, product._id.toString(), businessType);
 
                 const category = await CategoryService.getCategoryById(categoryId);
                 if (category) {

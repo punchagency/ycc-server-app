@@ -168,21 +168,6 @@ export class ShipmentService {
             .populate('items.productId', 'name imageURLs')
             .populate('items.businessId', 'businessName');
     }
-    static async selectShipmentRate(shipmentId: string, rateId: string, userId: string) {
-        const shipment = await ShipmentModel.findById(shipmentId);
-        if (!shipment) throw new Error('Shipment not found');
-        if (shipment.userId.toString() !== userId) throw new Error('Unauthorized');
-
-        const selectedRate = shipment.rates.find(r => r.id === rateId);
-        if (!selectedRate) throw new Error('Rate not found');
-
-        shipment.rates.forEach(r => r.isSelected = r.id === rateId);
-        shipment.carrierName = selectedRate.carrier;
-        shipment.status = 'rate_selected';
-        await shipment.save();
-
-        return shipment;
-    }
     static async purchaseShipmentLabel(selections: { shipmentId: string; rateId: string }[], userId: string) {
         if (!selections || !Array.isArray(selections) || selections.length === 0) {
             throw new Error('Selections array is required');
@@ -214,11 +199,17 @@ export class ShipmentService {
                     await shipment.save();
                 }
             }
+            logError({ message: 'Draft invoice creation failed', error, source: 'ShipmentService.purchaseShipmentLabel' });
             throw new Error(`Invoice creation failed: ${error.message}`);
         }
 
-        const results = await this.buyLabels(userId, selections);
-        const allSuccess = results.every(r => r.success);
+        const [error, results] = await catchError(
+            this.buyLabels(userId, selections)
+        );
+        if(error){
+            logError({message: 'Label purchase failed', error, source: 'ShipmentService.purchaseShipmentLabel'})
+        }
+        const allSuccess = results && results.every(r => r.success);
 
         if (allSuccess) {
             let invoiceUrl;
@@ -231,11 +222,11 @@ export class ShipmentService {
         } else {
             const stripe = StripeService.getInstance();
             try {
-                await (stripe as any).stripe.invoices.del(draftInvoice.invoice.id);
+                await stripe.deleteInvoice(draftInvoice.invoice.id);
             } catch (error: any) {
                 logError({ message: 'Draft invoice deletion failed', error, source: 'ShipmentService.purchaseShipmentLabel' });
             }
-            for (const result of results) {
+            for (const result of results as any[]){
                 if (!result.success) {
                     const shipment = await ShipmentModel.findById(result.shipmentId);
                     if (shipment) {
@@ -259,7 +250,7 @@ export class ShipmentService {
                     continue;
                 }
 
-                const shipment = await ShipmentModel.findById(shipmentId);
+                const shipment = await ShipmentModel.findById(shipmentId).populate('items.productId');
                 if (!shipment) throw new Error('Shipment not found');
                 if (shipment.userId.toString() !== userId) throw new Error('Not authorized');
                 if (shipment.status === 'label_purchased') throw new Error('Label already purchased');
@@ -267,18 +258,64 @@ export class ShipmentService {
                 const rate = shipment.rates.find(r => r.id === rateId);
                 if (!rate) throw new Error('Rate not found');
 
-                const newShipmentData = {
-                    from_address: shipment.fromAddress,
-                    to_address: shipment.toAddress,
-                    parcel: {
-                        length: shipment.rates[0]?.id ? undefined : 10,
-                        width: shipment.rates[0]?.id ? undefined : 10,
-                        height: shipment.rates[0]?.id ? undefined : 10,
-                        weight: shipment.rates[0]?.id ? undefined : 10
-                    }
+                const order = await OrderModel.findById(shipment.orderId);
+                if (!order) throw new Error('Order not found');
+
+                const businessId = shipment.items[0].businessId;
+                const business = await BusinessModel.findById(businessId);
+                const user = await UserModel.findById(order.userId);
+
+                const fromAddr = AddressFormatter.formatAddress(shipment.fromAddress);
+                const toAddr = AddressFormatter.formatAddress(shipment.toAddress);
+
+                const parsedFromAddress = {
+                    street1: fromAddr.street || '',
+                    street2: null,
+                    city: fromAddr.city || '',
+                    state: fromAddr.state || '',
+                    zip: fromAddr.zip || '',
+                    country: fromAddr.country || '',
+                    company: business?.businessName || '',
+                    phone: business?.phone || ''
+                };
+                const parsedToAddress = {
+                    name: user ? `${user.firstName} ${user.lastName}` : '',
+                    street1: toAddr.street || '',
+                    city: toAddr.city || '',
+                    state: toAddr.state || '',
+                    zip: toAddr.zip || '',
+                    country: toAddr.country || '',
+                    email: user?.email || '',
+                    phone: user?.phone || ''
                 };
 
-                const newEpShipment = await easypost.createShipmentLogistics(newShipmentData as any);
+                let totalWeight = 0;
+                let maxLength = 0;
+                let maxWidth = 0;
+                let maxHeight = 0;
+
+                for (const item of shipment.items) {
+                    const product: any = item.productId;
+                    if (product) {
+                        totalWeight += product.weight * item.quantity;
+                        maxLength = Math.max(maxLength, product.length);
+                        maxWidth = Math.max(maxWidth, product.width);
+                        maxHeight = Math.max(maxHeight, product.height);
+                    }
+                }
+
+                const [epError, newEpShipment] = await catchError(easypost.createShipmentLogistics({
+                    fromAddress: parsedFromAddress,
+                    toAddress: parsedToAddress,
+                    parcel: {
+                        length: parseFloat(maxLength.toFixed(1)),
+                        width: parseFloat(maxWidth.toFixed(1)),
+                        height: parseFloat(maxHeight.toFixed(1)),
+                        weight: parseFloat(totalWeight.toFixed(1))
+                    }
+                }));
+
+                if (epError) throw new Error(`EasyPost error: ${epError.message}`);
                 if (!newEpShipment.rates || newEpShipment.rates.length === 0) {
                     throw new Error('No rates returned');
                 }
@@ -292,20 +329,25 @@ export class ShipmentService {
                     );
                 }
 
-                const purchasedShipment = await easypost.purchaseLabel(newEpShipment.id, matchedRate.id);
+                const [error, purchasedShipment] = await catchError(
+                    easypost.purchaseLabel(newEpShipment.id, matchedRate.id)
+                );
+                if(error){
+                    logError({message: 'Label purchase failed', error, source: 'ShipmentService.buyLabels.purchaseLabel'})
+                    throw new Error(`Label purchase failed: ${error.message}`);
+                }
 
                 shipment.rates = newEpShipment.rates.map((r: any) => ({
-                    carrier: r.carrier,
+                    carrier: r.carrier || '',
                     rate: parseFloat(r.rate),
-                    service: r.service,
-                    estimatedDays: r.delivery_days,
+                    service: r.service || '',
+                    estimatedDays: r.delivery_days || 0,
                     guaranteedDeliveryDate: r.delivery_date_guaranteed || false,
-                    deliveryDate: r.est_delivery_date ? new Date(r.est_delivery_date) : undefined,
+                    deliveryDate: r.est_delivery_date ? new Date(r.est_delivery_date) : new Date(),
                     isSelected: r.id === matchedRate.id,
-                    id: r.id
-                }));
-                shipment.fromAddress = newShipmentData.from_address;
-                shipment.toAddress = newShipmentData.to_address;
+                    id: r.id || ''
+                })) as any;
+
                 shipment.status = 'label_purchased';
                 shipment.trackingNumber = purchasedShipment.tracking_code;
                 shipment.labelUrl = purchasedShipment.postage_label?.label_url;
@@ -338,11 +380,11 @@ export class ShipmentService {
         let stripeCustomerId = user.stripeCustomerId;
 
         if (!stripeCustomerId) {
-            const customers = await (stripe as any).stripe.customers.list({ email: user.email, limit: 1 });
+            const customers = await stripe.listCustomers({ email: user.email, limit: 1 });
             if (customers.data.length > 0) {
                 stripeCustomerId = customers.data[0].id;
             } else {
-                const customer = await (stripe as any).stripe.customers.create({
+                const customer = await stripe.createCustomer({
                     email: user.email,
                     name: `${user.firstName} ${user.lastName}`
                 });
@@ -352,7 +394,7 @@ export class ShipmentService {
             await user.save();
         }
 
-        const invoice = await (stripe as any).stripe.invoices.create({
+        const invoice = await stripe.createinvoices({
             customer: stripeCustomerId,
             collection_method: 'send_invoice',
             days_until_due: 7,
@@ -372,7 +414,7 @@ export class ShipmentService {
             const businessItems = order.items.filter(item => item.businessId.toString() === businessId);
             const subTotal = businessItems.reduce((sum, item) => sum + item.totalPriceOfItems, 0);
 
-            await (stripe as any).stripe.invoiceItems.create({
+            await stripe.createInvoiceItems({
                 customer: stripeCustomerId,
                 invoice: invoice.id,
                 amount: Math.round(subTotal * 100),
@@ -394,7 +436,7 @@ export class ShipmentService {
         }
 
         if (shippingTotal > 0) {
-            await (stripe as any).stripe.invoiceItems.create({
+            await stripe.createInvoiceItems({
                 customer: stripeCustomerId,
                 invoice: invoice.id,
                 amount: Math.round(shippingTotal * 100),
@@ -406,7 +448,7 @@ export class ShipmentService {
 
         const platformFee = order.totalAmount * 0.1;
         if (platformFee > 0) {
-            await (stripe as any).stripe.invoiceItems.create({
+            await stripe.createInvoiceItems({
                 customer: stripeCustomerId,
                 invoice: invoice.id,
                 amount: Math.round(platformFee * 100),
@@ -420,7 +462,7 @@ export class ShipmentService {
     }
     private static async finalizeAndSendInvoice(invoiceId: string, orderId: string) {
         const stripe = StripeService.getInstance();
-        const finalizedInvoice = await (stripe as any).stripe.invoices.finalizeInvoice(invoiceId);
+        const finalizedInvoice = await stripe.finalizeInvoice(invoiceId);
 
         const order = await OrderModel.findById(orderId).populate('userId');
         if (order) {
@@ -429,7 +471,7 @@ export class ShipmentService {
             await order.save();
         }
 
-        await (stripe as any).stripe.invoices.sendInvoice(invoiceId);
+        await stripe.sendInvoice(invoiceId);
 
         const businessIds = [...new Set(order!.items.map(item => item!.businessId))];
         try {
@@ -443,7 +485,7 @@ export class ShipmentService {
                 currency: 'usd',
                 status: 'pending',
                 invoiceDate: new Date(),
-                dueDate: new Date(finalizedInvoice.due_date * 1000),
+                dueDate: finalizedInvoice.due_date ? new Date(finalizedInvoice.due_date * 1000) : null,
                 stripeInvoiceUrl: finalizedInvoice.hosted_invoice_url
             });
         } catch (error: any) {

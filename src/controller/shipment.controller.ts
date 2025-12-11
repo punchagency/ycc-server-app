@@ -24,34 +24,6 @@ export class ShipmentController {
         return res.status(200).json({ success: true, data: shipments });
     }
 
-    static async selectRate(req: AuthenticatedRequest, res: Response) {
-        const { shipmentId } = req.params;
-        const { rateId } = req.body;
-        const userId = req.user?._id;
-
-        if (!userId) {
-            return res.status(401).json({ success: false, message: 'Unauthorized' });
-        }
-
-        if (!rateId) {
-            return res.status(400).json({ success: false, message: 'Rate ID is required' });
-        }
-
-        const [error, shipment] = await catchError(
-            ShipmentService.selectShipmentRate(shipmentId, rateId, userId)
-        );
-
-        if (error) {
-            return res.status(400).json({ success: false, message: error.message });
-        }
-
-        return res.status(200).json({ 
-            success: true, 
-            message: 'Rate selected successfully',
-            data: shipment 
-        });
-    }
-
     static async purchaseLabel(req: AuthenticatedRequest, res: Response) {
         const userId = req.user?._id;
         const { selections } = req.body;
@@ -73,7 +45,7 @@ export class ShipmentController {
         }
 
         return res.status(200).json({ 
-            success: true, 
+            success: result.labelsPurchased ? true : false, 
             message: result.labelsPurchased ? 'Labels purchased successfully' : 'Some labels failed to purchase',
             data: result
         });

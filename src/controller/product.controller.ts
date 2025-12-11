@@ -42,10 +42,10 @@ export class ProductController {
             }
 
             const businessOwner = business.userId as any;
-            if (!businessOwner || businessOwner.role !== 'distributor') {
+            if (!businessOwner || !['distributor', 'manufacturer'].includes(businessOwner.role)) {
                 res.status(400).json({
                     success: false,
-                    message: 'Business must belong to a distributor',
+                    message: 'Business must belong to a distributor or manufacturer',
                     code: 'VALIDATION_ERROR'
                 });
                 return;
@@ -53,8 +53,7 @@ export class ProductController {
 
             userId = businessOwner._id;
             businessId = business._id.toString();
-        } else if (userRole === 'distributor') {
-            // Distributor flow: use their own businessId
+        } else if (userRole === 'distributor' || userRole === 'manufacturer') {
             if (!businessId) {
                 res.status(400).json({
                     success: false,
@@ -66,7 +65,7 @@ export class ProductController {
         } else {
             res.status(403).json({
                 success: false,
-                message: 'Only distributors and admins can create products',
+                message: 'Only distributors, manufacturers and admins can create products',
                 code: 'FORBIDDEN'
             });
             return;
@@ -91,10 +90,10 @@ export class ProductController {
             return;
         }
 
-        if (!productData.category || !Validate.mongoId(productData.category)) {
+        if (!productData.category || !Validate.string(productData.category)) {
             res.status(400).json({
                 success: false,
-                message: 'Valid category ID is required',
+                message: 'Category is required',
                 code: 'VALIDATION_ERROR'
             });
             return;
@@ -133,7 +132,7 @@ export class ProductController {
         };
 
         const [error, product] = await catchError(
-            ProductService.createProduct(userId, businessId, productInput)
+            ProductService.createProduct(userId, businessId, productInput, productData.category)
         );
         if (error) {
             logError({ message: "Creating a product failed!", source: "ProductController.createProduct", error })
@@ -231,11 +230,12 @@ export class ProductController {
     static async searchProducts(req: AuthenticatedRequest, res: Response): Promise<void> {
         const query: ProductSearchDTO = req.query;
         const businessId = req.user?.businessId;
+        const userRole = req.user?.role;
 
-        // Add business filter for business users
         const searchQuery = {
             ...query,
             businessId: businessId || query.businessId,
+            userRole,
             page: Number(query.page) || 1,
             limit: Number(query.limit) || 20
         };
@@ -310,7 +310,6 @@ export class ProductController {
 
         // Authorization check
         if (userRole === 'admin') {
-            // Admin can update any distributor's product
             const business = await BusinessModel.findById(existingProduct.businessId).populate('userId');
             if (!business) {
                 res.status(404).json({
@@ -322,16 +321,15 @@ export class ProductController {
             }
 
             const businessOwner = business.userId as any;
-            if (!businessOwner || businessOwner.role !== 'distributor') {
+            if (!businessOwner || !['distributor', 'manufacturer'].includes(businessOwner.role)) {
                 res.status(403).json({
                     success: false,
-                    message: 'Can only update products for distributors',
+                    message: 'Can only update products for distributors or manufacturers',
                     code: 'ACCESS_DENIED'
                 });
                 return;
             }
-        } else if (userRole === 'distributor') {
-            // Distributor can only update their own products
+        } else if (userRole === 'distributor' || userRole === 'manufacturer') {
             if (existingProduct.businessId.toString() !== businessId) {
                 res.status(403).json({
                     success: false,
@@ -343,7 +341,7 @@ export class ProductController {
         } else {
             res.status(403).json({
                 success: false,
-                message: 'Only distributors and admins can update products',
+                message: 'Only distributors, manufacturers and admins can update products',
                 code: 'FORBIDDEN'
             });
             return;
@@ -368,10 +366,10 @@ export class ProductController {
             return;
         }
 
-        if (updateData.category && !Validate.mongoId(updateData.category)) {
+        if (updateData.category && !Validate.string(updateData.category)) {
             res.status(400).json({
                 success: false,
-                message: 'Invalid category ID',
+                message: 'Invalid category',
                 code: 'VALIDATION_ERROR'
             });
             return;
@@ -403,7 +401,7 @@ export class ProductController {
             productInput.imageURLs = files.productImage.map(file => file.location);
         }
 
-        const updatedProduct = await ProductService.updateProduct(id, productInput);
+        const updatedProduct = await ProductService.updateProduct(id, productInput, updateData.category);
         if (!updatedProduct) {
             res.status(500).json({
                 success: false,
@@ -526,6 +524,45 @@ export class ProductController {
             data: updatedProduct
         });
     }
+    static async getManufacturerProducts(req: AuthenticatedRequest, res: Response): Promise<void> {
+        const userRole = req.user!.role;
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 20;
+        const searchQuery = req.query.search as string;
+        const category = req.query.category as string;
+
+        if (!['distributor', 'admin'].includes(userRole)) {
+            res.status(403).json({
+                success: false,
+                message: 'Only distributors and admins can view manufacturer products',
+                code: 'FORBIDDEN'
+            });
+            return;
+        }
+
+        if (category && !Validate.mongoId(category)) {
+            res.status(400).json({
+                success: false,
+                message: 'Invalid category ID',
+                code: 'VALIDATION_ERROR'
+            });
+            return;
+        }
+
+        const result = await ProductService.getManufacturerProducts(page, limit, searchQuery, category);
+
+        res.json({
+            success: true,
+            message: 'Manufacturer products retrieved successfully',
+            data: result.products,
+            pagination: {
+                total: result.total,
+                page,
+                pages: Math.ceil(result.total / limit),
+                limit
+            }
+        });
+    }
     static async getLowStockProducts(req: AuthenticatedRequest, res: Response): Promise<void> {
         const businessId = req.user!.businessId;
 
@@ -555,8 +592,8 @@ export class ProductController {
             return;
         }
         const user = await UserModel.findById(userId);
-        if (!user || user.role !== 'distributor') {
-            res.status(403).json({ success: false, message: 'User must be a distributor', code: 'FORBIDDEN' });
+        if (!user || !['distributor', 'manufacturer'].includes(user.role)) {
+            res.status(403).json({ success: false, message: 'User must be a distributor or manufacturer', code: 'FORBIDDEN' });
             return;
         }
 

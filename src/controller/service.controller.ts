@@ -84,7 +84,7 @@ export class ServiceController {
             }
 
             if (!categoryId || !Validate.string(categoryId)) {
-                res.status(400).json({ success: false, message: 'Category ID is required', code: 'VALIDATION_ERROR' });
+                res.status(400).json({ success: false, message: 'Category is required', code: 'VALIDATION_ERROR' });
                 return;
             }
 
@@ -105,7 +105,7 @@ export class ServiceController {
                 isQuotable: isQuotable || false
             };
 
-            const service = await ServiceService.createService(serviceData, imageURLs);
+            const service = await ServiceService.createService(serviceData, imageURLs, categoryId);
 
             if (!service) {
                 res.status(400).json({ success: false, message: 'Failed to create service. Category may not exist.' });
@@ -348,7 +348,7 @@ export class ServiceController {
             if (isQuotable !== undefined) updateData.isQuotable = isQuotable;
 
             const serviceBusinessId = userRole === 'admin' ? existingService.businessId.toString() : businessId!;
-            const service = await ServiceService.updateService(id, serviceBusinessId, updateData, imageURLs);
+            const service = await ServiceService.updateService(id, serviceBusinessId, updateData, imageURLs, categoryId);
 
             if (!service) {
                 res.status(404).json({ success: false, message: 'Service not found or unauthorized', code: 'SERVICE_NOT_FOUND' });
@@ -398,7 +398,7 @@ export class ServiceController {
 
     static async fetchServicesForCrew(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
-            if (!req.user || req.user.role !== 'user') {
+            if (!req.user) {
                 res.status(403).json({ success: false, message: 'Only crew members can access services', code: 'FORBIDDEN' });
                 return;
             }

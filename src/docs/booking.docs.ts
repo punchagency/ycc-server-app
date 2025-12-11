@@ -204,3 +204,229 @@
  *       404:
  *         description: Booking not found
  */
+
+/**
+ * @swagger
+ * /api/v2/booking/{id}/quotes:
+ *   post:
+ *     tags: [Booking]
+ *     summary: Add quotes to a booking (Distributor only)
+ *     description: Add quote items to a quotable booking. This can only be done for bookings with requiresQuote=true and status=pending. After adding quotes, the distributor can confirm the booking.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Booking ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [quoteItems]
+ *             properties:
+ *               quoteItems:
+ *                 type: array
+ *                 description: Array of quote items
+ *                 items:
+ *                   type: object
+ *                   required: [name, price]
+ *                   properties:
+ *                     name:
+ *                       type: string
+ *                       description: Item name
+ *                       example: "Cleaning Supplies"
+ *                     description:
+ *                       type: string
+ *                       description: Item description
+ *                       example: "Professional grade cleaning products"
+ *                     price:
+ *                       type: number
+ *                       description: Unit price
+ *                       example: 25.00
+ *                     quantity:
+ *                       type: number
+ *                       description: Quantity (defaults to 1)
+ *                       example: 5
+ *     responses:
+ *       200:
+ *         description: Quotes added successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     booking:
+ *                       type: object
+ *                     quote:
+ *                       type: object
+ *                       properties:
+ *                         quoteAmount:
+ *                           type: number
+ *                         platformFee:
+ *                           type: number
+ *                         amount:
+ *                           type: number
+ *       400:
+ *         description: Invalid request or business rule violation
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Booking not found
+ */
+
+/**
+ * @swagger
+ * /api/v2/booking/{id}/accept-quote:
+ *   put:
+ *     tags: [Booking]
+ *     summary: Accept a quote (Crew/User only)
+ *     description: Accept the provided quote for a confirmed booking. After acceptance, crew member can proceed to payment.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Booking ID
+ *     responses:
+ *       200:
+ *         description: Quote accepted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     quoteStatus:
+ *                       type: string
+ *                       example: "accepted"
+ *                     crewAcceptedQuoteAt:
+ *                       type: string
+ *                       format: date-time
+ *       400:
+ *         description: Invalid request or business rule violation
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Booking not found
+ */
+
+/**
+ * @swagger
+ * /api/v2/booking/{id}/reject-quote:
+ *   put:
+ *     tags: [Booking]
+ *     summary: Reject a quote (Crew/User only)
+ *     description: Reject the provided quote for a confirmed booking. This will cancel the booking and payment.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Booking ID
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 description: Reason for rejecting the quote
+ *                 example: "Quote is too expensive for my budget"
+ *     responses:
+ *       200:
+ *         description: Quote rejected successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     quoteStatus:
+ *                       type: string
+ *                       example: "rejected"
+ *                     status:
+ *                       type: string
+ *                       example: "cancelled"
+ *                     crewRejectedQuoteAt:
+ *                       type: string
+ *                       format: date-time
+ *       400:
+ *         description: Invalid request or business rule violation
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Booking not found
+ */
+
+/**
+ * @swagger
+ * /api/v2/booking/{id}/confirm-completion:
+ *   put:
+ *     tags: [Booking]
+ *     summary: Confirm job completion (Crew/User only)
+ *     description: Confirm satisfaction with the completed job. This triggers payment release to the distributor. Requires booking to be in 'completed' status and payment to be 'paid'.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Booking ID
+ *     responses:
+ *       200:
+ *         description: Job completion confirmed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     notes:
+ *                       type: string
+ *                       description: Updated notes with confirmation
+ *       400:
+ *         description: Invalid request or business rule violation
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Booking not found
+ */

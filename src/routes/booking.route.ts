@@ -43,7 +43,8 @@ router.delete('/:id/quote-items/:itemId', authenticateToken, BookingController.d
 
 // Payment routes
 router.post('/:id/payment', authenticateToken, BookingController.createPayment);
-router.post('/webhooks/stripe', BookingController.handleStripeWebhook);
 
+// Completed status management
+router.patch('/:id/completed-status', authenticateToken, BookingController.updateCompletedStatus);
 
 export default router;

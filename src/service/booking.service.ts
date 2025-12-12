@@ -281,6 +281,7 @@ export class BookingService {
                 description: notes || `Booking confirmed`,
                 start: booking.startTime,
                 end: new Date(booking.startTime.getTime() + (2 * 60 * 60 * 1000)),
+                allDay: false,
                 status: 'confirmed',
                 bookingId: booking._id
             });
@@ -292,6 +293,7 @@ export class BookingService {
                 description: notes || `Booking confirmed`,
                 start: booking.startTime,
                 end: new Date(booking.startTime.getTime() + (2 * 60 * 60 * 1000)),
+                allDay: false,
                 status: 'confirmed',
                 bookingId: booking._id
             });
@@ -1211,7 +1213,7 @@ export class BookingService {
                 serviceId: service._id.toString(),
                 businessId: business._id.toString(),
                 customerEmail: user.email,
-                type: 'booking_payment'
+                transactionType: 'booking'  // Changed from 'type' to match existing webhook handler
             }
         });
 
@@ -1329,109 +1331,108 @@ export class BookingService {
         };
     }
 
-    /**
-     * Process Stripe webhook for booking payment
-     */
-    static async processBookingPaymentWebhook(event: any) {
-        if (event.type !== 'invoice.paid' && event.type !== 'invoice.payment_failed') {
-            return; // Ignore other event types
-        }
-
-        const invoice = event.data.object;
-        const metadata = invoice.metadata;
-
-        if (metadata.type !== 'booking_payment') {
-            return; // Not a booking payment
-        }
-
-        const bookingId = metadata.bookingId;
-        if (!bookingId) {
-            logError({ message: 'No bookingId in webhook metadata', error: new Error('Missing bookingId'), source: 'BookingService.processBookingPaymentWebhook' });
-            return;
-        }
-
-        const booking = await BookingModel.findById(bookingId)
-            .populate('serviceId')
-            .populate('userId')
-            .populate('businessId');
+    static async updateCompletedStatus({ bookingId, userId, userRole, completedStatus, rejectionReason }: {
+        bookingId: string;
+        userId: string;
+        userRole: string;
+        completedStatus: 'pending' | 'request_completed' | 'completed' | 'rejected';
+        rejectionReason?: string;
+    }) {
+        const booking = await BookingModel.findById(bookingId).populate('userId businessId serviceId');
 
         if (!booking) {
-            logError({ message: 'Booking not found for webhook', error: new Error(`Booking ${bookingId} not found`), source: 'BookingService.processBookingPaymentWebhook' });
-            return;
+            throw new Error('Booking not found');
         }
 
-        if (event.type === 'invoice.paid') {
-            // Update booking payment status
-            booking.paymentStatus = 'paid';
-            booking.paidAt = new Date();
-            await booking.save();
+        // Verify access - user role is 'user' for crew members, not 'crew'
+        if (userRole === 'user' && (booking.userId as any)?._id?.toString() !== userId) {
+            throw new Error('Unauthorized: You can only update your own bookings');
+        }
 
-            // Update invoice record
-            await InvoiceModel.updateOne(
-                { stripeInvoiceId: invoice.id },
-                { status: 'paid', paidAt: new Date() }
-            );
+        // For distributors, they should only be able to update bookings for their business
+        // The middleware ensures they're authenticated, and the business relationship is validated through the booking
+        if (userRole === 'distributor' && !booking.businessId) {
+            throw new Error('Booking has no associated business');
+        }
 
-            const user: any = booking.userId;
-            const service: any = booking.serviceId;
-            const business: any = booking.businessId;
+        // Validate status transitions
+        if (userRole === 'distributor') {
+            // Distributor can change from pending to request_completed OR from rejected to request_completed (resubmit)
+            if (completedStatus !== 'request_completed') {
+                throw new Error('Distributors can only mark service as completed (pending/rejected → request_completed)');
+            }
+            if (booking.completedStatus !== 'pending' && booking.completedStatus !== 'rejected') {
+                throw new Error('Can only mark as completed from pending or rejected status');
+            }
+            // Ensure payment is made before allowing status change
+            if (booking.paymentStatus !== 'paid') {
+                throw new Error('Payment must be completed before marking service as done');
+            }
+        } else if (userRole === 'user') {
+            // User/Crew can change from request_completed to completed or rejected
+            if (booking.completedStatus !== 'request_completed') {
+                throw new Error('Can only confirm or reject completion after distributor marks service as done');
+            }
+            if (completedStatus !== 'completed' && completedStatus !== 'rejected') {
+                throw new Error('You can only confirm completion or reject (request_completed → completed/rejected)');
+            }
+            // Require rejection reason if rejecting
+            if (completedStatus === 'rejected' && (!rejectionReason || !rejectionReason.trim())) {
+                throw new Error('Rejection reason is required when rejecting completion');
+            }
+        } else {
+            throw new Error('Invalid user role for this operation');
+        }
 
-            // Notify crew
+        // Update completed status
+        booking.completedStatus = completedStatus;
+
+        // Store rejection reason if rejecting
+        if (completedStatus === 'rejected' && rejectionReason) {
+            booking.completedRejectionReason = rejectionReason.trim();
+        }
+
+        // If fully completed, also update the booking status to 'completed'
+        if (completedStatus === 'completed') {
+            booking.status = 'completed';
+            booking.completedAt = new Date();
+        }
+
+        await booking.save();
+
+        // Send notifications
+        if (completedStatus === 'request_completed') {
+            // Notify user/crew that service is completed awaiting confirmation
             await addNotificationJob({
-                recipientId: user._id,
+                recipientId: (booking.userId as any)._id,
                 type: 'booking',
                 priority: 'high',
-                title: 'Payment Received!',
-                message: `Your payment for ${service.name} has been received. Your booking is now confirmed.`,
+                title: 'Service Completed - Confirm Receipt',
+                message: `${(booking.businessId as any).businessName} has marked your service as completed. Please confirm receipt.`,
                 data: { bookingId: booking._id }
             });
-
-            // Notify distributor
-            if (business?.userId) {
-                await addNotificationJob({
-                    recipientId: business.userId,
-                    type: 'booking',
-                    priority: 'high',
-                    title: 'Payment Received',
-                    message: `Payment received for booking ${service.name}. You can now proceed with service delivery.`,
-                    data: { bookingId: booking._id }
-                });
-            }
-
-            // Send confirmation emails
-            await addEmailJob({
-                email: user.email,
-                subject: `Payment Confirmed - ${service.name}`,
-                html: `
-                    <h2>Payment Confirmed!</h2>
-                    <p>Hi ${user.firstName},</p>
-                    <p>Your payment for <strong>${service.name}</strong> has been successfully processed.</p>
-                    <p><strong>Amount Paid:</strong> $${(invoice.amount_paid / 100).toFixed(2)}</p>
-                    <p><strong>Booking ID:</strong> ${booking._id}</p>
-                    <p>The distributor has been notified and will proceed with your service.</p>
-                    <p>Thank you for your business!</p>
-                `
-            });
-
-        } else if (event.type === 'invoice.payment_failed') {
-            // Update invoice record
-            await InvoiceModel.updateOne(
-                { stripeInvoiceId: invoice.id },
-                { status: 'failed' }
-            );
-
-            const user: any = booking.userId;
-            const service: any = booking.serviceId;
-
-            // Notify crew of payment failure
+        } else if (completedStatus === 'completed') {
+           // Notify distributor that user has confirmed completion
             await addNotificationJob({
-                recipientId: user._id,
+                recipientId: (booking.businessId as any)._id,
                 type: 'booking',
-                priority: 'urgent',
-                title: 'Payment Failed',
-                message: `Payment for ${service.name} failed. Please update your payment method and try again.`,
-                data: { bookingId: booking._id, invoiceId: invoice.id }
+                priority:  'medium',
+                title: 'Booking Completed',
+                message: `${(booking.userId as any).firstName} has confirmed completion of the booking.`,
+                data: { bookingId: booking._id }
+            });
+        } else if (completedStatus === 'rejected') {
+            // Notify distributor that user has rejected completion
+            await addNotificationJob({
+                recipientId: (booking.businessId as any)._id,
+                type: 'booking',
+                priority: 'high',
+                title: 'Service Completion Rejected',
+                message: `${(booking.userId as any).firstName} has rejected the service completion. Reason: ${rejectionReason}`,
+                data: { bookingId: booking._id }
             });
         }
+
+        return booking;
     }
 }

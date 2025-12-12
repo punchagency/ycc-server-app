@@ -129,7 +129,7 @@ export class BookingController {
             res.status(200).json({ success: true, message: 'Booking status updated successfully', code: 'STATUS_UPDATED', data: result });
         } catch (error) {
             logError({ message: "Updating booking status failed!", source: "BookingController.updateBookingStatus", error });
-            res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
+            res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERyNAL_SERVER_ERROR' });
         }
     }
     static async getBookings(req: AuthenticatedRequest, res: Response) {
@@ -647,17 +647,44 @@ export class BookingController {
         }
     }
 
-    static async handleStripeWebhook(req: AuthenticatedRequest, res: Response) {
+    static async updateCompletedStatus(req: AuthenticatedRequest, res: Response) {
         try {
-            const event = req.body;
+            if (!req.user) {
+                res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
+                return;
+            }
 
-            // Process the webhook event
-            await BookingService.processBookingPaymentWebhook(event);
+            const { id } = req.params;
+            const { completedStatus, rejectionReason } = req.body;
 
-            res.status(200).json({ received: true });
+            if (!Validate.mongoId(id)) {
+                res.status(400).json({ success: false, message: 'Invalid booking id', code: 'INVALID_BOOKING_ID' });
+                return;
+            }
+
+            if (!completedStatus || !['pending', 'request_completed', 'completed', 'rejected'].includes(completedStatus)) {
+                res.status(400).json({ success: false, message: 'Invalid completed status', code: 'INVALID_COMPLETED_STATUS' });
+                return;
+            }
+
+            const [error, result] = await catchError(BookingService.updateCompletedStatus({
+                bookingId: id,
+                userId: req.user._id.toString(),
+                userRole: req.user.role,
+                completedStatus,
+                rejectionReason
+            }));
+
+            if (error) {
+                logError({ message: "Updating completed status failed!", source: "BookingController.updateCompletedStatus", error });
+                res.status(400).json({ success: false, message: error.message || 'Failed to update completed status', code: 'UPDATE_FAILED' });
+                return;
+            }
+
+            res.status(200).json({ success: true, message: 'Completed status updated successfully', code: 'STATUS_UPDATED', data: result });
         } catch (error) {
-            logError({ message: "Processing Stripe webhook failed!", source: "BookingController.handleStripeWebhook", error });
-            res.status(400).json({ success: false, message: 'Webhook processing failed' });
+            logError({ message: "Updating completed status failed!", source: "BookingController.updateCompletedStatus", error });
+            res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
         }
     }
 }

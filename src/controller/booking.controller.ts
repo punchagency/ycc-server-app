@@ -646,18 +646,4 @@ export class BookingController {
             res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
         }
     }
-
-    static async handleStripeWebhook(req: AuthenticatedRequest, res: Response) {
-        try {
-            const event = req.body;
-
-            // Process the webhook event
-            await BookingService.processBookingPaymentWebhook(event);
-
-            res.status(200).json({ received: true });
-        } catch (error) {
-            logError({ message: "Processing Stripe webhook failed!", source: "BookingController.handleStripeWebhook", error });
-            res.status(400).json({ success: false, message: 'Webhook processing failed' });
-        }
-    }
 }

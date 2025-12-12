@@ -1211,7 +1211,7 @@ export class BookingService {
                 serviceId: service._id.toString(),
                 businessId: business._id.toString(),
                 customerEmail: user.email,
-                type: 'booking_payment'
+                transactionType: 'booking'  // Changed from 'type' to match existing webhook handler
             }
         });
 
@@ -1327,111 +1327,5 @@ export class BookingService {
             dueDate: finalizedInvoice.due_date,
             amount: finalizedInvoice.amount_due / 100
         };
-    }
-
-    /**
-     * Process Stripe webhook for booking payment
-     */
-    static async processBookingPaymentWebhook(event: any) {
-        if (event.type !== 'invoice.paid' && event.type !== 'invoice.payment_failed') {
-            return; // Ignore other event types
-        }
-
-        const invoice = event.data.object;
-        const metadata = invoice.metadata;
-
-        if (metadata.type !== 'booking_payment') {
-            return; // Not a booking payment
-        }
-
-        const bookingId = metadata.bookingId;
-        if (!bookingId) {
-            logError({ message: 'No bookingId in webhook metadata', error: new Error('Missing bookingId'), source: 'BookingService.processBookingPaymentWebhook' });
-            return;
-        }
-
-        const booking = await BookingModel.findById(bookingId)
-            .populate('serviceId')
-            .populate('userId')
-            .populate('businessId');
-
-        if (!booking) {
-            logError({ message: 'Booking not found for webhook', error: new Error(`Booking ${bookingId} not found`), source: 'BookingService.processBookingPaymentWebhook' });
-            return;
-        }
-
-        if (event.type === 'invoice.paid') {
-            // Update booking payment status
-            booking.paymentStatus = 'paid';
-            booking.paidAt = new Date();
-            await booking.save();
-
-            // Update invoice record
-            await InvoiceModel.updateOne(
-                { stripeInvoiceId: invoice.id },
-                { status: 'paid', paidAt: new Date() }
-            );
-
-            const user: any = booking.userId;
-            const service: any = booking.serviceId;
-            const business: any = booking.businessId;
-
-            // Notify crew
-            await addNotificationJob({
-                recipientId: user._id,
-                type: 'booking',
-                priority: 'high',
-                title: 'Payment Received!',
-                message: `Your payment for ${service.name} has been received. Your booking is now confirmed.`,
-                data: { bookingId: booking._id }
-            });
-
-            // Notify distributor
-            if (business?.userId) {
-                await addNotificationJob({
-                    recipientId: business.userId,
-                    type: 'booking',
-                    priority: 'high',
-                    title: 'Payment Received',
-                    message: `Payment received for booking ${service.name}. You can now proceed with service delivery.`,
-                    data: { bookingId: booking._id }
-                });
-            }
-
-            // Send confirmation emails
-            await addEmailJob({
-                email: user.email,
-                subject: `Payment Confirmed - ${service.name}`,
-                html: `
-                    <h2>Payment Confirmed!</h2>
-                    <p>Hi ${user.firstName},</p>
-                    <p>Your payment for <strong>${service.name}</strong> has been successfully processed.</p>
-                    <p><strong>Amount Paid:</strong> $${(invoice.amount_paid / 100).toFixed(2)}</p>
-                    <p><strong>Booking ID:</strong> ${booking._id}</p>
-                    <p>The distributor has been notified and will proceed with your service.</p>
-                    <p>Thank you for your business!</p>
-                `
-            });
-
-        } else if (event.type === 'invoice.payment_failed') {
-            // Update invoice record
-            await InvoiceModel.updateOne(
-                { stripeInvoiceId: invoice.id },
-                { status: 'failed' }
-            );
-
-            const user: any = booking.userId;
-            const service: any = booking.serviceId;
-
-            // Notify crew of payment failure
-            await addNotificationJob({
-                recipientId: user._id,
-                type: 'booking',
-                priority: 'urgent',
-                title: 'Payment Failed',
-                message: `Payment for ${service.name} failed. Please update your payment method and try again.`,
-                data: { bookingId: booking._id, invoiceId: invoice.id }
-            });
-        }
     }
 }

@@ -39,3 +39,5 @@ rules.md
 delete*
 rules*
 .amazonq/
+migrations
+database-migration.md

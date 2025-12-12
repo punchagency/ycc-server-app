@@ -52,7 +52,11 @@ const corsOptions: cors.CorsOptions = {
         'Authorization',
         'Accept',
         'Access-Control-Allow-Origin',
-        'x-retry-count'
+        'x-retry-count',
+        'baggage',
+        'sentry-trace',
+        'traceparent',
+        'tracestate'
     ],
     exposedHeaders: [
         'Content-Type',

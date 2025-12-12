@@ -1330,4 +1330,109 @@ export class BookingService {
             amount: finalizedInvoice.amount_due / 100
         };
     }
+
+    static async updateCompletedStatus({ bookingId, userId, userRole, completedStatus, rejectionReason }: {
+        bookingId: string;
+        userId: string;
+        userRole: string;
+        completedStatus: 'pending' | 'request_completed' | 'completed' | 'rejected';
+        rejectionReason?: string;
+    }) {
+        const booking = await BookingModel.findById(bookingId).populate('userId businessId serviceId');
+
+        if (!booking) {
+            throw new Error('Booking not found');
+        }
+
+        // Verify access - user role is 'user' for crew members, not 'crew'
+        if (userRole === 'user' && (booking.userId as any)?._id?.toString() !== userId) {
+            throw new Error('Unauthorized: You can only update your own bookings');
+        }
+
+        // For distributors, they should only be able to update bookings for their business
+        // The middleware ensures they're authenticated, and the business relationship is validated through the booking
+        if (userRole === 'distributor' && !booking.businessId) {
+            throw new Error('Booking has no associated business');
+        }
+
+        // Validate status transitions
+        if (userRole === 'distributor') {
+            // Distributor can change from pending to request_completed OR from rejected to request_completed (resubmit)
+            if (completedStatus !== 'request_completed') {
+                throw new Error('Distributors can only mark service as completed (pending/rejected → request_completed)');
+            }
+            if (booking.completedStatus !== 'pending' && booking.completedStatus !== 'rejected') {
+                throw new Error('Can only mark as completed from pending or rejected status');
+            }
+            // Ensure payment is made before allowing status change
+            if (booking.paymentStatus !== 'paid') {
+                throw new Error('Payment must be completed before marking service as done');
+            }
+        } else if (userRole === 'user') {
+            // User/Crew can change from request_completed to completed or rejected
+            if (booking.completedStatus !== 'request_completed') {
+                throw new Error('Can only confirm or reject completion after distributor marks service as done');
+            }
+            if (completedStatus !== 'completed' && completedStatus !== 'rejected') {
+                throw new Error('You can only confirm completion or reject (request_completed → completed/rejected)');
+            }
+            // Require rejection reason if rejecting
+            if (completedStatus === 'rejected' && (!rejectionReason || !rejectionReason.trim())) {
+                throw new Error('Rejection reason is required when rejecting completion');
+            }
+        } else {
+            throw new Error('Invalid user role for this operation');
+        }
+
+        // Update completed status
+        booking.completedStatus = completedStatus;
+
+        // Store rejection reason if rejecting
+        if (completedStatus === 'rejected' && rejectionReason) {
+            booking.completedRejectionReason = rejectionReason.trim();
+        }
+
+        // If fully completed, also update the booking status to 'completed'
+        if (completedStatus === 'completed') {
+            booking.status = 'completed';
+            booking.completedAt = new Date();
+        }
+
+        await booking.save();
+
+        // Send notifications
+        if (completedStatus === 'request_completed') {
+            // Notify user/crew that service is completed awaiting confirmation
+            await addNotificationJob({
+                recipientId: (booking.userId as any)._id,
+                type: 'booking',
+                priority: 'high',
+                title: 'Service Completed - Confirm Receipt',
+                message: `${(booking.businessId as any).businessName} has marked your service as completed. Please confirm receipt.`,
+                data: { bookingId: booking._id }
+            });
+        } else if (completedStatus === 'completed') {
+           // Notify distributor that user has confirmed completion
+            await addNotificationJob({
+                recipientId: (booking.businessId as any)._id,
+                type: 'booking',
+                priority:  'medium',
+                title: 'Booking Completed',
+                message: `${(booking.userId as any).firstName} has confirmed completion of the booking.`,
+                data: { bookingId: booking._id }
+            });
+        } else if (completedStatus === 'rejected') {
+            // Notify distributor that user has rejected completion
+            await addNotificationJob({
+                recipientId: (booking.businessId as any)._id,
+                type: 'booking',
+                priority: 'high',
+                title: 'Service Completion Rejected',
+                message: `${(booking.userId as any).firstName} has rejected the service completion. Reason: ${rejectionReason}`,
+                data: { bookingId: booking._id }
+            });
+        }
+
+        return booking;
+    }
 }

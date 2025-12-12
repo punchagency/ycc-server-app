@@ -281,6 +281,7 @@ export class BookingService {
                 description: notes || `Booking confirmed`,
                 start: booking.startTime,
                 end: new Date(booking.startTime.getTime() + (2 * 60 * 60 * 1000)),
+                allDay: false,
                 status: 'confirmed',
                 bookingId: booking._id
             });
@@ -292,6 +293,7 @@ export class BookingService {
                 description: notes || `Booking confirmed`,
                 start: booking.startTime,
                 end: new Date(booking.startTime.getTime() + (2 * 60 * 60 * 1000)),
+                allDay: false,
                 status: 'confirmed',
                 bookingId: booking._id
             });

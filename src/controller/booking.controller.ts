@@ -129,7 +129,7 @@ export class BookingController {
             res.status(200).json({ success: true, message: 'Booking status updated successfully', code: 'STATUS_UPDATED', data: result });
         } catch (error) {
             logError({ message: "Updating booking status failed!", source: "BookingController.updateBookingStatus", error });
-            res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
+            res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERyNAL_SERVER_ERROR' });
         }
     }
     static async getBookings(req: AuthenticatedRequest, res: Response) {

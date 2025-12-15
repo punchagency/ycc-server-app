@@ -24,6 +24,8 @@ export interface IBooking extends Document {
     customerPhone?: string;
     status: typeof BOOKING_STATUSES[number];
     paymentStatus: 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded';
+    completedStatus?: 'pending' | 'request_completed' | 'completed' | 'rejected';
+    completedRejectionReason?: string;
     attachments?: string[];
     confirmationToken?: string;
     confirmationExpires?: Date;
@@ -75,6 +77,8 @@ const bookingSchema = new Schema<IBooking>({
     customerPhone: { type: String },
     status: { type: String, enum: ['pending', 'confirmed', 'cancelled', 'completed', 'declined'], required: true },
     paymentStatus: { type: String, enum: ['pending', 'paid', 'failed', 'cancelled', 'refunded'], required: true },
+    completedStatus: { type: String, enum: ['pending', 'request_completed', 'completed', 'rejected'], default: 'pending' },
+    completedRejectionReason: { type: String },
     attachments: [{ type: String }],
     confirmationToken: { type: String },
     confirmationExpires: { type: Date },

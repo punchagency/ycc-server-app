@@ -142,10 +142,13 @@ const handleOrderPaymentSuccess = async (orderId: string, stripeInvoice: Stripe.
 };
 
 const handleBookingPaymentSuccess = async (bookingId: string, stripeInvoice: Stripe.Invoice, userId: string) => {
-    const booking = await Booking.findById(bookingId);
+    const booking = await Booking.findById(bookingId)
+        .populate('serviceId')
+        .populate('businessId');
     if (!booking) return;
 
     booking.paymentStatus = 'paid';
+    booking.paidAt = new Date(stripeInvoice.status_transitions.paid_at! * 1000); // Set payment timestamp
     booking.statusHistory?.push({
         fromStatus: booking.status,
         toStatus: booking.status,
@@ -165,6 +168,10 @@ const handleBookingPaymentSuccess = async (bookingId: string, stripeInvoice: Str
     }
 
     const user = await User.findById(userId);
+    const service: any = booking.serviceId;
+    const business: any = booking.businessId;
+
+    // Send email to crew
     if (user?.email) {
         await SendMail({
             email: user.email,
@@ -175,10 +182,29 @@ const handleBookingPaymentSuccess = async (bookingId: string, stripeInvoice: Str
                 <p>Your payment has been successfully processed!</p>
                 <ul>
                     <li>Booking ID: ${booking._id}</li>
+                    <li>Service: ${service?.name || 'N/A'}</li>
                     <li>Amount Paid: $${(stripeInvoice.amount_paid! / 100).toFixed(2)}</li>
                     <li>Payment Date: ${new Date().toLocaleDateString()}</li>
                 </ul>
-                <p>Your booking is now confirmed.</p>
+                <p>Your booking is now confirmed and the distributor will proceed with service delivery.</p>
+            `
+        });
+    }
+
+    // Send email to distributor
+    if (business?.email) {
+        await SendMail({
+            email: business.email,
+            subject: 'Payment Received for Booking',
+            html: `
+                <h2>Payment Received</h2>
+                <p>A payment has been received for booking #${booking._id}</p>
+                <ul>
+                    <li>Service: ${service?.name || 'N/A'}</li>
+                    <li>Customer: ${user?.firstName} ${user?.lastName}</li>
+                    <li>Amount: $${(stripeInvoice.amount_paid! / 100).toFixed(2)}</li>
+                </ul>
+                <p>You can now proceed with service delivery.</p>
             `
         });
     }

@@ -256,7 +256,7 @@ export class ServiceController {
             }
 
             // Check if service exists
-            const existingService = await ServiceService.getServiceById(id);
+            const existingService: any = await ServiceService.getServiceById(id);
             if (!existingService) {
                 res.status(404).json({
                     success: false,
@@ -269,7 +269,7 @@ export class ServiceController {
             // Authorization check
             if (userRole === 'admin') {
                 // Admin can update any distributor's service
-                const business = await BusinessModel.findById(existingService.businessId).populate('userId');
+                const business = await BusinessModel.findById(existingService.businessId._id).populate('userId');
                 if (!business) {
                     res.status(404).json({
                         success: false,
@@ -299,7 +299,7 @@ export class ServiceController {
                     return;
                 }
 
-                if (existingService.businessId.toString() !== businessId) {
+                if (existingService.businessId._id.toString() !== businessId) {
                     res.status(403).json({
                         success: false,
                         message: 'Access denied',

@@ -104,11 +104,11 @@ export class AuthController {
                     res.status(400).json({ success: false, message: 'Website is required for business accounts', code: "VALIDATION_ERROR" });
                     return;
                 }
-                if (!taxId || !Validate.string(taxId)) {
+                if (taxId || !Validate.string(taxId)) {
                     res.status(400).json({ success: false, message: 'Tax ID is required for business accounts', code: "VALIDATION_ERROR" });
                     return;
                 }
-                if (!license || !Validate.string(license)) {
+                if (license || !Validate.string(license)) {
                     res.status(400).json({ success: false, message: 'License is required for business accounts', code: "VALIDATION_ERROR" });
                     return;
                 }

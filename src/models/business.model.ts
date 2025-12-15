@@ -15,7 +15,7 @@ export interface IBusiness extends Document {
     },
     email: string;
     phone: string;
-    taxId: string;
+    taxId?: string;
     ratings: {
         averageRating: number;
         totalReviews: number;
@@ -26,7 +26,7 @@ export interface IBusiness extends Document {
     stripeChargesEnabled?: boolean;
     stripedetailsSubmitted?: boolean;
     stripeTransfersEnabled?: boolean;
-    license: string;
+    license?: string;
     isOnboarded: boolean;
     isRejected: boolean;
     businessType: typeof BUSINESS_TYPE[number];
@@ -73,7 +73,8 @@ const businessSchema = new Schema<IBusiness>({
     },
     taxId: {
         type: String,
-        required: true
+        required: false,
+        default: null
     },
     ratings: {
         averageRating: Number,
@@ -104,7 +105,8 @@ const businessSchema = new Schema<IBusiness>({
     },
     license: {
         type: String,
-        required: true
+        required: false,
+        default: null
     },
     isOnboarded: {
         type: Boolean,

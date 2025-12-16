@@ -9,7 +9,7 @@ import { TryParseJSON } from '../utils/Helpers';
 export class AuthController {
     static async register(req: Request, res: Response): Promise<void> {
         try {
-            let { firstName, lastName, email, password, phone, nationality, address, role, businessName, businessEmail, businessPhone, website, taxId, license } = req.body;
+            let { firstName, lastName, email, password, phone, nationality, address, role, businessName, businessEmail, businessPhone, website } = req.body;
             email = email.toLowerCase().trim();
             firstName = firstName.trim();
             if (phone) phone = phone.trim();
@@ -88,7 +88,6 @@ export class AuthController {
                 }
             }
             
-
             // Business validation for distributor/manufacturer
             if (role === 'distributor' || role === 'manufacturer') {
                 if (!businessName || !Validate.string(businessName)) {
@@ -102,14 +101,6 @@ export class AuthController {
 
                 if (!website || !Validate.string(website)) {
                     res.status(400).json({ success: false, message: 'Website is required for business accounts', code: "VALIDATION_ERROR" });
-                    return;
-                }
-                if (taxId || !Validate.string(taxId)) {
-                    res.status(400).json({ success: false, message: 'Tax ID is required for business accounts', code: "VALIDATION_ERROR" });
-                    return;
-                }
-                if (license || !Validate.string(license)) {
-                    res.status(400).json({ success: false, message: 'License is required for business accounts', code: "VALIDATION_ERROR" });
                     return;
                 }
             }

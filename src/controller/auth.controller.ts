@@ -9,7 +9,7 @@ import { TryParseJSON } from '../utils/Helpers';
 export class AuthController {
     static async register(req: Request, res: Response): Promise<void> {
         try {
-            let { firstName, lastName, email, password, phone, nationality, address, role, businessName, businessEmail, businessPhone, website, taxId, license } = req.body;
+            let { firstName, lastName, email, password, phone, nationality, address, role, businessName, businessEmail, businessPhone, website } = req.body;
             email = email.toLowerCase().trim();
             firstName = firstName.trim();
             if (phone) phone = phone.trim();

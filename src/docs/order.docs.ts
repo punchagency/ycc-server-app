@@ -294,6 +294,12 @@
  *           type: string
  *           enum: [asc, desc]
  *           default: desc
+ *       - in: query
+ *         name: userType
+ *         schema:
+ *           type: string
+ *           enum: [user, distributor]
+ *         description: Filter by order type (distributors only - 'user' for orders from users, 'distributor' for orders to manufacturers)
  *     responses:
  *       200:
  *         description: Orders fetched successfully

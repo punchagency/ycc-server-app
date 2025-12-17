@@ -20,6 +20,9 @@ class OrderController {
             if (!userId) {
                 return res.status(401).json({ success: false, message: 'Unauthorized', code: 'UNAUTHORIZED' });
             }
+            if(!['user', 'distributor'].includes(req.user?.role)){
+                return res.status(403).json({ success: false, message: 'Only users and distributors can create orders', code: 'FORBIDDEN' });
+            }
 
             if (!products || !Array.isArray(products) || products.length === 0) {
                 return res.status(400).json({ success: false, message: 'Products array is required', code: 'VALIDATION_ERROR' });
@@ -35,8 +38,10 @@ class OrderController {
                 }
             }
 
+
             const [error, result] = await catchError(OrderService.createOrder({
                 userId,
+                userType: req.user?.role as "user" | "distributor",
                 products,
                 deliveryAddress,
                 estimatedDeliveryDate: estimatedDeliveryDate ? new Date(estimatedDeliveryDate) : undefined
@@ -378,7 +383,7 @@ class OrderController {
                 return;
             }
 
-            const { page, limit, status, paymentStatus, startDate, endDate, sortBy, orderBy } = req.query;
+            const { page, limit, status, paymentStatus, startDate, endDate, sortBy, orderBy, userType } = req.query;
 
             if (status && !['pending', 'declined', 'confirmed', 'processing', 'out_for_delivery', 'shipped', 'delivered', 'cancelled'].includes(status as string)) {
                 res.status(400).json({ success: false, message: 'Invalid status value', code: 'INVALID_STATUS' });
@@ -415,6 +420,11 @@ class OrderController {
                 return;
             }
 
+            if (userType && !['user', 'distributor'].includes(userType as string)) {
+                res.status(400).json({ success: false, message: 'Invalid user type value', code: 'INVALID_USERTYPE' });
+                return;
+            }
+
             const [error, result] = await catchError(OrderService.getOrders({
                 userId: req.user._id.toString(),
                 role: req.user.role,
@@ -425,7 +435,8 @@ class OrderController {
                 startDate: startDate ? new Date(startDate as string) : undefined,
                 endDate: endDate ? new Date(endDate as string) : undefined,
                 sortBy: sortBy as string,
-                orderBy: orderBy as string
+                orderBy: orderBy as string,
+                userType: userType as 'user' | 'distributor' | undefined
             }));
 
             if (error) {

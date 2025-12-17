@@ -46,7 +46,6 @@ export interface IProductSearchQuery {
 }
 
 export class ProductService {
-
     static async createProduct(userId: string, businessId: string, productData: IProductInput, categoryInput: string): Promise<IProduct | null> {
         const stripeService = StripeService.getInstance();
         const BusinessModel = require('../models/business.model').default;

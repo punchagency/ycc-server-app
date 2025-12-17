@@ -234,7 +234,7 @@ export class ProductController {
 
         const searchQuery = {
             ...query,
-            businessId: businessId || query.businessId,
+            businessId: query.businessId ? query.businessId : businessId,
             userRole,
             page: Number(query.page) || 1,
             limit: Number(query.limit) || 20

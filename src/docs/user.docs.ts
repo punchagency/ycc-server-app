@@ -31,16 +31,20 @@
  *         name: page
  *         schema:
  *           type: integer
- *           default: 1
  *         required: false
- *         description: Page number for pagination
+ *         description: Page number for pagination. If not provided, returns all records.
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
- *           default: 10
  *         required: false
- *         description: Number of items per page
+ *         description: Number of items per page. If not provided, returns all records.
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: Search term to filter by firstName, lastName, or email (case-insensitive)
  *     responses:
  *       200:
  *         description: Business users fetched successfully
@@ -133,6 +137,7 @@
  *                             type: boolean
  *                 pagination:
  *                   type: object
+ *                   description: Included only when page and limit parameters are provided
  *                   properties:
  *                     total:
  *                       type: integer
@@ -146,6 +151,10 @@
  *                     pages:
  *                       type: integer
  *                       example: 10
+ *                 total:
+ *                   type: integer
+ *                   description: Total count of records (included only when pagination is not used)
+ *                   example: 100
  *       400:
  *         description: Invalid query parameters
  *         content:
@@ -326,6 +335,173 @@
  *                 code:
  *                   type: string
  *                   example: FORBIDDEN
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: User not found
+ *                 code:
+ *                   type: string
+ *                   example: INTERNAL_SERVER_ERROR
+ */
+
+/**
+ * @swagger
+ * /api/v2/user/{id}:
+ *   get:
+ *     summary: Get user by ID
+ *     description: Retrieve user details by user ID. Returns user information and associated business details if the user is a distributor or manufacturer.
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *         example: 507f1f77bcf86cd799439011
+ *     responses:
+ *       200:
+ *         description: User fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Business user fetched successfully
+ *                 code:
+ *                   type: string
+ *                   example: SUCCESS
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       type: object
+ *                       properties:
+ *                         _id:
+ *                           type: string
+ *                         firstName:
+ *                           type: string
+ *                         lastName:
+ *                           type: string
+ *                         email:
+ *                           type: string
+ *                         phone:
+ *                           type: string
+ *                         profilePicture:
+ *                           type: string
+ *                         address:
+ *                           type: object
+ *                           properties:
+ *                             street:
+ *                               type: string
+ *                             zipcode:
+ *                               type: string
+ *                             city:
+ *                               type: string
+ *                             state:
+ *                               type: string
+ *                             country:
+ *                               type: string
+ *                         role:
+ *                           type: string
+ *                           enum: [admin, user, distributor, manufacturer]
+ *                         isVerified:
+ *                           type: boolean
+ *                         isActive:
+ *                           type: boolean
+ *                         createdAt:
+ *                           type: string
+ *                           format: date-time
+ *                     business:
+ *                       type: object
+ *                       nullable: true
+ *                       description: Business details (only present for distributor/manufacturer roles)
+ *                       properties:
+ *                         userId:
+ *                           type: string
+ *                         businessName:
+ *                           type: string
+ *                         businessType:
+ *                           type: string
+ *                           enum: [distributor, manufacturer]
+ *                         email:
+ *                           type: string
+ *                         phone:
+ *                           type: string
+ *                         website:
+ *                           type: string
+ *                         address:
+ *                           type: object
+ *                           properties:
+ *                             street:
+ *                               type: string
+ *                             zipcode:
+ *                               type: string
+ *                             city:
+ *                               type: string
+ *                             state:
+ *                               type: string
+ *                             country:
+ *                               type: string
+ *                         ratings:
+ *                           type: object
+ *                           properties:
+ *                             averageRating:
+ *                               type: number
+ *                             totalReviews:
+ *                               type: number
+ *                             totalRatings:
+ *                               type: number
+ *                         isOnboarded:
+ *                           type: boolean
+ *       400:
+ *         description: Invalid user ID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Invalid user id
+ *                 code:
+ *                   type: string
+ *                   example: VALIDATION_ERROR
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Authentication required
+ *                 code:
+ *                   type: string
+ *                   example: AUTH_REQUIRED
  *       500:
  *         description: Internal server error
  *         content:

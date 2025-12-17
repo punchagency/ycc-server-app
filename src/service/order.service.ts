@@ -17,6 +17,7 @@ import { logCritical } from "../utils/SystemLogs";
 
 export interface CreateOrderInput {
     userId: Schema.Types.ObjectId | string;
+    userType: 'user' | 'distributor';
     products: { productId: string; quantity: number; discount?: number }[];
     deliveryAddress: { street: string; zipcode: string; city: string; state: string; country: string };
     estimatedDeliveryDate?: Date;
@@ -137,7 +138,7 @@ export class OrderService {
         }
     }
     static async createOrder(data: CreateOrderInput) {
-        const { userId, products, deliveryAddress, estimatedDeliveryDate } = data;
+        const { userId, userType, products, deliveryAddress, estimatedDeliveryDate } = data;
 
         const [userError, user] = await catchError(UserModel.findById(userId));
         if (userError || !user) throw new Error('User not found');
@@ -191,6 +192,7 @@ export class OrderService {
             userId,
             items,
             status: 'pending',
+            userType: userType,
             deliveryAddress: {
                 street: deliveryAddress.street,
                 city: deliveryAddress.city,
@@ -286,6 +288,35 @@ export class OrderService {
         const order = await OrderModel.findById(id);
         if (!order) throw new Error('Order not found');
 
+        if (userRole === 'user') {
+            if (order.userId.toString() !== userId || order.userType !== 'user') {
+                throw new Error('Unauthorized to view this order');
+            }
+        } else if (userRole === 'distributor') {
+            const business = await BusinessModel.findOne({ userId });
+            if (!business) throw new Error('Business not found');
+
+            const isOrderPlacer = order.userId.toString() === userId && order.userType === 'distributor';
+            const isSupplier = order.userType === 'user' && order.items.some(item => 
+                item.businessId.toString() === business._id.toString()
+            );
+
+            if (!isOrderPlacer && !isSupplier) {
+                throw new Error('Unauthorized to view this order');
+            }
+        } else if (userRole === 'manufacturer') {
+            const business = await BusinessModel.findOne({ userId });
+            if (!business) throw new Error('Business not found');
+
+            const isSupplier = order.userType === 'distributor' && order.items.some(item => 
+                item.businessId.toString() === business._id.toString()
+            );
+
+            if (!isSupplier) {
+                throw new Error('Unauthorized to view this order');
+            }
+        }
+
         const productIds = order.items.map(item => item.productId);
         const businessIds = [...new Set(order.items.map(item => item.businessId))];
 
@@ -295,23 +326,6 @@ export class OrderService {
             BusinessModel.find({ _id: { $in: businessIds } }).select('businessName email phone address'),
             ShipmentModel.find({ orderId: id })
         ]);
-
-        if (userRole === 'user') {
-            if (order.userId.toString() !== userId) {
-                throw new Error('Unauthorized to view this order');
-            }
-        } else if (userRole === 'distributor' || userRole === 'manufacturer') {
-            const business = await BusinessModel.findOne({ userId });
-            if (!business) throw new Error('Business not found');
-
-            const hasBusinessItems = order.items.some(item => 
-                item.businessId.toString() === business._id.toString()
-            );
-
-            if (!hasBusinessItems) {
-                throw new Error('Unauthorized to view this order');
-            }
-        }
 
         const productMap = new Map(products.map(p => [p._id.toString(), p]));
         const businessMap = new Map(businesses.map(b => [b._id.toString(), b]));
@@ -327,7 +341,7 @@ export class OrderService {
 
         return orderObj;
     }
-    static async getOrders({userId, role, page = 1, limit = 10, status, paymentStatus, startDate, endDate, sortBy = 'createdAt', orderBy = 'desc'}:{
+    static async getOrders({userId, role, page = 1, limit = 10, status, paymentStatus, startDate, endDate, sortBy = 'createdAt', orderBy = 'desc', userType}:{
         userId: string;
         role: typeof ROLES[number];
         page?: number;
@@ -338,15 +352,29 @@ export class OrderService {
         endDate?: Date;
         sortBy?: string;
         orderBy?: string;
+        userType?: 'user' | 'distributor';
     }) {
         const query: any = {};
 
         if (role === 'user') {
             query.userId = userId;
-        } else if (role === 'distributor' || role === 'manufacturer') {
+            query.userType = 'user';
+        } else if (role === 'distributor') {
+            const business = await BusinessModel.findOne({ userId });
+            if (!business) throw new Error('Business not found');
+            
+            if (userType === 'distributor') {
+                query.userId = userId;
+                query.userType = 'distributor';
+            } else {
+                query['items.businessId'] = business._id;
+                query.userType = 'user';
+            }
+        } else if (role === 'manufacturer') {
             const business = await BusinessModel.findOne({ userId });
             if (!business) throw new Error('Business not found');
             query['items.businessId'] = business._id;
+            query.userType = 'distributor';
         }
 
         if (status) query.status = status;

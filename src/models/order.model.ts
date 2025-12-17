@@ -23,6 +23,7 @@ export interface IOrder extends Document {
         confirmationToken: string;
         confirmationExpires: Date;
     }[];
+    userType: 'user' | 'distributor';
     status: typeof ORDER_STATUSES[number];
     deliveryAddress: {
         street: string;
@@ -80,6 +81,11 @@ const OrderSchema = new Schema({
         confirmationToken: { type: String, required: true },
         confirmationExpires: { type: Date, required: true }
     }],
+    userType: {
+        type: String,
+        enum: ['user', 'distributor'],
+        required: true
+    },
     status: {
         type: String,
         enum: ['pending', 'declined', 'confirmed', 'processing', 'out_for_delivery', 'shipped', 'delivered', 'cancelled'],

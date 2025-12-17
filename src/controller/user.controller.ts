@@ -11,15 +11,20 @@ export class UserController {
             return;
         }
 
-        if(req.user.role !== 'admin'){
+        if(!['admin', 'distributor'].includes(req.user?.role)){
             res.status(403).json({ success: false, message: 'Forbidden', code: 'FORBIDDEN' });
             return;
         }
         
-        const { businessType, isVerified, isOnboarded, page, limit } = req.query;
+        const { businessType, isVerified, isOnboarded, page, limit, search } = req.query;
 
         if(businessType && !Validate.oneOf({value: businessType as string, allowedValues: ['manufacturer', 'distributor']})){
             res.status(400).json({ success: false, message: 'Invalid business type. Must be either "manufacturer" or "distributor"', code: 'VALIDATION_ERROR' });
+            return;
+        }
+
+        if(req.user?.role === "distributor" && businessType === "distributor"){
+            res.status(403).json({ success: false, message: 'Forbidden', code: 'FORBIDDEN' });
             return;
         }
 
@@ -33,16 +38,14 @@ export class UserController {
             return;
         }
 
-        const pageNum = page ? parseInt(page as string) : 1;
-        const limitNum = limit ? parseInt(limit as string) : 10;
-
         const [error, result] = await catchError(
             UserService.getBusinessUsers({ 
                 businessType: businessType as 'manufacturer' | 'distributor',
                 isVerified: isVerified ? isVerified === 'true' : undefined,
                 isOnboarded: isOnboarded ? isOnboarded === 'true' : undefined,
-                page: pageNum,
-                limit: limitNum
+                page: page ? parseInt(page as string) : undefined,
+                limit: limit ? parseInt(limit as string) : undefined,
+                search: search as string
             })
         );
 
@@ -51,7 +54,13 @@ export class UserController {
             return;
         }
         
-        res.status(200).json({ success: true, data: result.data, message: 'Business users fetched successfully', code: 'SUCCESS', pagination: result.pagination });
+        const response: any = { success: true, data: result.data, message: 'Business users fetched successfully', code: 'SUCCESS' };
+        if (result.pagination) {
+            response.pagination = result.pagination;
+        } else {
+            response.total = result.total;
+        }
+        res.status(200).json(response);
     }
     static async respondToBusinessApproval(req: AuthenticatedRequest, res: Response) {
         if(!req.user){
@@ -96,5 +105,34 @@ export class UserController {
         }
 
         res.status(200).json({ success: true, data: result, message: 'Business user responded successfully', code: 'SUCCESS' });
+    }
+    static async getUserById(req: AuthenticatedRequest, res: Response) {
+        if(!req.user){
+            res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
+            return;
+        }
+
+        // if(!['admin', 'distributor', ].includes(req.user?.role)){
+        //     res.status(403).json({ success: false, message: 'Forbidden', code: 'FORBIDDEN' });
+        //     return;
+        // }
+
+        const { id } = req.params;
+
+        if(!Validate.mongoId(id)){
+            res.status(400).json({ success: false, message: 'Invalid user id', code: 'VALIDATION_ERROR' });
+            return;
+        }
+
+        const [error, result] = await catchError(
+            UserService.getUserById(id)
+        );
+
+        if(error){
+            res.status(500).json({ success: false, message: error.message, code: 'INTERNAL_SERVER_ERROR' });
+            return;
+        }
+
+        res.status(200).json({ success: true, data: result, message: 'Business user fetched successfully', code: 'SUCCESS' });
     }
 }

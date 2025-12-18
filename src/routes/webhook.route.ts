@@ -5,10 +5,11 @@ import { EasypostWebhook } from '../webhooks/easypost.webhook';
 
 const router = Router();
 
-router.post('/easypost', EasypostWebhook.handleWebhook)
-// Raw body parser for Stripe webhook signature verification
-router.use(express.raw({ type: 'application/json' }));
-router.post('/stripe', handleStripeWebhook);
+// Stripe webhook - needs raw body for signature verification
+router.post('/stripe', express.raw({ type: 'application/json' }), handleStripeWebhook);
+
+// EasyPost webhook - uses standard JSON
+router.post('/easypost', EasypostWebhook.handleWebhook);
 
 export default router;
  

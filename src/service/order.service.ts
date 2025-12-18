@@ -358,7 +358,7 @@ export class OrderService {
 
         if (role === 'user') {
             query.userId = userId;
-            query.userType = 'user';
+            query.$or = [{ userType: 'user' }, { userType: null }, { userType: { $exists: false } }];
         } else if (role === 'distributor') {
             const business = await BusinessModel.findOne({ userId });
             if (!business) throw new Error('Business not found');
@@ -368,7 +368,7 @@ export class OrderService {
                 query.userType = 'distributor';
             } else {
                 query['items.businessId'] = business._id;
-                query.userType = 'user';
+                query.$or = [{ userType: 'user' }, { userType: null }, { userType: { $exists: false } }];
             }
         } else if (role === 'manufacturer') {
             const business = await BusinessModel.findOne({ userId });
@@ -509,7 +509,7 @@ export class OrderService {
 
         return { success: true, orderId: order._id };
     }
-    static async updateOrderStatus(userId: string, orderId: string, status: 'confirmed' | 'processing' | 'shipped' | 'out_for_delivery'| 'cancelled', userRole: typeof ROLES[number], reason?: string, notes?: string, trackingNumber?: string) {
+    static async updateUserOrderStatus(userId: string, orderId: string, status: 'confirmed' | 'processing' | 'shipped' | 'out_for_delivery'| 'cancelled', userRole: typeof ROLES[number], reason?: string, notes?: string, trackingNumber?: string) {
         const order = await OrderModel.findById(orderId);
         if (!order) throw new Error('Order not found');
 
@@ -665,5 +665,145 @@ export class OrderService {
         }
 
         return { success: true, order };
+    }
+    static async updateDistributorOrderStatus({userId, orderId, status, userRole, notes, reason, enableShipping, trackingNumber }: { userId: string, orderId: string, status: 'confirmed' | 'processing' | 'shipped' | 'out_for_delivery' | 'cancelled', reason?: string, notes?: string, userRole: typeof ROLES[number], enableShipping?: boolean, trackingNumber?: string}){
+        const order = await OrderModel.findById(orderId);
+        if (!order) throw new Error('Order not found');
+
+        if (order.userType !== 'distributor') throw new Error('This endpoint is only for distributor orders');
+
+        if (userRole === 'distributor') {
+            if (order.userId.toString() !== userId) throw new Error('Unauthorized to update this order');
+            if (status !== 'cancelled') throw new Error('Distributors can only cancel orders');
+
+            const fromStatus = order.status;
+            order.status = 'cancelled';
+            order.orderHistory.push({
+                fromStatus,
+                toStatus: 'cancelled',
+                changedBy: userId,
+                userRole,
+                reason,
+                notes,
+                changedAt: new Date()
+            });
+
+            await order.save();
+
+            if (order.paymentStatus === 'paid') {
+                await this.handleProductOrderEvent(order._id.toString(), 'distributor_cancel');
+            } else{
+                order.paymentStatus = 'cancelled';
+                await order.save();
+            }
+
+            const distributor = await UserModel.findById(userId);
+            const businessIds = [...new Set(order.items.map(item => item.businessId))];
+            const businesses = await BusinessModel.find({ _id: { $in: businessIds } });
+
+            for (const business of businesses) {
+                await addNotificationJob({
+                    recipientId: business.userId,
+                    type: 'order',
+                    priority: 'high',
+                    title: 'Order Cancelled',
+                    message: `Order #${order._id} has been cancelled by ${distributor?.firstName} ${distributor?.lastName}.`,
+                    data: { orderId: order._id, status: 'cancelled' }
+                });
+            }
+
+            return { success: true, order };
+        } else if (userRole === 'manufacturer') {
+            const business = await BusinessModel.findOne({ userId });
+            if (!business) throw new Error('Business not found');
+
+            const businessItems = order.items.filter(i => i.businessId.toString() === business._id.toString());
+            if (businessItems.length === 0) throw new Error('No items found for your business in this order');
+
+            const validTransitions: Record<string, string[]> = {
+                'pending': ['confirmed', 'cancelled'],
+                'confirmed': ['processing', 'cancelled'],
+                'declined': [],
+                'processing': ['shipped', 'cancelled'],
+                'shipped': ['out_for_delivery', 'cancelled'],
+                'out_for_delivery': ['cancelled'],
+                'delivered': [],
+                'cancelled': []
+            };
+
+            for (const item of businessItems) {
+                if (!validTransitions[item.status]?.includes(status)) {
+                    throw new Error(`Cannot transition from ${item.status} to ${status}`);
+                }
+
+                const fromStatus = item.status;
+                item.status = status;
+
+                order.orderHistory.push({
+                    fromStatus,
+                    toStatus: status,
+                    changedBy: userId,
+                    userRole,
+                    reason,
+                    notes,
+                    changedAt: new Date()
+                });
+            }
+
+            if (status === 'confirmed' && enableShipping !== undefined) {
+                order.enableShipping = enableShipping;
+            }
+
+            if (status === 'out_for_delivery' && trackingNumber) {
+                order.trackingNumber = trackingNumber;
+            }
+
+            const allSameStatus = order.items.every(i => i.status === status);
+            if (allSameStatus) {
+                order.status = status;
+            }
+
+            await order.save();
+
+            if (status === 'confirmed' && enableShipping) {
+                const [shipmentError] = await catchError(
+                    ShipmentService.createShipmentsForConfirmedItems(order._id.toString(), business._id.toString())
+                );
+                if (shipmentError) {
+                    logCritical({message: `Shipment creation failed: ${shipmentError.message}`, error: shipmentError, source: "OrderService.updateDistributorOrderStatus"});
+                    throw new Error('Shipment creation failed');
+                }
+            }
+
+            const distributor = await UserModel.findById(order.userId);
+            await addNotificationJob({
+                recipientId: order.userId,
+                type: 'order',
+                priority: 'high',
+                title: 'Order Status Updated',
+                message: `Items in your order #${order._id} have been updated to ${status} by ${business.businessName}.`,
+                data: { orderId: order._id, status }
+            });
+
+            await addEmailJob({
+                email: distributor?.email || '',
+                subject: `Order #${order._id} Status Updated`,
+                html: `
+                <h1>Order Status Updated</h1>
+                <p>Dear ${distributor?.firstName} ${distributor?.lastName},</p>
+                <p>Items in your order #${order._id} have been updated to <strong>${status}</strong> by ${business.businessName}.</p>
+                ${trackingNumber ? `<p><strong>Tracking Number:</strong> ${trackingNumber}</p>` : ''}
+                ${notes ? `<p><strong>Notes:</strong> ${notes}</p>` : ''}
+                ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
+                <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/distributor/orders/${order._id}" style="display:inline-block;background-color:#4CAF50;color:white;padding:14px 20px;text-align:center;text-decoration:none;font-size:16px;margin:4px 2px;cursor:pointer;border-radius:4px;">
+                    View Order
+                </a>
+                `
+            });
+
+            return { success: true, order };
+        } else {
+            throw new Error('Invalid user role');
+        }
     }
 }

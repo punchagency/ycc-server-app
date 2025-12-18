@@ -8,6 +8,7 @@ import { Types } from 'mongoose';
 import { pineconeService } from '../integration/pinecone';
 import StripeService from '../integration/stripe';
 import { CategoryService } from "../service/category.service"
+import OrderModel from '../models/order.model';
 
 export interface IProductInput {
     name: string;
@@ -370,14 +371,46 @@ export class ProductService {
         return product;
     }
 
-    static async deleteProduct(id: string): Promise<boolean> {
+    static async deleteProduct(id: string): Promise<{ status: boolean; message: string; source: string; additionalData?: any }> {
         if (!Types.ObjectId.isValid(id)) {
-            return false;
+            return {
+                status: false,
+                message: 'Invalid product ID',
+                source: 'ProductService.deleteProduct',
+                additionalData: { productId: id }
+            };
         }
 
         const product = await this.getProductById(id);
         if (!product) {
-            return false;
+            return {
+                status: false,
+                message: 'Product not found',
+                source: 'ProductService.deleteProduct',
+                additionalData: { productId: id }
+            };
+        }
+
+        const [orderError, hasOrders] = await catchError(
+            OrderModel.exists({ 'items.productId': new Types.ObjectId(id) })
+        );
+
+        if (orderError) {
+            return {
+                status: false,
+                message: 'Failed to check product orders',
+                source: 'ProductService.deleteProduct',
+                additionalData: { productId: id, error: orderError.message }
+            };
+        }
+
+        if (hasOrders) {
+            return {
+                status: false,
+                message: 'Cannot delete product with existing orders',
+                source: 'ProductService.deleteProduct',
+                additionalData: { productId: id }
+            };
         }
 
         const [error] = await catchError(
@@ -385,12 +418,12 @@ export class ProductService {
         );
 
         if (error) {
-            await logError({
+            return {
+                status: false,
                 message: 'Failed to delete product',
                 source: 'ProductService.deleteProduct',
                 additionalData: { productId: id, error: error.message }
-            });
-            return false;
+            };
         }
 
         await this.removeFromInventory(product.businessId.toString(), id);
@@ -412,7 +445,12 @@ export class ProductService {
             additionalData: { productId: id, name: product.name }
         });
 
-        return true;
+        return {
+            status: true,
+            message: 'Product deleted successfully',
+            source: 'ProductService.deleteProduct',
+            additionalData: { productId: id }
+        };
     }
 
     static async updateStock(id: string, quantity: number): Promise<IProduct | null> {

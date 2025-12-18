@@ -436,3 +436,107 @@
  *                 code:
  *                   type: string
  */
+
+/**
+ * @swagger
+ * /api/v2/order/distributor-status:
+ *   patch:
+ *     tags: [Order]
+ *     summary: Update distributor order status (for distributor-to-manufacturer orders)
+ *     description: Allows distributors to cancel their orders to manufacturers, and manufacturers to update order status (confirm, process, ship, etc.) with optional platform shipping
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [orderId, status]
+ *             properties:
+ *               orderId:
+ *                 type: string
+ *                 description: Order ID to update
+ *               status:
+ *                 type: string
+ *                 enum: [confirmed, processing, shipped, out_for_delivery, cancelled]
+ *                 description: New status for the order
+ *               enableShipping:
+ *                 type: boolean
+ *                 description: Enable platform shipping system (only for manufacturers when confirming orders). If false, manufacturer handles shipping externally.
+ *               reason:
+ *                 type: string
+ *                 description: Optional reason for status change (especially for cancellations)
+ *               notes:
+ *                 type: string
+ *                 description: Optional notes about the status change
+ *               trackingNumber:
+ *                 type: string
+ *                 description: Optional tracking number (for out_for_delivery status)
+ *     responses:
+ *       200:
+ *         description: Order status updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *       400:
+ *         description: Validation error or update failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 code:
+ *                   type: string
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 code:
+ *                   type: string
+ *       403:
+ *         description: Forbidden - Only distributors and manufacturers can access
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 code:
+ *                   type: string
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 code:
+ *                   type: string
+ */

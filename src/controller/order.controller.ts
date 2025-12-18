@@ -314,7 +314,7 @@ class OrderController {
             `);
         }
     }
-    static async updateOrderStatus(req: AuthenticatedRequest, res: Response) {
+    static async updateUserOrderStatus(req: AuthenticatedRequest, res: Response) {
         try {
             if (!req.user) {
                 res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
@@ -336,10 +336,10 @@ class OrderController {
                 return res.status(400).json({ success: false, message: 'Invalid status. User can only set confirmed or cancelled', code: 'VALIDATION_ERROR' });
             }
 
-            const [error, result] = await catchError(OrderService.updateOrderStatus(userId.toString(), orderId, status, userRole, reason, notes, trackingNumber));
+            const [error, result] = await catchError(OrderService.updateUserOrderStatus(userId.toString(), orderId, status, userRole, reason, notes, trackingNumber));
 
             if (error) {
-                logError({ message: "Updating order status failed!", source: "OrderController.updateOrderStatus", error });
+                logError({ message: "Updating order status failed!", source: "OrderController.updateUserOrderStatus", error });
                 return res.status(400).json({ success: false, message: error.message, code: 'UPDATE_FAILED' });
             }
 
@@ -449,6 +449,58 @@ class OrderController {
         } catch (error) {
             logError({ message: "Fetching orders failed!", source: "OrderController.getOrders", error });
             res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
+        }
+    }
+    static async updateDistributorOrderStatus(req: AuthenticatedRequest, res: Response){
+        try {
+            if (!req.user) {
+                res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
+                return;
+            }
+
+            const { orderId, status, reason, notes, enableShipping, trackingNumber } = req.body;
+            const userId = req.user._id;
+            const userRole = req.user.role;
+
+            if (!userId || !userRole) {
+                return res.status(401).json({ success: false, message: 'Unauthorized', code: 'UNAUTHORIZED' });
+            }
+
+            if (!['distributor', 'manufacturer'].includes(userRole)) {
+                return res.status(403).json({ success: false, message: 'Only distributors and manufacturers can update distributor orders', code: 'FORBIDDEN' });
+            }
+
+            if (!orderId || !status) {
+                return res.status(400).json({ success: false, message: 'Order ID and status are required', code: 'VALIDATION_ERROR' });
+            }
+
+            if (!['confirmed', 'processing', 'shipped', 'out_for_delivery', 'cancelled'].includes(status)) {
+                return res.status(400).json({ success: false, message: 'Invalid status', code: 'VALIDATION_ERROR' });
+            }
+
+            if (status === 'confirmed' && enableShipping !== undefined && typeof enableShipping !== 'boolean') {
+                return res.status(400).json({ success: false, message: 'enableShipping must be a boolean', code: 'VALIDATION_ERROR' });
+            }
+
+            const [error, result] = await catchError(OrderService.updateDistributorOrderStatus({
+                userId: userId.toString(),
+                orderId,
+                status,
+                userRole,
+                reason,
+                notes,
+                enableShipping,
+                trackingNumber
+            }));
+
+            if (error) {
+                logError({ message: "Updating distributor order status failed!", source: "OrderController.updateDistributorOrderStatus", error });
+                return res.status(400).json({ success: false, message: error.message, code: 'UPDATE_FAILED' });
+            }
+
+            return res.status(200).json({ success: true, message: 'Order status updated successfully', data: result?.order });
+        } catch (error: any) {
+            return res.status(500).json({ success: false, message: error.message || 'Internal server error', code: 'INTERNAL_ERROR' });
         }
     }
 }

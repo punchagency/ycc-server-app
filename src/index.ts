@@ -69,7 +69,7 @@ const corsOptions: cors.CorsOptions = {
 };
 
 
-// Webhook route (before body parser middleware)
+// Webhook routes (before CORS and body parsers - webhooks are server-to-server)
 app.use('/webhook', webhookRoutes);
 
 // Security middleware

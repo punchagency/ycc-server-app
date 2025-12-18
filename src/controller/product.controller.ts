@@ -420,6 +420,7 @@ export class ProductController {
     static async deleteProduct(req: AuthenticatedRequest, res: Response): Promise<void> {
         const { id } = req.params;
         const businessId = req.user!.businessId;
+        const userRole = req.user!.role;
 
         if (!Validate.mongoId(id)) {
             res.status(400).json({
@@ -430,7 +431,6 @@ export class ProductController {
             return;
         }
 
-        // Check if product exists and belongs to user's business
         const existingProduct = await ProductService.getProductById(id);
         if (!existingProduct) {
             res.status(404).json({
@@ -441,28 +441,58 @@ export class ProductController {
             return;
         }
 
-        if (existingProduct.businessId.toString() !== businessId) {
+        // Authorization check
+        if (userRole === 'admin') {
+            const business = await BusinessModel.findById(existingProduct.businessId).populate('userId');
+            if (!business) {
+                res.status(404).json({
+                    success: false,
+                    message: 'Business not found',
+                    code: 'BUSINESS_NOT_FOUND'
+                });
+                return;
+            }
+
+            const businessOwner = business.userId as any;
+            if (!businessOwner || !['distributor', 'manufacturer'].includes(businessOwner.role)) {
+                res.status(403).json({
+                    success: false,
+                    message: 'Can only delete products for distributors or manufacturers',
+                    code: 'ACCESS_DENIED'
+                });
+                return;
+            }
+        } else if (userRole === 'distributor' || userRole === 'manufacturer') {
+            if (existingProduct.businessId.toString() !== businessId) {
+                res.status(403).json({
+                    success: false,
+                    message: 'Access denied',
+                    code: 'ACCESS_DENIED'
+                });
+                return;
+            }
+        } else {
             res.status(403).json({
                 success: false,
-                message: 'Access denied',
-                code: 'ACCESS_DENIED'
+                message: 'Only distributors, manufacturers and admins can delete products',
+                code: 'FORBIDDEN'
             });
             return;
         }
 
         const deleted = await ProductService.deleteProduct(id);
-        if (!deleted) {
-            res.status(500).json({
+        if(!deleted.status){
+            res.status(400).json({
                 success: false,
-                message: 'Failed to delete product',
+                message: deleted.message,
                 code: 'DELETE_FAILED'
             });
             return;
         }
-
+            
         res.json({
             success: true,
-            message: 'Product deleted successfully'
+            message: deleted.message
         });
     }
     static async updateStock(req: AuthenticatedRequest, res: Response): Promise<void> {

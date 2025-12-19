@@ -6,12 +6,13 @@ import { saveAuditLog } from '../utils/SaveAuditlogs';
 import 'dotenv/config';
 
 export class UserService {
-    static async getBusinessUsers({ businessType, isVerified, isOnboarded, page = 1, limit = 10 }: { 
+    static async getBusinessUsers({ businessType, isVerified, isOnboarded, page, limit, search }: { 
         businessType?: 'manufacturer' | 'distributor',
         isVerified?: boolean,
         isOnboarded?: boolean,
         page?: number,
-        limit?: number
+        limit?: number,
+        search?: string
     }) {
         const userFilter: any = { role: { $in: ['distributor', 'manufacturer'] } };
         
@@ -23,14 +24,26 @@ export class UserService {
             userFilter.isVerified = isVerified;
         }
 
-        const total = await UserModel.countDocuments(userFilter);
-        const skip = (page - 1) * limit;
+        if (search) {
+            userFilter.$or = [
+                { firstName: { $regex: search, $options: 'i' } },
+                { lastName: { $regex: search, $options: 'i' } },
+                { email: { $regex: search, $options: 'i' } }
+            ];
+        }
 
-        const users = await UserModel.find(userFilter)
-            .select('_id firstName lastName email phone profilePicture address role isVerified isActive createdAt')
-            .skip(skip)
-            .limit(limit)
-            .lean();
+        const total = await UserModel.countDocuments(userFilter);
+        const usePagination = page !== undefined && limit !== undefined;
+        const skip = usePagination ? (page! - 1) * limit! : 0;
+
+        let userQuery = UserModel.find(userFilter)
+            .select('_id firstName lastName email phone profilePicture address role isVerified isActive createdAt');
+        
+        if (usePagination) {
+            userQuery = userQuery.skip(skip).limit(limit!);
+        }
+
+        const users = await userQuery.lean();
 
         const userIds = users.map(user => user._id);
         
@@ -63,15 +76,20 @@ export class UserService {
                 business: businessMap.get(user._id.toString()) || null
             }));
 
-        return {
-            data,
-            pagination: {
+        const response: any = { data };
+        
+        if (usePagination) {
+            response.pagination = {
                 total,
                 page,
                 limit,
-                pages: Math.ceil(total / limit)
-            }
-        };
+                pages: Math.ceil(total / limit!)
+            };
+        } else {
+            response.total = total;
+        }
+
+        return response;
     }
     static async respondToBusinessApproval({ userId, status, subject, emailBody }: {
         userId: string,
@@ -152,6 +170,23 @@ export class UserService {
             status,
             email: user.email,
             businessName: business.businessName
+        };
+    }
+    static async getUserById(userId: string) {
+        const user = await UserModel.findById(userId)
+            .select('_id firstName lastName email phone profilePicture address role isVerified isActive createdAt');
+
+        if (!user) {
+            throw new Error('User not found');
+        }
+        let business: any = null;
+        if (user.role === 'distributor' || user.role === 'manufacturer') {
+            business = await BusinessModel.findOne({ userId })
+            .select('userId businessName businessType email phone website address ratings isOnboarded');
+        }
+        return {
+            user,
+            business
         };
     }
 }

@@ -198,10 +198,10 @@ export class ServiceService {
         return { services, total, page, pages: Math.ceil(total / limit) };
     }
 
-    static async updateService(id: string, businessId: string, updateData: UpdateServiceDTO, imageURLs?: string[], categoryInput?: string): Promise<IService | null> {
+    static async updateService(id: string, updateData: UpdateServiceDTO, imageURLs?: string[], categoryInput?: string): Promise<IService | null> {
         if (!Types.ObjectId.isValid(id)) return null;
 
-        const service = await ServiceModel.findOne({ _id: id, businessId });
+        const service = await ServiceModel.findById(id);
         if (!service) return null;
 
         const finalUpdateData = { ...updateData };
@@ -278,21 +278,56 @@ export class ServiceService {
         return updatedService;
     }
 
-    static async deleteService(id: string, businessId: string): Promise<boolean> {
-        if (!Types.ObjectId.isValid(id)) return false;
+    static async deleteService(id: string): Promise<{status: boolean; message: string; source: string; additionalData?: any}> {
+        if (!Types.ObjectId.isValid(id)){
+            return {
+                status: false,
+                message: 'Invalid service ID',
+                source: 'ServiceService.deleteService',
+                additionalData: { serviceId: id }
+            };
+        }
 
-        const service = await ServiceModel.findOne({ _id: id, businessId });
-        if (!service) return false;
+        const service = await ServiceModel.findById(id);
+        if (!service) return {
+            status: false,
+            message: 'Service not found',
+            source: 'ServiceService.deleteService',
+            additionalData: { serviceId: id }
+        };
+
+        const BookingModel = require('../models/booking.model').default;
+        const [bookingError, hasBookings] = await catchError(
+            BookingModel.exists({ serviceId: new Types.ObjectId(id) })
+        );
+
+        if (bookingError) {
+            return {
+                status: false,
+                message: 'Failed to check service bookings',
+                source: 'ServiceService.deleteService',
+                additionalData: { serviceId: id, error: bookingError.message }
+            };
+        }
+
+        if (hasBookings) {
+            return {
+                status: false,
+                message: 'Cannot delete service with existing bookings',
+                source: 'ServiceService.deleteService',
+                additionalData: { serviceId: id }
+            };
+        }
 
         const [error] = await catchError(ServiceModel.findByIdAndDelete(id));
 
         if (error) {
-            await logError({
+            return {
+                status: false,
                 message: 'Failed to delete service',
                 source: 'ServiceService.deleteService',
                 additionalData: { serviceId: id, error: error.message }
-            });
-            return false;
+            };
         }
 
         await logInfo({
@@ -303,7 +338,12 @@ export class ServiceService {
 
         pineconeEmitter.emit('delete', id);
 
-        return true;
+        return {
+            status: true,
+            message: 'Service deleted successfully',
+            source: 'ServiceService.deleteService',
+            additionalData: { serviceId: id }
+        };
     }
 
     static async vectorSearchServices(query: string, limit: number = 10): Promise<IService[]> {

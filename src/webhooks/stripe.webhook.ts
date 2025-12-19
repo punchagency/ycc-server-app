@@ -18,10 +18,10 @@ const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
 export const handleStripeWebhook = async (req: Request, res: Response) => {
     const sig = req.headers['stripe-signature'] as string;
     let event: Stripe.Event;
-
     try {
         // Use raw body for signature verification
         const rawBody = (req as any).rawBody || req.body;
+        logInfo({ message: 'Received Stripe webhook', source: 'handleStripeWebhook', additionalData: rawBody });
         event = stripe.webhooks.constructEvent(rawBody, sig, endpointSecret);
     } catch (err: any) {
         logError({ message: 'Stripe webhook signature verification failed', error: err, source: 'handleStripeWebhook' });

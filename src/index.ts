@@ -70,7 +70,8 @@ const corsOptions: cors.CorsOptions = {
 };
 
 
-// Webhook route (before body parser middleware)
+// Webhook routes (before CORS and body parsers - webhooks are server-to-server)
+app.use('/webhook', webhookRoutes);
 
 // Security middleware
 // app.use(correlationIdMiddleware);
@@ -104,6 +105,7 @@ import invoiceRoutes from './routes/invoice.route';
 import notificationRoutes from './routes/notification.route';
 import orderRoutes from './routes/order.route';
 import productRoutes from './routes/product.route';
+import publicRoutes from './routes/public.route';
 import quoteRoutes from './routes/quote.route';
 import serviceRoutes from './routes/service.route';
 import stripeAccountRoutes from './routes/stripe_account.route';
@@ -129,6 +131,7 @@ app.use('/api/v2/invoice', invoiceRoutes);
 app.use('/api/v2/notification', notificationRoutes);
 app.use('/api/v2/order', orderRoutes);
 app.use('/api/v2/product', productRoutes);
+app.use('/api/v2/public', publicRoutes);
 app.use('/api/v2/quote', quoteRoutes);
 app.use('/api/v2/service', serviceRoutes);
 app.use('/api/v2/stripe-account', stripeAccountRoutes);

@@ -1,7 +1,7 @@
 import { Schema, model, Document } from 'mongoose';
 
 export const ORDER_STATUSES = ['pending', 'declined', 'confirmed', 'processing', 'out_for_delivery', 'shipped', 'delivered', 'cancelled'] as const;
-export const ORDER_PAYMENT_STATUSES =['paid', 'pending', 'failed'];
+export const ORDER_PAYMENT_STATUSES =['paid', 'pending', 'failed', 'cancelled'];
 export interface IOrder extends Document {
     _id: Schema.Types.ObjectId;
     userId: Schema.Types.ObjectId;
@@ -23,6 +23,7 @@ export interface IOrder extends Document {
         confirmationToken: string;
         confirmationExpires: Date;
     }[];
+    userType: 'user' | 'distributor';
     status: typeof ORDER_STATUSES[number];
     deliveryAddress: {
         street: string;
@@ -43,6 +44,7 @@ export interface IOrder extends Document {
     paymentStatus: typeof ORDER_PAYMENT_STATUSES[number];
     stripeInvoiceUrl?: string | null;
     stripeInvoiceId?: string | null;
+    enableShipping?: boolean;
     orderHistory: {
         fromStatus: 'pending' | 'declined' | 'confirmed' | 'processing' | 'out_for_delivery' | 'shipped' | 'delivered' | 'cancelled';
         toStatus: 'pending' | 'declined' | 'confirmed' | 'processing' | 'out_for_delivery' | 'shipped' | 'delivered' | 'cancelled';
@@ -80,6 +82,11 @@ const OrderSchema = new Schema({
         confirmationToken: { type: String, required: true },
         confirmationExpires: { type: Date, required: true }
     }],
+    userType: {
+        type: String,
+        enum: ['user', 'distributor'],
+        required: true
+    },
     status: {
         type: String,
         enum: ['pending', 'declined', 'confirmed', 'processing', 'out_for_delivery', 'shipped', 'delivered', 'cancelled'],
@@ -107,11 +114,12 @@ const OrderSchema = new Schema({
     invoiceId: { type: Schema.Types.ObjectId },
     paymentStatus: {
         type: String,
-        enum: ['paid', 'pending', 'failed'],
+        enum: ['paid', 'pending', 'failed', 'cancelled'],
         required: true
     },
     stripeInvoiceUrl: { type: String },
     stripeInvoiceId: { type: String },
+    enableShipping: { type: Boolean, default: true },
     orderHistory: [{
         fromStatus: {
             type: String,

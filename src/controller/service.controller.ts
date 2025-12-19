@@ -256,7 +256,7 @@ export class ServiceController {
             }
 
             // Check if service exists
-            const existingService = await ServiceService.getServiceById(id);
+            const existingService: any = await ServiceService.getServiceById(id);
             if (!existingService) {
                 res.status(404).json({
                     success: false,
@@ -269,7 +269,7 @@ export class ServiceController {
             // Authorization check
             if (userRole === 'admin') {
                 // Admin can update any distributor's service
-                const business = await BusinessModel.findById(existingService.businessId).populate('userId');
+                const business = await BusinessModel.findById(existingService.businessId._id).populate('userId');
                 if (!business) {
                     res.status(404).json({
                         success: false,
@@ -299,7 +299,7 @@ export class ServiceController {
                     return;
                 }
 
-                if (existingService.businessId.toString() !== businessId) {
+                if (existingService.businessId._id.toString() !== businessId) {
                     res.status(403).json({
                         success: false,
                         message: 'Access denied',
@@ -347,8 +347,7 @@ export class ServiceController {
             if (categoryId) updateData.categoryId = categoryId;
             if (isQuotable !== undefined) updateData.isQuotable = isQuotable;
 
-            const serviceBusinessId = userRole === 'admin' ? existingService.businessId.toString() : businessId!;
-            const service = await ServiceService.updateService(id, serviceBusinessId, updateData, imageURLs, categoryId);
+            const service = await ServiceService.updateService(id, updateData, imageURLs, categoryId);
 
             if (!service) {
                 res.status(404).json({ success: false, message: 'Service not found or unauthorized', code: 'SERVICE_NOT_FOUND' });
@@ -367,23 +366,84 @@ export class ServiceController {
 
     static async deleteService(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
-            if (!req.user || req.user.role !== 'distributor') {
-                res.status(403).json({ success: false, message: 'Only distributors can delete services', code: 'FORBIDDEN' });
-                return;
-            }
-
-            const businessId = req.user.businessId;
-            if (!businessId) {
-                res.status(400).json({ success: false, message: 'Business not found for user', code: 'BUSINESS_NOT_FOUND' });
-                return;
-            }
-
             const { id } = req.params;
+            const userRole = req.user!.role;
+            const businessId = req.user!.businessId;
 
-            const deleted = await ServiceService.deleteService(id, businessId);
+            if (!Validate.mongoId(id)) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Invalid service ID',
+                    code: 'VALIDATION_ERROR'
+                });
+                return;
+            }
 
-            if (!deleted) {
-                res.status(404).json({ success: false, message: 'Service not found or unauthorized', code: 'SERVICE_NOT_FOUND' });
+            const existingService: any = await ServiceService.getServiceById(id);
+            if (!existingService) {
+                res.status(404).json({
+                    success: false,
+                    message: 'Service not found',
+                    code: 'SERVICE_NOT_FOUND'
+                });
+                return;
+            }
+
+            // Authorization check
+            if (userRole === 'admin') {
+                const business = await BusinessModel.findById(existingService.businessId._id).populate('userId');
+                if (!business) {
+                    res.status(404).json({
+                        success: false,
+                        message: 'Business not found',
+                        code: 'BUSINESS_NOT_FOUND'
+                    });
+                    return;
+                }
+
+                const businessOwner = business.userId as any;
+                if (!businessOwner || businessOwner.role !== 'distributor') {
+                    res.status(403).json({
+                        success: false,
+                        message: 'Can only delete services for distributors',
+                        code: 'ACCESS_DENIED'
+                    });
+                    return;
+                }
+            } else if (userRole === 'distributor' || userRole === "manufacturer") {
+                if (!businessId) {
+                    res.status(400).json({
+                        success: false,
+                        message: 'Business ID is required',
+                        code: 'BUSINESS_REQUIRED'
+                    });
+                    return;
+                }
+
+                if (existingService.businessId._id.toString() !== businessId) {
+                    res.status(403).json({
+                        success: false,
+                        message: 'Access denied',
+                        code: 'ACCESS_DENIED'
+                    });
+                    return;
+                }
+            } else {
+                res.status(403).json({
+                    success: false,
+                    message: 'Only distributors, manufacturers and admins can delete services',
+                    code: 'FORBIDDEN'
+                });
+                return;
+            }
+
+            const deleted = await ServiceService.deleteService(id);
+            if (!deleted.status) {                
+                res.status(400).json({
+                    success: deleted.status,
+                    message: deleted.message,
+                    code: 'DELETE_FAILED'
+                });
                 return;
             }
 

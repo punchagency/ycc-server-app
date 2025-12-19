@@ -105,7 +105,7 @@ export const sendContactMessage = async (
       html = html.replace(/\{\{#if location\}\}[\s\S]*?\{\{\/if\}\}/, '');
     }
 
-    const supportEmail = process.env.SUPPPORT_EMAIL_USER || 'support@yachtcrewcenter.com';
+    const supportEmail = 'contact@yachtcrewcenter.com';
     const finalSubject = `Contact — ${trimmedSubject} — ${trimmedFullName}`;
 
     // ✅ Call sendMail with a single object argument

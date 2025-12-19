@@ -18,7 +18,8 @@ export class DistributorAnalyticsController {
         };
 
         try {
-            const [error, result] = await catchError(DistributorAnalyticsService.getTotalProducts(req.user?.businessId ||""));
+            const { timeRange, startDate, endDate } = req.query;
+            const [error, result] = await catchError(DistributorAnalyticsService.getTotalProducts(req.user?.businessId ||"", { timeRange: timeRange as any, startDate: startDate as any, endDate: endDate as any }));
 
             if (error) {
                 res.status(400).json({ success: false, message: error.message || 'Failed to fetch total products', code: 'FETCH_FAILED' });
@@ -42,7 +43,8 @@ export class DistributorAnalyticsController {
         };
 
         try {
-            const [error, result] = await catchError(DistributorAnalyticsService.getTotalServices(req.user?.businessId ||""));
+            const { timeRange, startDate, endDate } = req.query;
+            const [error, result] = await catchError(DistributorAnalyticsService.getTotalServices(req.user?.businessId ||"", { timeRange: timeRange as any, startDate: startDate as any, endDate: endDate as any }));
 
             if (error) {
                 res.status(400).json({ success: false, message: error.message || 'Failed to fetch total services', code: 'FETCH_FAILED' });
@@ -114,7 +116,8 @@ export class DistributorAnalyticsController {
         };
 
         try {
-            const [error, result] = await catchError(DistributorAnalyticsService.getActiveOrdersNumber(req.user?.businessId ||""));
+            const { timeRange, startDate, endDate } = req.query;
+            const [error, result] = await catchError(DistributorAnalyticsService.getActiveOrdersNumber(req.user?.businessId ||"", { timeRange: timeRange as any, startDate: startDate as any, endDate: endDate as any }));
 
             if (error) {
                 res.status(400).json({ success: false, message: error.message || 'Failed to fetch active orders', code: 'FETCH_FAILED' });
@@ -138,7 +141,8 @@ export class DistributorAnalyticsController {
         };
 
         try {
-            const [error, result] = await catchError(DistributorAnalyticsService.getTotalBookings(req.user?.businessId ||""));
+            const { timeRange, startDate, endDate } = req.query;
+            const [error, result] = await catchError(DistributorAnalyticsService.getTotalBookings(req.user?.businessId ||"", { timeRange: timeRange as any, startDate: startDate as any, endDate: endDate as any }));
 
             if (error) {
                 res.status(400).json({ success: false, message: error.message || 'Failed to fetch total bookings', code: 'FETCH_FAILED' });
@@ -162,7 +166,8 @@ export class DistributorAnalyticsController {
         };
 
         try {
-            const [error, result] = await catchError(DistributorAnalyticsService.getPopularServicesNumber(req.user?.businessId ||""));
+            const { timeRange, startDate, endDate, limit } = req.query;
+            const [error, result] = await catchError(DistributorAnalyticsService.getPopularServicesNumber(req.user?.businessId ||"", { timeRange: timeRange as any, startDate: startDate as any, endDate: endDate as any }, limit ? parseInt(limit as string) : 10));
 
             if (error) {
                 res.status(400).json({ success: false, message: error.message || 'Failed to fetch popular services', code: 'FETCH_FAILED' });
@@ -186,7 +191,8 @@ export class DistributorAnalyticsController {
         };
 
         try {
-            const [error, result] = await catchError(DistributorAnalyticsService.getPopularProductsNumber(req.user?.businessId ||""));
+            const { timeRange, startDate, endDate, limit } = req.query;
+            const [error, result] = await catchError(DistributorAnalyticsService.getPopularProductsNumber(req.user?.businessId ||"", { timeRange: timeRange as any, startDate: startDate as any, endDate: endDate as any }, limit ? parseInt(limit as string) : 10));
 
             if (error) {
                 res.status(400).json({ success: false, message: error.message || 'Failed to fetch popular products', code: 'FETCH_FAILED' });
@@ -210,7 +216,8 @@ export class DistributorAnalyticsController {
         };
 
         try {
-            const [error, result] = await catchError(DistributorAnalyticsService.getTotalRevenue(req.user?.businessId ||""));
+            const { timeRange, startDate, endDate } = req.query;
+            const [error, result] = await catchError(DistributorAnalyticsService.getTotalRevenue(req.user?.businessId ||"", { timeRange: timeRange as any, startDate: startDate as any, endDate: endDate as any }));
 
             if (error) {
                 res.status(400).json({ success: false, message: error.message || 'Failed to fetch total revenue', code: 'FETCH_FAILED' });

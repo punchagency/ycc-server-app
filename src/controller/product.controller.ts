@@ -236,6 +236,7 @@ export class ProductController {
             ...query,
             businessId: query.businessId ? query.businessId : businessId,
             userRole,
+            random: query.random == "true" || query.random == true ? true : false, 
             page: Number(query.page) || 1,
             limit: Number(query.limit) || 20
         };

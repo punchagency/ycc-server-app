@@ -21,6 +21,7 @@ const PORT = process.env.PORT || 4500;
 // Connect to MongoDB and Redis
 connectDB();
 RedisConnect();
+app.use('/webhook', webhookRoutes);
 
 // Setup global error handlers
 // setupGlobalErrorHandlers();
@@ -70,7 +71,6 @@ const corsOptions: cors.CorsOptions = {
 
 
 // Webhook route (before body parser middleware)
-app.use('/webhook', webhookRoutes);
 
 // Security middleware
 // app.use(correlationIdMiddleware);

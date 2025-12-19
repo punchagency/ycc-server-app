@@ -21,6 +21,7 @@ const PORT = process.env.PORT || 4500;
 // Connect to MongoDB and Redis
 connectDB();
 RedisConnect();
+app.use('/webhook', webhookRoutes);
 
 // Setup global error handlers
 // setupGlobalErrorHandlers();

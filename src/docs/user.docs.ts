@@ -45,6 +45,13 @@
  *           type: string
  *         required: false
  *         description: Search term to filter by firstName, lastName, or email (case-insensitive)
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, approved, rejected]
+ *         required: false
+ *         description: Filter by business approval status. If not provided, returns users regardless of status.
  *     responses:
  *       200:
  *         description: Business users fetched successfully

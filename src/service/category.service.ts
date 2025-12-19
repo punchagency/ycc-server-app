@@ -1,4 +1,6 @@
 import CategoryModel, { ICategory } from '../models/category.model';
+import ProductModel from '../models/product.model';
+import ServiceModel from '../models/service.model';
 import { fileUploadService } from '../integration/fileUpload';
 import catchError from '../utils/catchError';
 import { logError, logInfo } from '../utils/SystemLogs';
@@ -114,6 +116,40 @@ export class CategoryService {
         }
 
         return category;
+    }
+
+    static async isCategoryInUse(id: string): Promise<boolean> {
+        const [productError, productCount] = await catchError(
+            ProductModel.countDocuments({ category: id })
+        );
+        
+        if (productError) {
+            await logError({
+                message: 'Failed to check product usage for category',
+                source: 'CategoryService.isCategoryInUse',
+                additionalData: { categoryId: id, error: productError.message }
+            });
+            return true;
+        }
+
+        if (productCount && productCount > 0) {
+            return true;
+        }
+
+        const [serviceError, serviceCount] = await catchError(
+            ServiceModel.countDocuments({ categoryId: id })
+        );
+        
+        if (serviceError) {
+            await logError({
+                message: 'Failed to check service usage for category',
+                source: 'CategoryService.isCategoryInUse',
+                additionalData: { categoryId: id, error: serviceError.message }
+            });
+            return true;
+        }
+
+        return serviceCount ? serviceCount > 0 : false;
     }
 
     static async deleteCategory(id: string): Promise<boolean> {

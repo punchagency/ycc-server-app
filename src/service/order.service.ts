@@ -94,7 +94,8 @@ export class OrderService {
                         await stripeService.createTransfer({
                             amount: supplierAmount,
                             destination: business.stripeAccountId,
-                            sourceTransaction: chargeId as string
+                            source_transaction: chargeId as string,
+                            description: `Refund for order ${order._id} - 25% to supplier`
                         });
                     }
                 }
@@ -109,7 +110,8 @@ export class OrderService {
                         await stripeService.createTransfer({
                             amount: item.totalPriceOfItems,
                             destination: business.stripeAccountId,
-                            sourceTransaction: chargeId as string
+                            source_transaction: chargeId as string,
+                            description: `Refund for order ${order._id} - full amount to supplier`
                         });
                     }
                 }

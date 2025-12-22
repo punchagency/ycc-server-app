@@ -5,6 +5,7 @@ import Order from '../models/order.model';
 import Booking from '../models/booking.model';
 import Quote from '../models/quote.model';
 import User from '../models/user.model';
+import Business from '../models/business.model';
 import SendMail from '../utils/SendMail';
 import { logInfo, logError } from '../utils/SystemLogs';
 import { saveAuditLog } from '../utils/SaveAuditlogs';
@@ -104,9 +105,149 @@ const handlePaymentSuccess = async (
     });
 };
 
-const handleOrderPaymentSuccess = async (orderId: string, stripeInvoice: Stripe.Invoice, userId: string) => {
+const processBusinessPayouts = async (orderId: string, stripeInvoice: Stripe.Invoice) => {
+    logInfo({ message: `Starting business payouts for order: ${orderId}`, source: 'processBusinessPayouts', additionalData: { invoiceId: stripeInvoice.id } });
+
+    // if (!stripeInvoice.charge) {
+    //     logError({ message: `No charge found for invoice: ${stripeInvoice.id}`, source: 'processBusinessPayouts' });
+    //     return;
+    // }
+
     const order = await Order.findById(orderId);
-    if (!order) return;
+    if (!order) {
+        logError({ message: `Order not found: ${orderId}`, source: 'processBusinessPayouts' });
+        return;
+    }
+
+    const invoiceItems = await stripe.invoiceItems.list({ invoice: stripeInvoice.id, limit: 100 });
+    const supplierItems = invoiceItems.data.filter(item =>
+        item.metadata?.type === 'supplier_product' || item.metadata?.type === 'manufacturer_shipping'
+    );
+
+    logInfo({ message: `Found ${supplierItems.length} supplier items to process`, source: 'processBusinessPayouts', additionalData: { orderId } });
+
+    let paidCount = 0;
+    let failedCount = 0;
+
+    for (const item of supplierItems) {
+        const { supplierUserId, orderItemIndex, type } = item.metadata || {};
+
+        if (!supplierUserId) {
+            logError({ message: `Missing supplierUserId in invoice item: ${item.id}`, source: 'processBusinessPayouts' });
+            continue;
+        }
+
+        const business = await Business.findOne({ userId: supplierUserId });
+        if (!business) {
+            logError({ message: `Business not found for user: ${supplierUserId}`, source: 'processBusinessPayouts' });
+            if (type === 'supplier_product' && orderItemIndex !== undefined) {
+                order.items[parseInt(orderItemIndex)].paymentStatus = 'failed';
+            }
+            failedCount++;
+            continue;
+        }
+
+        // Check if item already paid
+        if (type === 'supplier_product' && orderItemIndex !== undefined) {
+            const orderItem = order.items[parseInt(orderItemIndex)];
+            if (orderItem?.paymentStatus === 'paid') {
+                logInfo({ message: `Order item ${orderItemIndex} already paid, skipping`, source: 'processBusinessPayouts' });
+                paidCount++;
+                continue;
+            }
+        }
+
+        // Validate Stripe account
+        if (!business.stripeAccountId || !business.stripeTransfersEnabled) {
+            logError({
+                message: `Business ${business._id} missing Stripe setup`,
+                source: 'processBusinessPayouts',
+                additionalData: { hasAccountId: !!business.stripeAccountId, transfersEnabled: business.stripeTransfersEnabled }
+            });
+
+            const businessOwner = await User.findById(business.userId);
+            if (businessOwner?.email) {
+                await SendMail({
+                    email: businessOwner.email,
+                    subject: 'Complete Stripe Onboarding to Receive Payouts',
+                    html: `
+                        <h2>Action Required: Complete Stripe Onboarding</h2>
+                        <p>Dear ${businessOwner.firstName},</p>
+                        <p>You have received a payment for order #${orderId}, but we cannot transfer funds to your account because your Stripe onboarding is incomplete.</p>
+                        <p>Please complete your Stripe onboarding to receive payouts.</p>
+                        <p><strong>Amount Pending: $${(item.amount / 100).toFixed(2)}</strong></p>
+                        <p>Log in to your account to complete the setup.</p>
+                    `
+                });
+            }
+
+            if (type === 'supplier_product' && orderItemIndex !== undefined) {
+                order.items[parseInt(orderItemIndex)].paymentStatus = 'failed';
+            }
+            failedCount++;
+            continue;
+        }
+
+        // Create transfer
+        try {
+            const transfer = await stripe.transfers.create({
+                amount: item.amount,
+                currency: item.currency || 'usd',
+                destination: business.stripeAccountId,
+                // source_transaction: stripeInvoice.charge as string,
+                description: `Payout for ${type === 'manufacturer_shipping' ? 'shipping' : 'products'} (Order ${orderId})`,
+                metadata: {
+                    orderId,
+                    invoiceId: stripeInvoice.id,
+                    supplierUserId,
+                    businessId: business._id.toString(),
+                    invoiceItemId: item.id,
+                    type
+                }
+            });
+
+            if (type === 'supplier_product' && orderItemIndex !== undefined) {
+                order.items[parseInt(orderItemIndex)].paymentStatus = 'paid';
+            }
+            paidCount++;
+
+            logInfo({
+                message: `Transfer created: ${transfer.id}`,
+                source: 'processBusinessPayouts',
+                additionalData: { businessId: business._id, amount: item.amount, orderId }
+            });
+        } catch (error: any) {
+            logError({
+                message: `Transfer failed for business ${business._id}: ${error.message}`,
+                error,
+                source: 'processBusinessPayouts',
+                additionalData: { businessId: business._id, orderId, errorCode: error.code }
+            });
+
+            if (type === 'supplier_product' && orderItemIndex !== undefined) {
+                order.items[parseInt(orderItemIndex)].paymentStatus = 'failed';
+            }
+            failedCount++;
+        }
+    }
+
+    await order.save();
+
+    logInfo({
+        message: `Business payouts completed`,
+        source: 'processBusinessPayouts',
+        additionalData: { orderId, paidCount, failedCount, totalItems: supplierItems.length }
+    });
+};
+
+const handleOrderPaymentSuccess = async (orderId: string, stripeInvoice: Stripe.Invoice, userId: string) => {
+    logInfo({ message: `Processing order payment success: ${orderId}`, source: 'handleOrderPaymentSuccess', additionalData: { invoiceId: stripeInvoice.id } });
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+        logError({ message: `Order not found: ${orderId}`, source: 'handleOrderPaymentSuccess' });
+        return;
+    }
 
     order.paymentStatus = 'paid';
     order.orderHistory.push({
@@ -118,6 +259,9 @@ const handleOrderPaymentSuccess = async (orderId: string, stripeInvoice: Stripe.
         changedAt: new Date()
     });
     await order.save();
+
+    // Process business payouts
+    await processBusinessPayouts(orderId, stripeInvoice);
 
     const user = await User.findById(userId);
     if (user?.email) {
@@ -138,7 +282,7 @@ const handleOrderPaymentSuccess = async (orderId: string, stripeInvoice: Stripe.
         });
     }
 
-    logInfo({ message: `Order payment success: ${orderId}`, source: 'handleOrderPaymentSuccess' });
+    logInfo({ message: `Order payment success completed: ${orderId}`, source: 'handleOrderPaymentSuccess' });
 };
 
 const handleBookingPaymentSuccess = async (bookingId: string, stripeInvoice: Stripe.Invoice, userId: string) => {

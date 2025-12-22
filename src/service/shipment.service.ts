@@ -503,16 +503,23 @@ export class ShipmentService {
             }
 
             const businessItems = order.items.filter(item => item.businessId.toString() === businessId);
-            const subTotal = businessItems.reduce((sum, item) => sum + item.totalPriceOfItems, 0);
-
-            await stripe.createInvoiceItems({
-                customer: stripeCustomerId,
-                invoice: invoice.id,
-                amount: Math.round(subTotal * 100),
-                currency: 'usd',
-                description: `Products from ${business.businessName}`,
-                metadata: { supplierId: businessId, supplierUserId: business.userId.toString(), type: 'supplier_product' }
-            });
+            
+            for (const item of businessItems) {
+                const itemIndex = order.items.findIndex(i => i._id?.toString() === item._id?.toString());
+                await stripe.createInvoiceItems({
+                    customer: stripeCustomerId,
+                    invoice: invoice.id,
+                    amount: Math.round(item.totalPriceOfItems * 100),
+                    currency: 'usd',
+                    description: `Product from ${business.businessName}`,
+                    metadata: { 
+                        supplierId: businessId, 
+                        supplierUserId: business.userId.toString(), 
+                        type: 'supplier_product',
+                        orderItemIndex: itemIndex.toString()
+                    }
+                });
+            }
         }
 
         if (missingStripeAccounts.length > 0) {
@@ -523,6 +530,22 @@ export class ShipmentService {
         let shippingTotal = 0;
         for (const shipment of shipments) {
             if (shipment.isManufacturerHandled && shipment.shipmentCost) {
+                const manufacturerBusinessId = shipment.items[0]?.businessId;
+                if (manufacturerBusinessId) {
+                    const business = await BusinessModel.findById(manufacturerBusinessId);
+                    await stripe.createInvoiceItems({
+                        customer: stripeCustomerId,
+                        invoice: invoice.id,
+                        amount: Math.round(shipment.shipmentCost * 100),
+                        currency: 'usd',
+                        description: `Manufacturer Shipping - ${business?.businessName || 'Manufacturer'}`,
+                        metadata: { 
+                            type: 'manufacturer_shipping',
+                            supplierId: manufacturerBusinessId.toString(),
+                            supplierUserId: business?.userId.toString() || ''
+                        }
+                    });
+                }
                 shippingTotal += shipment.shipmentCost;
             } else {
                 const selectedRate = shipment.rates.find(r => r.isSelected);
@@ -531,14 +554,24 @@ export class ShipmentService {
         }
 
         if (shippingTotal > 0) {
-            await stripe.createInvoiceItems({
-                customer: stripeCustomerId,
-                invoice: invoice.id,
-                amount: Math.round(shippingTotal * 100),
-                currency: 'usd',
-                description: 'Shipping (platform)',
-                metadata: { type: 'shipping' }
-            });
+            const platformShipping = shipments.filter(s => !s.isManufacturerHandled && s.rates.some(r => r.isSelected));
+            if (platformShipping.length > 0) {
+                const platformShippingCost = platformShipping.reduce((sum, s) => {
+                    const rate = s.rates.find(r => r.isSelected);
+                    return sum + (rate?.rate || 0);
+                }, 0);
+                
+                if (platformShippingCost > 0) {
+                    await stripe.createInvoiceItems({
+                        customer: stripeCustomerId,
+                        invoice: invoice.id,
+                        amount: Math.round(platformShippingCost * 100),
+                        currency: 'usd',
+                        description: 'Shipping (platform)',
+                        metadata: { type: 'shipping' }
+                    });
+                }
+            }
         }
 
         const platformFee = order.totalAmount * 0.1;

@@ -42,17 +42,21 @@ export class CartController {
                 return;
             }
 
-            const cart = await CartService.addToCart(req.user._id, productId, quantity);
+            const result = await CartService.addToCart(req.user._id, productId, quantity, req.user.role);
 
-            if (!cart) {
+            if (!result.cart) {
                 res.status(400).json({ success: false, message: 'Failed to add item to cart. Product may not exist or insufficient stock.' });
                 return;
             }
 
+            const message = result.wasCleared
+                ? `Your previous cart items from ${result.previousBusinessName} have been cleared. New cart started with products from ${result.newBusinessName}`
+                : 'Item added to cart successfully';
+
             res.status(200).json({
                 success: true,
-                message: 'Item added to cart successfully',
-                data: { cart }
+                message,
+                data: { cart: result.cart }
             });
         } catch (error) {
             res.status(500).json({ success: false, message: 'Failed to add item to cart' });
@@ -78,17 +82,21 @@ export class CartController {
                 return;
             }
 
-            const cart = await CartService.updateCartItem(req.user._id, productId, quantity);
+            const result = await CartService.updateCartItem(req.user._id, productId, quantity, req.user.role);
 
-            if (!cart) {
+            if (!result.cart) {
                 res.status(400).json({ success: false, message: 'Failed to update cart item. Item may not exist or insufficient stock.' });
                 return;
             }
 
+            const message = result.wasCleared
+                ? `Your previous cart items from ${result.previousBusinessName} have been cleared. New cart started with products from ${result.newBusinessName}`
+                : 'Cart item updated successfully';
+
             res.status(200).json({
                 success: true,
-                message: 'Cart item updated successfully',
-                data: { cart }
+                message,
+                data: { cart: result.cart }
             });
         } catch (error) {
             res.status(500).json({ success: false, message: 'Failed to update cart item' });

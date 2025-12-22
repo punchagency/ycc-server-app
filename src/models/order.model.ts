@@ -6,6 +6,7 @@ export interface IOrder extends Document {
     _id: Schema.Types.ObjectId;
     userId: Schema.Types.ObjectId;
     items: {
+        _id: Schema.Types.ObjectId;
         productId: Schema.Types.ObjectId;
         quantity: number;
         businessId: Schema.Types.ObjectId;
@@ -20,6 +21,7 @@ export interface IOrder extends Document {
             country: string;
         };
         status: 'pending' | 'declined' | 'confirmed' | 'processing' | 'out_for_delivery' | 'shipped' | 'delivered' | 'cancelled';
+        paymentStatus?: 'pending' | 'paid' | 'failed';
         confirmationToken: string;
         confirmationExpires: Date;
     }[];
@@ -78,6 +80,11 @@ const OrderSchema = new Schema({
             type: String,
             enum: ['pending', 'declined', 'confirmed', 'processing', 'out_for_delivery', 'shipped', 'delivered', 'cancelled'],
             required: true
+        },
+        paymentStatus: {
+            type: String,
+            enum: ['pending', 'paid', 'failed'],
+            default: 'pending'
         },
         confirmationToken: { type: String, required: true },
         confirmationExpires: { type: Date, required: true }

@@ -1,9 +1,17 @@
 import CartModel, { ICart } from '../models/cart.model';
 import ProductModel from '../models/product.model';
+import BusinessModel from '../models/business.model';
 import { RedisUtils } from '../utils/RedisUtils';
 import catchError from '../utils/catchError';
 import { logError, logInfo } from '../utils/SystemLogs';
 import { Types } from 'mongoose';
+
+interface CartOperationResult {
+    cart: ICart | null;
+    wasCleared?: boolean;
+    previousBusinessName?: string;
+    newBusinessName?: string;
+}
 
 export class CartService {
     private static CART_CACHE_TTL = 1800;
@@ -50,17 +58,17 @@ export class CartService {
         return cart;
     }
 
-    static async addToCart(userId: string, productId: string, quantity: number): Promise<ICart | null> {
-        if (!Types.ObjectId.isValid(productId)) return null;
+    static async addToCart(userId: string, productId: string, quantity: number, userRole?: string): Promise<CartOperationResult> {
+        if (!Types.ObjectId.isValid(productId)) return { cart: null };
 
-        const [productError, product] = await catchError(ProductModel.findById(productId));
+        const [productError, product] = await catchError(ProductModel.findById(productId).populate('businessId'));
         if (productError || !product) {
             await logError({
                 message: 'Product not found',
                 source: 'CartService.addToCart',
                 additionalData: { userId, productId }
             });
-            return null;
+            return { cart: null };
         }
 
         if (product.quantity < quantity) {
@@ -69,10 +77,28 @@ export class CartService {
                 source: 'CartService.addToCart',
                 additionalData: { userId, productId, requested: quantity, available: product.quantity }
             });
-            return null;
+            return { cart: null };
         }
 
         let cart = await CartModel.findOne({ userId });
+        let wasCleared = false;
+        let previousBusinessName: string | undefined;
+        let newBusinessName: string | undefined;
+
+        if (userRole === 'distributor' && cart && cart.items.length > 0) {
+            const existingBusinessId = cart.items[0].businessId.toString();
+            const newBusinessId = (product.businessId as any)._id.toString()
+
+            if (existingBusinessId !== newBusinessId) {
+                const [, previousBusiness] = await catchError(BusinessModel.findById(existingBusinessId));
+                previousBusinessName = previousBusiness?.businessName || 'previous manufacturer';
+                newBusinessName = (product.businessId as any).businessName || 'new manufacturer';
+
+                await this.clearCart(userId);
+                cart = null;
+                wasCleared = true;
+            }
+        }
 
         if (!cart) {
             cart = new CartModel({
@@ -96,16 +122,17 @@ export class CartService {
                     source: 'CartService.addToCart',
                     additionalData: { userId, productId, requested: newQuantity, available: product.quantity }
                 });
-                return null;
+                return { cart: null };
             }
             cart.items[existingItemIndex].quantity = newQuantity;
             cart.items[existingItemIndex].totalPriceOfItems = newQuantity * product.price;
         } else {
+            const businessIdValue = typeof product.businessId === 'object' ? (product.businessId as any)._id : product.businessId;
             cart.items.push({
                 productId: new Types.ObjectId(productId) as any,
                 quantity,
                 pricePerItem: product.price,
-                businessId: product.businessId,
+                businessId: businessIdValue,
                 totalPriceOfItems: quantity * product.price
             });
         }
@@ -121,7 +148,7 @@ export class CartService {
                 source: 'CartService.addToCart',
                 additionalData: { userId, productId, error: saveError.message }
             });
-            return null;
+            return { cart: null };
         }
 
         await this.invalidateCache(userId);
@@ -129,17 +156,18 @@ export class CartService {
         await logInfo({
             message: 'Item added to cart',
             source: 'CartService.addToCart',
-            additionalData: { userId, productId, quantity }
+            additionalData: { userId, productId, quantity, wasCleared }
         });
 
-        return this.getCart(userId);
+        const updatedCart = await this.getCart(userId);
+        return { cart: updatedCart, wasCleared, previousBusinessName, newBusinessName };
     }
 
-    static async updateCartItem(userId: string, productId: string, quantity: number): Promise<ICart | null> {
-        if (!Types.ObjectId.isValid(productId)) return null;
+    static async updateCartItem(userId: string, productId: string, quantity: number, userRole?: string): Promise<CartOperationResult> {
+        if (!Types.ObjectId.isValid(productId)) return { cart: null };
 
-        const [productError, product] = await catchError(ProductModel.findById(productId));
-        if (productError || !product) return null;
+        const [productError, product] = await catchError(ProductModel.findById(productId).populate('businessId'));
+        if (productError || !product) return { cart: null };
 
         if (product.quantity < quantity) {
             await logError({
@@ -147,17 +175,56 @@ export class CartService {
                 source: 'CartService.updateCartItem',
                 additionalData: { userId, productId, requested: quantity, available: product.quantity }
             });
-            return null;
+            return { cart: null };
         }
 
-        const cart = await CartModel.findOne({ userId });
-        if (!cart) return null;
+        let cart = await CartModel.findOne({ userId });
+        if (!cart) return { cart: null };
+
+        let wasCleared = false;
+        let previousBusinessName: string | undefined;
+        let newBusinessName: string | undefined;
+
+        if (userRole === 'distributor' && cart.items.length > 0) {
+            const existingBusinessId = cart.items[0].businessId.toString();
+            const newBusinessId = (product.businessId as any)._id.toString()
+
+            if (existingBusinessId !== newBusinessId) {
+                const [, previousBusiness] = await catchError(BusinessModel.findById(existingBusinessId));
+                previousBusinessName = previousBusiness?.businessName || 'previous manufacturer';
+                newBusinessName = (product.businessId as any).businessName || 'new manufacturer';
+
+                await this.clearCart(userId);
+                cart = new CartModel({
+                    userId: new Types.ObjectId(userId),
+                    totalItems: 0,
+                    totalPrice: 0,
+                    lastUpdated: new Date(),
+                    items: []
+                });
+                wasCleared = true;
+            }
+        }
 
         const itemIndex = cart.items.findIndex(item => item.productId.toString() === productId);
-        if (itemIndex === -1) return null;
+        if (itemIndex === -1) {
+            if (wasCleared) {
+                const businessIdValue = typeof product.businessId === 'object' ? (product.businessId as any)._id : product.businessId;
+                cart.items.push({
+                    productId: new Types.ObjectId(productId) as any,
+                    quantity,
+                    pricePerItem: product.price,
+                    businessId: businessIdValue,
+                    totalPriceOfItems: quantity * product.price
+                });
+            } else {
+                return { cart: null };
+            }
+        } else {
+            cart.items[itemIndex].quantity = quantity;
+            cart.items[itemIndex].totalPriceOfItems = quantity * product.price;
+        }
 
-        cart.items[itemIndex].quantity = quantity;
-        cart.items[itemIndex].totalPriceOfItems = quantity * product.price;
         cart.totalItems = cart.items.reduce((sum, item) => sum + item.quantity, 0);
         cart.totalPrice = cart.items.reduce((sum, item) => sum + item.totalPriceOfItems, 0);
         cart.lastUpdated = new Date();
@@ -169,7 +236,7 @@ export class CartService {
                 source: 'CartService.updateCartItem',
                 additionalData: { userId, productId, error: saveError.message }
             });
-            return null;
+            return { cart: null };
         }
 
         await this.invalidateCache(userId);
@@ -177,10 +244,11 @@ export class CartService {
         await logInfo({
             message: 'Cart item updated',
             source: 'CartService.updateCartItem',
-            additionalData: { userId, productId, quantity }
+            additionalData: { userId, productId, quantity, wasCleared }
         });
 
-        return this.getCart(userId);
+        const updatedCart = await this.getCart(userId);
+        return { cart: updatedCart, wasCleared, previousBusinessName, newBusinessName };
     }
 
     static async removeFromCart(userId: string, productId: string): Promise<ICart | null> {

@@ -54,6 +54,8 @@ export interface IShipment extends Document {
     batchId: string;
     lastWebhookData: Schema.Types.Mixed;
     status: typeof SHIPMENT_STATUSES[number];
+    shipmentCost?: number;
+    isManufacturerHandled: boolean;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -103,7 +105,9 @@ const ShipmentSchema = new Schema({
         type: String, 
         enum: SHIPMENT_STATUSES, 
         default: 'created' 
-    }
+    },
+    shipmentCost: { type: Number },
+    isManufacturerHandled: { type: Boolean, default: false }
 }, {
     timestamps: true
 });

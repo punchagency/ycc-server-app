@@ -666,7 +666,7 @@ export class OrderService {
 
         return { success: true, order };
     }
-    static async updateDistributorOrderStatus({userId, orderId, status, userRole, notes, reason, enableShipping, trackingNumber }: { userId: string, orderId: string, status: 'confirmed' | 'processing' | 'shipped' | 'out_for_delivery' | 'cancelled', reason?: string, notes?: string, userRole: typeof ROLES[number], enableShipping?: boolean, trackingNumber?: string}){
+    static async updateDistributorOrderStatus({userId, orderId, status, userRole, notes, reason, enableShipping, trackingNumber, shipmentCost }: { userId: string, orderId: string, status: 'confirmed' | 'processing' | 'shipped' | 'out_for_delivery' | 'cancelled', reason?: string, notes?: string, userRole: typeof ROLES[number], enableShipping?: boolean, trackingNumber?: string, shipmentCost?: number}){
         const order = await OrderModel.findById(orderId);
         if (!order) throw new Error('Order not found');
 
@@ -772,6 +772,22 @@ export class OrderService {
                 if (shipmentError) {
                     logCritical({message: `Shipment creation failed: ${shipmentError.message}`, error: shipmentError, source: "OrderService.updateDistributorOrderStatus"});
                     throw new Error('Shipment creation failed');
+                }
+            } else if (status === 'confirmed' && enableShipping === false && shipmentCost) {
+                const [shipmentError] = await catchError(
+                    ShipmentService.createManufacturerHandledShipment(order._id.toString(), business._id.toString(), shipmentCost)
+                );
+                if (shipmentError) {
+                    logCritical({message: `Manufacturer shipment creation failed: ${shipmentError.message}`, error: shipmentError, source: "OrderService.updateDistributorOrderStatus"});
+                    throw new Error('Manufacturer shipment creation failed');
+                }
+
+                const [invoiceError] = await catchError(
+                    ShipmentService.createAndFinalizeManufacturerInvoice(order._id.toString())
+                );
+                if (invoiceError) {
+                    logCritical({message: `Invoice creation failed: ${invoiceError.message}`, error: invoiceError, source: "OrderService.updateDistributorOrderStatus"});
+                    throw new Error('Invoice creation failed');
                 }
             }
 

@@ -4,6 +4,7 @@ import StripeService from "../integration/stripe";
 import { logInfo } from "../utils/SystemLogs";
 import { saveAuditLog } from "../utils/SaveAuditlogs";
 import 'dotenv/config';
+import { AddressFormatter } from "../utils/StateFormatter";
 
 export class StripeAccountService {
 
@@ -30,7 +31,7 @@ export class StripeAccountService {
         const stripeAccount = await stripeService.createConnectAccount({
             email: business.email,
             businessType: 'individual',
-            country: business.address?.country || 'US'
+            country: business.address.country ? AddressFormatter.formatCountryCode(business.address.country) : 'US'
         });
 
         const return_url = `${process.env.FRONTEND_URL}/distributor/onboarding/${userId}`;

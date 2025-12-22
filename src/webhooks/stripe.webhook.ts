@@ -89,9 +89,9 @@ const handlePaymentSuccess = async (
     await invoice.save();
 
     if (transactionType === 'order' && orderId) {
-        await handleOrderPaymentSuccess(orderId, stripeInvoice, invoice.userId.toString());
+        await handleOrderPaymentSuccess(orderId, stripeInvoice, invoice.userId.toString(), invoice._id.toString());
     } else if (transactionType === 'booking' && bookingId) {
-        await handleBookingPaymentSuccess(bookingId, stripeInvoice, invoice.userId.toString());
+        await handleBookingPaymentSuccess(bookingId, stripeInvoice, invoice.userId.toString(), invoice._id.toString());
     }
 
     await saveAuditLog({
@@ -104,11 +104,14 @@ const handlePaymentSuccess = async (
     });
 };
 
-const handleOrderPaymentSuccess = async (orderId: string, stripeInvoice: Stripe.Invoice, userId: string) => {
+const handleOrderPaymentSuccess = async (orderId: string, stripeInvoice: Stripe.Invoice, userId: string, invoiceId?: string) => {
     const order = await Order.findById(orderId);
     if (!order) return;
 
     order.paymentStatus = 'paid';
+    if (invoiceId) {
+        order.invoiceId = invoiceId as any;
+    }
     order.orderHistory.push({
         fromStatus: order.status,
         toStatus: order.status,
@@ -141,13 +144,16 @@ const handleOrderPaymentSuccess = async (orderId: string, stripeInvoice: Stripe.
     logInfo({ message: `Order payment success: ${orderId}`, source: 'handleOrderPaymentSuccess' });
 };
 
-const handleBookingPaymentSuccess = async (bookingId: string, stripeInvoice: Stripe.Invoice, userId: string) => {
+const handleBookingPaymentSuccess = async (bookingId: string, stripeInvoice: Stripe.Invoice, userId: string, invoiceId?: string) => {
     const booking = await Booking.findById(bookingId)
         .populate('serviceId')
         .populate('businessId');
     if (!booking) return;
 
     booking.paymentStatus = 'paid';
+    if (invoiceId) {
+        booking.invoiceId = invoiceId as any;
+    }
     booking.paidAt = new Date(stripeInvoice.status_transitions.paid_at! * 1000); // Set payment timestamp
     booking.statusHistory?.push({
         fromStatus: booking.status,

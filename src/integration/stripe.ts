@@ -405,6 +405,30 @@ class StripeService {
             throw error;
         }
     }
+
+    public async getLatestChargeId(stripeInvoiceId: string): Promise<string> {
+        try {
+            const invoice = await StripeService.stripe.invoices.retrieve(stripeInvoiceId);
+            if (!(invoice as any).charge) {
+                // If the invoice object doesn't have the charge ID directly, look through payments
+                const payments = await StripeService.stripe.invoicePayments.list({ invoice: stripeInvoiceId });
+                const paidPayment = payments.data.find(p => p.status === 'paid');
+                if (!paidPayment || !paidPayment.payment.payment_intent) {
+                    throw new Error('No paid transaction found for this invoice');
+                }
+                
+                const pi = await StripeService.stripe.paymentIntents.retrieve(paidPayment.payment.payment_intent as string);
+                if (!pi.latest_charge) {
+                    throw new Error('No charge ID found on payment intent');
+                }
+                return pi.latest_charge as string;
+            }
+            return (invoice as any).charge as string;
+        } catch (error) {
+            logError({ message: 'Failed to retrieve charge ID', error, source: 'StripeService.getLatestChargeId' });
+            throw error;
+        }
+    }
 }
 
 export default StripeService;

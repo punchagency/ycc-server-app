@@ -159,6 +159,92 @@ export class ShipmentService {
 
         return shipments.length === 1 ? shipments[0] : shipments;
     }
+    static async createManufacturerHandledShipment(orderId: string, businessId: string, shipmentCost: number) {
+        const order = await OrderModel.findById(orderId);
+        if (!order) throw new Error('Order not found');
+
+        const confirmedItems = order.items.filter(
+            item => item.businessId.toString() === businessId && item.status === 'confirmed'
+        );
+        if (confirmedItems.length === 0) throw new Error('No confirmed items found');
+
+        const existingShipment = await ShipmentModel.findOne({
+            orderId: order._id,
+            'items.businessId': businessId
+        });
+        if (existingShipment) return existingShipment;
+
+        const shipment = await ShipmentModel.create({
+            orderId: order._id,
+            userId: order.userId,
+            fromAddress: confirmedItems[0].fromAddress,
+            toAddress: order.deliveryAddress,
+            items: confirmedItems.map(item => ({
+                productId: item.productId,
+                quantity: item.quantity,
+                businessId: item.businessId,
+                discount: item.discount,
+                pricePerItem: item.pricePerItem,
+                totalPriceOfItems: item.totalPriceOfItems
+            })),
+            rates: [],
+            shipmentCost,
+            isManufacturerHandled: true,
+            status: 'created'
+        });
+
+        await addNotificationJob({
+            recipientId: order.userId,
+            type: 'order',
+            priority: 'high',
+            title: 'Order Confirmed - Manufacturer Handling Shipment',
+            message: `Your order has been confirmed. The manufacturer will handle shipment directly. Shipment cost: $${shipmentCost.toFixed(2)}`,
+            data: { orderId: order._id, shipmentId: shipment._id, shipmentCost }
+        });
+
+        return shipment;
+    }
+    static async createAndFinalizeManufacturerInvoice(orderId: string) {
+        try {
+            const { invoice, order } = await this.createDraftInvoice(orderId);
+            
+            const stripe = StripeService.getInstance();
+            
+            const finalizedInvoice = await stripe.finalizeInvoice(invoice.id);
+    
+            order.stripeInvoiceUrl = finalizedInvoice.hosted_invoice_url;
+            order.stripeInvoiceId = invoice.id;
+            await order.save();
+    
+            await stripe.sendInvoice(invoice.id);
+    
+            const businessIds = [...new Set(order.items.map(item => item.businessId))];
+            
+            await InvoiceModel.create({
+                stripeInvoiceId: invoice.id,
+                userId: order.userId,
+                orderId: orderId,
+                businessIds,
+                amount: finalizedInvoice.amount_due / 100,
+                platformFee: order.platformFee,
+                currency: 'usd',
+                status: 'pending',
+                invoiceDate: new Date(),
+                dueDate: finalizedInvoice.due_date ? new Date(finalizedInvoice.due_date * 1000) : new Date(),
+                stripeInvoiceUrl: finalizedInvoice.hosted_invoice_url
+            });
+            
+            return finalizedInvoice.hosted_invoice_url;
+        } catch (error: any) {
+            logError({ 
+                message: `Failed to create and finalize manufacturer invoice: ${error.message}`, 
+                error, 
+                additionalData: { orderId, errorStack: error.stack, errorCode: error.code, errorType: error.type },
+                source: 'ShipmentService.createAndFinalizeManufacturerInvoice' 
+            });
+            throw error;
+        }
+    }
     static async getShipmentsByOrder(orderId: string, userId: string) {
         const order = await OrderModel.findById(orderId);
         if (!order) throw new Error('Order not found');
@@ -398,7 +484,12 @@ export class ShipmentService {
             customer: stripeCustomerId,
             collection_method: 'send_invoice',
             days_until_due: 7,
-            metadata: { orderId: orderId, userId: user._id.toString(), customerEmail: user.email }
+            metadata: { 
+                orderId: orderId,
+                userId: user._id.toString(),
+                customerEmail: user.email,
+                transactionType: "order"
+            }
         });
 
         const businessIds = [...new Set(order.items.map(item => item.businessId.toString()))];
@@ -431,8 +522,12 @@ export class ShipmentService {
         const shipments = await ShipmentModel.find({ orderId });
         let shippingTotal = 0;
         for (const shipment of shipments) {
-            const selectedRate = shipment.rates.find(r => r.isSelected);
-            if (selectedRate) shippingTotal += selectedRate.rate;
+            if (shipment.isManufacturerHandled && shipment.shipmentCost) {
+                shippingTotal += shipment.shipmentCost;
+            } else {
+                const selectedRate = shipment.rates.find(r => r.isSelected);
+                if (selectedRate) shippingTotal += selectedRate.rate;
+            }
         }
 
         if (shippingTotal > 0) {

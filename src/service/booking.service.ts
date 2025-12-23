@@ -1500,7 +1500,7 @@ export class BookingService {
             const transfer = await stripe.createTransfer({
                 amount: amountInCents,
                 destination: business.stripeAccountId,
-                sourceTransaction: chargeId
+                source_transaction: chargeId
             });
 
             booking.distributorPayoutStatus = 'paid';
@@ -1517,4 +1517,4 @@ export class BookingService {
             }
         }
     }
-}
+} 

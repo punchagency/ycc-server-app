@@ -77,7 +77,7 @@ export class ServiceService {
         return service;
     }
 
-    static async uploadMultipleServices(userId: string, services: Array<{ name: string; description?: string; price: number; categoryName: string; isQuotable?: boolean }>) {
+    static async uploadMultipleServices(userId: string, services: Array<{ name: string; description?: string; price?: number; categoryName: string; isQuotable?: boolean }>) {
         const categoryCache = new Map<string, string>();
         const newCategories: string[] = [];
         const createdServices: IService[] = [];

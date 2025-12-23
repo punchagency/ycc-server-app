@@ -15,7 +15,7 @@ const serviceSchema = new Schema<IService>({
     name: { type: String, required: true },
     description: { type: String, required: false },
     imageURLs: [{ type: String, required: false }],
-    price: { type: Number, required: true },
+    price: { type: Number, required: false },
     businessId: { type: Schema.Types.ObjectId, required: true, ref: 'Business' },
     categoryId: { type: Schema.Types.ObjectId, required: true, ref: 'Category' },
     isQuotable: { type: Boolean, required: false, default: false }

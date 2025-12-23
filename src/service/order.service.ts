@@ -291,20 +291,27 @@ export class OrderService {
         if (!order) throw new Error('Order not found');
 
         if (userRole === 'user') {
-            if (order.userId.toString() !== userId || order.userType !== 'user') {
-                throw new Error('Unauthorized to view this order');
+            // if (order.userId.toString() !== userId || order.userType !== 'user') {
+            //     throw new Error('user not authorized to view this order');
+            // }
+            if (order.userId.toString() !== userId) {
+                throw new Error('user not authorized to view this order');
             }
         } else if (userRole === 'distributor') {
             const business = await BusinessModel.findOne({ userId });
             if (!business) throw new Error('Business not found');
 
-            const isOrderPlacer = order.userId.toString() === userId && order.userType === 'distributor';
-            const isSupplier = order.userType === 'user' && order.items.some(item => 
+            // const isOrderPlacer = order.userId.toString() === userId && order.userType === 'distributor';
+            const isOrderPlacer = order.userId.toString() === userId
+            // const isSupplier = order.userType === 'user' && order.items.some(item => 
+            //     item.businessId.toString() === business._id.toString()
+            // );
+            const isSupplier = order.items.some(item => 
                 item.businessId.toString() === business._id.toString()
             );
 
             if (!isOrderPlacer && !isSupplier) {
-                throw new Error('Unauthorized to view this order');
+                throw new Error('distributor not authorized to view this order');
             }
         } else if (userRole === 'manufacturer') {
             const business = await BusinessModel.findOne({ userId });
@@ -315,7 +322,7 @@ export class OrderService {
             );
 
             if (!isSupplier) {
-                throw new Error('Unauthorized to view this order');
+                throw new Error('manufacturer not authorized to view this order');
             }
         }
 

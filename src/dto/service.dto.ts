@@ -1,7 +1,7 @@
 export interface CreateServiceDTO {
     name: string;
     description?: string;
-    price: number;
+    price?: number;
     businessId: string;
     categoryId: string;
     isQuotable?: boolean;
@@ -17,7 +17,7 @@ export interface UpdateServiceDTO {
 export interface BulkServiceInput {
     name: string;
     description?: string;
-    price: number;
+    price?: number;
     categoryName: string;
     isQuotable?: boolean;
 }

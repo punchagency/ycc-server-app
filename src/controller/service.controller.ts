@@ -78,8 +78,8 @@ export class ServiceController {
                 return;
             }
 
-            if (!price || typeof Number(price) !== 'number' || Number(price) < 1) {
-                res.status(400).json({ success: false, message: 'Valid price is required', code: 'VALIDATION_ERROR' });
+            if (!isQuotable && (!price || typeof Number(price) !== 'number' || Number(price) < 1)) {
+                res.status(400).json({ success: false, message: 'Valid price is required for non-quotable services', code: 'VALIDATION_ERROR' });
                 return;
             }
 
@@ -153,8 +153,8 @@ export class ServiceController {
                     res.status(400).json({ success: false, message: 'Each service name must be 2-50 characters', code: 'VALIDATION_ERROR' });
                     return;
                 }
-                if (!service.price || typeof Number(service.price) !== 'number' || Number(service.price) < 1) {
-                    res.status(400).json({ success: false, message: 'Each service must have a valid price', code: 'VALIDATION_ERROR' });
+                if (!service.isQuotable && (!service.price || typeof Number(service.price) !== 'number' || Number(service.price) < 1)) {
+                    res.status(400).json({ success: false, message: 'Each non-quotable service must have a valid price', code: 'VALIDATION_ERROR' });
                     return;
                 }
                 if (!service.categoryName || !Validate.string(service.categoryName)) {
@@ -327,8 +327,16 @@ export class ServiceController {
                 return;
             }
 
+            const finalIsQuotable = isQuotable !== undefined ? isQuotable : existingService.isQuotable;
+            const finalPrice = price !== undefined ? Number(price) : existingService.price;
+
+            if (!finalIsQuotable && (!finalPrice || finalPrice < 1)) {
+                res.status(400).json({ success: false, message: 'Valid price is required for non-quotable services', code: 'VALIDATION_ERROR' });
+                return;
+            }
+
             if (price !== undefined && (typeof Number(price) !== 'number' || Number(price) < 0)) {
-                res.status(400).json({ success: false, message: 'Valid price is required', code: 'VALIDATION_ERROR' });
+                res.status(400).json({ success: false, message: 'Valid price must be 0 or greater', code: 'VALIDATION_ERROR' });
                 return;
             }
 

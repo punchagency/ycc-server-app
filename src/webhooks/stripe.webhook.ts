@@ -66,12 +66,12 @@ export const handleStripeWebhook = async (req: Request, res: Response) => {
     }
 };
 
-const handlePaymentSuccess = async (
+async function handlePaymentSuccess(
     stripeInvoice: Stripe.Invoice,
     orderId?: string,
     bookingId?: string,
     transactionType?: string
-) => {
+) {
     logInfo({ message: `Processing payment success: ${stripeInvoice.id}`, source: 'handlePaymentSuccess' });
 
     const invoice = await Invoice.findOne({ stripeInvoiceId: stripeInvoice.id });
@@ -90,9 +90,9 @@ const handlePaymentSuccess = async (
     await invoice.save();
 
     if (transactionType === 'order' && orderId) {
-        await handleOrderPaymentSuccess(orderId, stripeInvoice, invoice.userId.toString());
+        await handleOrderPaymentSuccess(orderId, stripeInvoice, invoice.userId.toString(), invoice._id.toString());
     } else if (transactionType === 'booking' && bookingId) {
-        await handleBookingPaymentSuccess(bookingId, stripeInvoice, invoice.userId.toString());
+        await handleBookingPaymentSuccess(bookingId, stripeInvoice, invoice.userId.toString(), invoice._id.toString());
     }
 
     await saveAuditLog({
@@ -103,15 +103,10 @@ const handlePaymentSuccess = async (
         entityType: "user",
         newValues: { status: 'paid', paymentDate: invoice.paymentDate }
     });
-};
+}
 
-const processBusinessPayouts = async (orderId: string, stripeInvoice: Stripe.Invoice) => {
+async function processBusinessPayouts(orderId: string, stripeInvoice: Stripe.Invoice) {
     logInfo({ message: `Starting business payouts for order: ${orderId}`, source: 'processBusinessPayouts', additionalData: { invoiceId: stripeInvoice.id } });
-
-    // if (!stripeInvoice.charge) {
-    //     logError({ message: `No charge found for invoice: ${stripeInvoice.id}`, source: 'processBusinessPayouts' });
-    //     return;
-    // }
 
     const order = await Order.findById(orderId);
     if (!order) {
@@ -190,11 +185,14 @@ const processBusinessPayouts = async (orderId: string, stripeInvoice: Stripe.Inv
 
         // Create transfer
         try {
+            // Using the charge from the invoice if available
+            const chargeId = (stripeInvoice as any).charge as string;
+
             const transfer = await stripe.transfers.create({
                 amount: item.amount,
                 currency: item.currency || 'usd',
                 destination: business.stripeAccountId,
-                // source_transaction: stripeInvoice.charge as string,
+                source_transaction: chargeId || undefined,
                 description: `Payout for ${type === 'manufacturer_shipping' ? 'shipping' : 'products'} (Order ${orderId})`,
                 metadata: {
                     orderId,
@@ -238,9 +236,9 @@ const processBusinessPayouts = async (orderId: string, stripeInvoice: Stripe.Inv
         source: 'processBusinessPayouts',
         additionalData: { orderId, paidCount, failedCount, totalItems: supplierItems.length }
     });
-};
+}
 
-const handleOrderPaymentSuccess = async (orderId: string, stripeInvoice: Stripe.Invoice, userId: string) => {
+async function handleOrderPaymentSuccess(orderId: string, stripeInvoice: Stripe.Invoice, userId: string, invoiceId?: string) {
     logInfo({ message: `Processing order payment success: ${orderId}`, source: 'handleOrderPaymentSuccess', additionalData: { invoiceId: stripeInvoice.id } });
 
     const order = await Order.findById(orderId);
@@ -250,6 +248,9 @@ const handleOrderPaymentSuccess = async (orderId: string, stripeInvoice: Stripe.
     }
 
     order.paymentStatus = 'paid';
+    if (invoiceId) {
+        order.invoiceId = invoiceId as any;
+    }
     order.orderHistory.push({
         fromStatus: order.status,
         toStatus: order.status,
@@ -283,15 +284,18 @@ const handleOrderPaymentSuccess = async (orderId: string, stripeInvoice: Stripe.
     }
 
     logInfo({ message: `Order payment success completed: ${orderId}`, source: 'handleOrderPaymentSuccess' });
-};
+}
 
-const handleBookingPaymentSuccess = async (bookingId: string, stripeInvoice: Stripe.Invoice, userId: string) => {
+async function handleBookingPaymentSuccess(bookingId: string, stripeInvoice: Stripe.Invoice, userId: string, invoiceId?: string) {
     const booking = await Booking.findById(bookingId)
         .populate('serviceId')
         .populate('businessId');
     if (!booking) return;
 
     booking.paymentStatus = 'paid';
+    if (invoiceId) {
+        booking.invoiceId = invoiceId as any;
+    }
     booking.paidAt = new Date(stripeInvoice.status_transitions.paid_at! * 1000); // Set payment timestamp
     booking.statusHistory?.push({
         fromStatus: booking.status,
@@ -354,14 +358,14 @@ const handleBookingPaymentSuccess = async (bookingId: string, stripeInvoice: Str
     }
 
     logInfo({ message: `Booking payment success: ${bookingId}`, source: 'handleBookingPaymentSuccess' });
-};
+}
 
-const handlePaymentFailed = async (
+async function handlePaymentFailed(
     stripeInvoice: Stripe.Invoice,
     orderId?: string,
     bookingId?: string,
     transactionType?: string
-) => {
+) {
     logInfo({ message: `Processing payment failure: ${stripeInvoice.id}`, source: 'handlePaymentFailed' });
 
     const invoice = await Invoice.findOne({ stripeInvoiceId: stripeInvoice.id });
@@ -422,9 +426,9 @@ const handlePaymentFailed = async (
         newValues: { status: 'failed' },
         entityType: "user"
     });
-};
+}
 
-const handleInvoiceVoided = async (stripeInvoice: Stripe.Invoice, orderId?: string, bookingId?: string) => {
+async function handleInvoiceVoided(stripeInvoice: Stripe.Invoice, orderId?: string, bookingId?: string) {
     logInfo({ message: `Processing invoice void: ${stripeInvoice.id}`, source: 'handleInvoiceVoided' });
 
     const invoice = await Invoice.findOne({ stripeInvoiceId: stripeInvoice.id });
@@ -448,4 +452,4 @@ const handleInvoiceVoided = async (stripeInvoice: Stripe.Invoice, orderId?: stri
             await booking.save();
         }
     }
-};
+}

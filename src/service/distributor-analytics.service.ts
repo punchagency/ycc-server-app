@@ -191,9 +191,37 @@ export class DistributorAnalyticsService {
         }
 
         const result = await InvoiceModel.aggregate([
-            { $match: matchQuery },
-            { $group: { _id: null, totalRevenue: { $sum: "$amount" } } }
+            { 
+                $match: { 
+                    businessIds: new Types.ObjectId(businessId), 
+                    status: 'paid' 
+                } 
+            },
+            {
+                $project: {
+                    distributorAmount: { $ifNull: ["$distributorAmount", { $subtract: ["$amount", "$platformFee"] }] },
+                    type: {
+                        $cond: [
+                            { $ifNull: ["$orderId", false] }, 
+                            "order", 
+                            { $cond: [{ $ifNull: ["$bookingId", false] }, "booking", "other"] }
+                        ]
+                    }
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalRevenue: { $sum: "$distributorAmount" },
+                    orderRevenue: {
+                        $sum: { $cond: [{ $eq: ["$type", "order"] }, "$distributorAmount", 0] }
+                    },
+                    bookingRevenue: {
+                        $sum: { $cond: [{ $eq: ["$type", "booking"] }, "$distributorAmount", 0] }
+                    }
+                }
+            }
         ]);
-        return result[0]?.totalRevenue || 0;
+        return result[0] || { totalRevenue: 0, orderRevenue: 0, bookingRevenue: 0 };
     }
 }

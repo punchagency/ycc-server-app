@@ -602,6 +602,7 @@ export class ShipmentService {
         await stripe.sendInvoice(invoiceId);
 
         const businessIds = [...new Set(order!.items.map(item => item!.businessId))];
+        const distributorAmount = (finalizedInvoice.amount_due / 100) - order!.platformFee;
         try {
             await InvoiceModel.create({
                 stripeInvoiceId: invoiceId,
@@ -610,6 +611,7 @@ export class ShipmentService {
                 businessIds,
                 amount: finalizedInvoice.amount_due / 100,
                 platformFee: order!.platformFee,
+                distributorAmount,
                 currency: 'usd',
                 status: 'pending',
                 invoiceDate: new Date(),

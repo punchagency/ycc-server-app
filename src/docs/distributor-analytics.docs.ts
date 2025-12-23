@@ -359,7 +359,7 @@
  * /api/v2/distributor-analytics/total-revenue:
  *   get:
  *     tags: [Distributor Analytics]
- *     summary: Get total revenue from paid invoices
+ *     summary: Get total revenue from paid invoices with breakdown
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -394,7 +394,14 @@
  *                 message:
  *                   type: string
  *                 data:
- *                   type: number
+ *                   type: object
+ *                   properties:
+ *                     totalRevenue:
+ *                       type: number
+ *                     orderRevenue:
+ *                       type: number
+ *                     bookingRevenue:
+ *                       type: number
  *       401:
  *         description: Unauthorized
  */

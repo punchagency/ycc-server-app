@@ -104,6 +104,7 @@ export class QuoteService {
         }
 
         const existingInvoice = await InvoiceModel.findOne({ stripeInvoiceId: stripeInvoice!.id });
+        const distributorAmount = quote.amount - quote.platformFee;
         if (existingInvoice) {
             existingInvoice.status = 'pending';
             existingInvoice.stripeInvoiceUrl = stripeInvoice!.hosted_invoice_url || undefined;
@@ -116,6 +117,7 @@ export class QuoteService {
                 businessIds: booking ? [booking.businessId] : [],
                 amount: quote.amount,
                 platformFee: quote.platformFee,
+                distributorAmount,
                 currency: quote.currency,
                 status: 'pending',
                 invoiceDate: new Date(),

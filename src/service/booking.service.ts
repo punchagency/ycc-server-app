@@ -1294,20 +1294,29 @@ export class BookingService {
         await stripe.sendInvoice(invoice.id);
 
         // Create invoice record in database
+        let invoiceRecord;
+        const totalAmount = finalizedInvoice.amount_due / 100;
+        const distributorAmount = totalAmount - platformFee;
+        
         try {
-            await InvoiceModel.create({
+            invoiceRecord = await InvoiceModel.create({
                 stripeInvoiceId: invoice.id,
                 userId: user._id,
                 bookingId: booking._id,
                 businessIds: [business._id],
-                amount: finalizedInvoice.amount_due / 100,
+                amount: totalAmount,
                 platformFee,
+                distributorAmount,
                 currency: 'usd',
                 status: 'pending',
                 invoiceDate: new Date(),
                 dueDate: finalizedInvoice.due_date ? new Date(finalizedInvoice.due_date * 1000) : null,
                 stripeInvoiceUrl: finalizedInvoice.hosted_invoice_url
             });
+
+            // Link invoice record to booking
+            booking.invoiceId = invoiceRecord._id as any;
+            await booking.save();
         } catch (error) {
             logError({ message: 'Invoice record creation failed', error, source: 'BookingService.createBookingPayment' });
         }
@@ -1400,6 +1409,13 @@ export class BookingService {
 
         await booking.save();
 
+        // Trigger payout if fully completed
+        if (completedStatus === 'completed') {
+            this.processDistributorPayout(bookingId).catch(err => {
+                logError({ message: 'Async payout trigger failed', error: err, source: 'BookingService.updateCompletedStatus' });
+            });
+        }
+
         // Send notifications
         if (completedStatus === 'request_completed') {
             // Notify user/crew that service is completed awaiting confirmation
@@ -1435,4 +1451,70 @@ export class BookingService {
 
         return booking;
     }
-}
+
+    private static async processDistributorPayout(bookingId: string) {
+        try {
+            const booking = await BookingModel.findById(bookingId).populate('invoiceId businessId');
+            if (!booking) {
+                console.error(`[Payout Error] Booking ${bookingId} not found`);
+                return;
+            }
+
+            if (booking.distributorPayoutStatus === 'paid') {
+                console.log(`[Payout Skip] Booking ${bookingId} already paid out`);
+                return;
+            }
+
+            const invoice = booking.invoiceId as any;
+            if (!invoice || !invoice.distributorAmount || invoice.distributorAmount <= 0) {
+                console.warn(`[Payout Skip] Booking ${bookingId} has no distributorAmount to pay out`);
+                return;
+            }
+
+            const business = booking.businessId as any;
+            if (!business || !business.stripeAccountId) {
+                console.error(`[Payout Error] Business ${business?._id} for Booking ${bookingId} has no Stripe account linked`);
+                booking.distributorPayoutStatus = 'failed';
+                await booking.save();
+                return;
+            }
+
+            // Get the charge ID from the Stripe invoice to use as source_transaction
+            const stripe = StripeService.getInstance();
+            let chargeId: string;
+            try {
+                chargeId = await stripe.getLatestChargeId(invoice.stripeInvoiceId);
+            } catch (error) {
+                console.error(`[Payout Error] Failed to get charge ID for Booking ${bookingId}:`, error);
+                booking.distributorPayoutStatus = 'failed';
+                await booking.save();
+                return;
+            }
+
+            // Create transfer
+            // Note: amount is in cents for Stripe, distributorAmount is in major currency
+            const amountInCents = Math.round(invoice.distributorAmount * 100);
+            
+            console.log(`[Payout Initiating] Booking ${bookingId}: Transferring $${invoice.distributorAmount} to ${business.stripeAccountId}`);
+            
+            const transfer = await stripe.createTransfer({
+                amount: amountInCents,
+                destination: business.stripeAccountId,
+                source_transaction: chargeId
+            });
+
+            booking.distributorPayoutStatus = 'paid';
+            booking.distributorPayoutId = transfer.id;
+            await booking.save();
+
+            console.log(`[Payout Success] Booking ${bookingId}: Transfer ${transfer.id} completed for $${invoice.distributorAmount}`);
+        } catch (error) {
+            console.error(`[Payout Fatal Error] Booking ${bookingId}:`, error);
+            try {
+                await BookingModel.findByIdAndUpdate(bookingId, { distributorPayoutStatus: 'failed' });
+            } catch (e) {
+                logError({ message: 'Failed to update failed payout status', error: e, source: 'BookingService.processDistributorPayout' });
+            }
+        }
+    }
+} 

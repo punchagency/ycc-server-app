@@ -9,6 +9,7 @@ interface IInvoice extends Document {
     businessIds: Schema.Types.ObjectId[];
     amount: number;
     platformFee: number;
+    distributorAmount: number;
     currency: string;
     status: 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded';
     invoiceDate: Date;
@@ -27,6 +28,7 @@ const invoiceSchema = new Schema<IInvoice>({
     businessIds: [{ type: Schema.Types.ObjectId, ref: 'Business', required: true }],
     amount: { type: Number, required: true },
     platformFee: { type: Number, required: true },
+    distributorAmount: { type: Number, required: true },
     currency: { type: String, required: true },
     status: { type: String, enum: ['pending', 'paid', 'failed', 'cancelled', 'refunded'], required: true },
     invoiceDate: { type: Date, required: true },

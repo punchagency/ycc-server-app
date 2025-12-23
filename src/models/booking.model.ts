@@ -40,7 +40,10 @@ export interface IBooking extends Document {
     crewRejectedQuoteAt?: Date;
     stripeInvoiceId?: string;
     stripeInvoiceUrl?: string;
+    invoiceId?: Schema.Types.ObjectId;
     paidAt?: Date;
+    distributorPayoutStatus?: 'pending' | 'paid' | 'failed';
+    distributorPayoutId?: string;
     notes?: string;
     statusHistory?: {
         fromStatus: string;
@@ -93,7 +96,10 @@ const bookingSchema = new Schema<IBooking>({
     crewRejectedQuoteAt: { type: Date },
     stripeInvoiceId: { type: String },
     stripeInvoiceUrl: { type: String },
+    invoiceId: { type: Schema.Types.ObjectId, ref: 'Invoice' },
     paidAt: { type: Date },
+    distributorPayoutStatus: { type: String, enum: ['pending', 'paid', 'failed'], default: 'pending' },
+    distributorPayoutId: { type: String },
     notes: { type: String },
     statusHistory: [{
         fromStatus: { type: String, required: true },

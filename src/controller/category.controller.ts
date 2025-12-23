@@ -232,6 +232,16 @@ export class CategoryController {
             return;
         }
 
+        const isInUse = await CategoryService.isCategoryInUse(id);
+        if (isInUse) {
+            res.status(409).json({
+                success: false,
+                message: 'Cannot delete category as it is assigned to one or more products or services',
+                code: 'CATEGORY_IN_USE'
+            });
+            return;
+        }
+
         const deleted = await CategoryService.deleteCategory(id);
         if (!deleted) {
             res.status(500).json({

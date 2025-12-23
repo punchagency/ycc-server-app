@@ -6,20 +6,45 @@ import { saveAuditLog } from '../utils/SaveAuditlogs';
 import 'dotenv/config';
 
 export class UserService {
-    static async getBusinessUsers({ businessType, isVerified, isOnboarded, page, limit, search }: { 
+    static async getBusinessUsers({ businessType, isVerified, isOnboarded, page, limit, search, status }: { 
         businessType?: 'manufacturer' | 'distributor',
         isVerified?: boolean,
         isOnboarded?: boolean,
         page?: number,
         limit?: number,
         search?: string
+        status?: 'approved' | 'rejected' | 'pending'
     }) {
-        const userFilter: any = { role: { $in: ['distributor', 'manufacturer'] } };
+        const businessFilter: any = {};
         
         if (businessType) {
-            userFilter.role = businessType;
+            businessFilter.businessType = businessType;
         }
 
+        if (isOnboarded !== undefined) {
+            businessFilter.isOnboarded = isOnboarded;
+        }
+
+        if (status) {
+            if (status === 'pending') {
+                businessFilter.$or = [{ status: 'pending' }, { status: { $exists: false } }];
+            } else {
+                businessFilter.status = status;
+            }
+        }
+
+        if (search) {
+            businessFilter.businessName = { $regex: search, $options: 'i' };
+        }
+
+        const businesses = await BusinessModel.find(businessFilter)
+            .select('userId businessName businessType email phone website address ratings isOnboarded status')
+            .lean();
+
+        const userIds = businesses.map(b => b.userId);
+
+        const userFilter: any = { _id: { $in: userIds }, role: { $in: ['distributor', 'manufacturer'] } };
+        
         if (isVerified !== undefined) {
             userFilter.isVerified = isVerified;
         }
@@ -45,36 +70,23 @@ export class UserService {
 
         const users = await userQuery.lean();
 
-        const userIds = users.map(user => user._id);
-        
-        const businessFilter: any = { userId: { $in: userIds }, $or: [{ isRejected: null }, { isRejected: false }] };
-        if (isOnboarded !== undefined) {
-            businessFilter.isOnboarded = isOnboarded;
-        }
-
-        const businesses = await BusinessModel.find(businessFilter)
-            .select('userId businessName businessType email phone website address ratings isOnboarded')
-            .lean();
-
         const businessMap = new Map(businesses.map(b => [b.userId.toString(), b]));
 
-        const data = users
-            .filter(user => isOnboarded === undefined || businessMap.has(user._id.toString()))
-            .map(user => ({
-                user: {
-                    _id: user._id,
-                    firstName: user.firstName,
-                    lastName: user.lastName,
-                    email: user.email,
-                    phone: user.phone,
-                    profilePicture: user.profilePicture,
-                    role: user.role,
-                    isVerified: user.isVerified,
-                    isActive: user.isActive,
-                    createdAt: user.createdAt
-                },
-                business: businessMap.get(user._id.toString()) || null
-            }));
+        const data = users.map(user => ({
+            user: {
+                _id: user._id,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                phone: user.phone,
+                profilePicture: user.profilePicture,
+                role: user.role,
+                isVerified: user.isVerified,
+                isActive: user.isActive,
+                createdAt: user.createdAt
+            },
+            business: businessMap.get(user._id.toString()) || null
+        }));
 
         const response: any = { data };
         
@@ -116,6 +128,9 @@ export class UserService {
             user.isActive = true;
             await user.save();
 
+            business.status = "approved";
+            await business.save();
+
             const onboardingUrl = `${process.env.FRONTEND_URL}/${user.role === 'distributor' ? 'distributor' : 'manufacturer'}/onboarding/${user._id.toString()}`;
             
             const emailHtml = vendorApprovalEmailTemplate
@@ -142,7 +157,7 @@ export class UserService {
             user.isActive = false;
             await user.save();
 
-            business.isRejected = true;
+            business.status = "rejected";
             await business.save();
 
             const emailHtml = vendorRejectionEmailTemplate

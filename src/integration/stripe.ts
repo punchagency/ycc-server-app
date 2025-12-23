@@ -203,43 +203,6 @@ class StripeService {
         return await StripeService.stripe.invoices.retrieve(invoiceId);
     }
 
-    public async createTransfer({
-        amount,
-        destination,
-        sourceTransaction
-    }: {
-        amount: number,
-        destination: string,
-        sourceTransaction: string
-    }) {
-        try {
-            if (!amount || amount <= 0) {
-                throw new Error('Transfer amount must be greater than 0');
-            }
-            if (!destination) {
-                throw new Error('Destination account is required');
-            }
-            if (!sourceTransaction) {
-                throw new Error('Source transaction is required');
-            }
-
-            const transfer = await StripeService.stripe.transfers.create({
-                amount,
-                currency: 'usd',
-                destination,
-                source_transaction: sourceTransaction
-            });
-
-            return transfer;
-        } catch (error) {
-            logError({ message: 'Stripe transfer failed', error, source: 'StripeService.createTransfer' })
-            if (error instanceof Error) {
-                throw new Error(`Stripe transfer failed: ${error.message}`);
-            }
-            throw error;
-        }
-    }
-
     public async createProduct({
         name,
         description,
@@ -426,6 +389,38 @@ class StripeService {
             return (invoice as any).charge as string;
         } catch (error) {
             logError({ message: 'Failed to retrieve charge ID', error, source: 'StripeService.getLatestChargeId' });
+            throw error;
+        }
+    }
+
+    public async createTransfer({amount, currency = 'usd', destination, source_transaction, description, metadata}:
+        {amount: number, currency?: string, destination: string, source_transaction: string, description?: string, metadata?: { [key: string]: string }}){
+        try {
+            if (!amount || amount <= 0) {
+                throw new Error('Transfer amount must be greater than 0');
+            }
+            if (!destination) {
+                throw new Error('Destination account is required');
+            }
+            if (!source_transaction) {
+                throw new Error('Source transaction is required');
+            }
+
+            const transfer = await StripeService.stripe.transfers.create({
+                amount,
+                currency: currency,
+                destination,
+                source_transaction: source_transaction,
+                description,
+                metadata
+            });
+
+            return transfer;
+        } catch (error) {
+            logError({ message: 'Stripe transfer failed', error, source: 'StripeService.createTransfer' })
+            if (error instanceof Error) {
+                throw new Error(`Stripe transfer failed: ${error.message}`);
+            }
             throw error;
         }
     }

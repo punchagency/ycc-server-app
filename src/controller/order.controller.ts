@@ -458,7 +458,7 @@ class OrderController {
                 return;
             }
 
-            const { orderId, status, reason, notes, enableShipping, trackingNumber } = req.body;
+            const { orderId, status, reason, notes, enableShipping, trackingNumber, shipmentCost } = req.body;
             const userId = req.user._id;
             const userRole = req.user.role;
 
@@ -482,6 +482,10 @@ class OrderController {
                 return res.status(400).json({ success: false, message: 'enableShipping must be a boolean', code: 'VALIDATION_ERROR' });
             }
 
+            if (status === 'confirmed' && enableShipping === false && (!shipmentCost || typeof shipmentCost !== 'number' || shipmentCost <= 0)) {
+                return res.status(400).json({ success: false, message: 'shipmentCost is required and must be a positive number when enableShipping is false', code: 'VALIDATION_ERROR' });
+            }
+
             const [error, result] = await catchError(OrderService.updateDistributorOrderStatus({
                 userId: userId.toString(),
                 orderId,
@@ -490,7 +494,8 @@ class OrderController {
                 reason,
                 notes,
                 enableShipping,
-                trackingNumber
+                trackingNumber,
+                shipmentCost
             }));
 
             if (error) {

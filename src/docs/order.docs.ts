@@ -464,6 +464,9 @@
  *               enableShipping:
  *                 type: boolean
  *                 description: Enable platform shipping system (only for manufacturers when confirming orders). If false, manufacturer handles shipping externally.
+ *               shipmentCost:
+ *                  type: number
+ *                  description: Shipment cost for the order (only for manufacturers when confirming orders). If not provided, manufacturer handles shipping externally.
  *               reason:
  *                 type: string
  *                 description: Optional reason for status change (especially for cancellations)

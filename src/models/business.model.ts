@@ -28,7 +28,7 @@ export interface IBusiness extends Document {
     stripeTransfersEnabled?: boolean;
     license?: string;
     isOnboarded: boolean;
-    isRejected: boolean;
+    status?: 'pending' | 'approved' | 'rejected';
     businessType: typeof BUSINESS_TYPE[number];
 }
 
@@ -112,9 +112,10 @@ const businessSchema = new Schema<IBusiness>({
         type: Boolean,
         default: false
     },
-    isRejected: {
-        type: Boolean,
-        default: false
+    status: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected'],
+        default: "pending"
     }
 }, {
     timestamps: true

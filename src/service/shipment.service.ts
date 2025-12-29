@@ -11,6 +11,7 @@ import { AddressFormatter } from "../utils/StateFormatter";
 import BusinessModel from "../models/business.model";
 import InvoiceModel from "../models/invoice.model";
 import StripeService from "../integration/stripe";
+import CONSTANTS from "../config/constant";
 
 export class ShipmentService {
     static async createShipmentsForConfirmedItems(orderId: string, businessId: string) {
@@ -574,14 +575,14 @@ export class ShipmentService {
             }
         }
 
-        const platformFee = order.totalAmount * 0.1;
+        const platformFee = order.totalAmount * CONSTANTS.PLATFORM_FEE_PERCENT;
         if (platformFee > 0) {
             await stripe.createInvoiceItems({
                 customer: stripeCustomerId,
                 invoice: invoice.id,
                 amount: Math.round(platformFee * 100),
                 currency: 'usd',
-                description: 'Platform Fee (10%)',
+                description: 'Platform Fee (5%)',
                 metadata: { type: 'platform_fee' }
             });
         }

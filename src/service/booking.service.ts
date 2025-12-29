@@ -554,6 +554,8 @@ export class BookingService {
         });
 
         // Send email to crew
+        console.log('Sending email to crew', bookingUser.email);
+        
         await addEmailJob({
             email: bookingUser.email,
             subject: 'Quote Provided for Your Booking',
@@ -564,7 +566,7 @@ export class BookingService {
                 <p><strong>Total Amount: $${amount.toFixed(2)}</strong></p>
                 <p>Service Price: $${service.price.toFixed(2)}</p>
                 <p>Additional Items: $${quoteItemsTotal.toFixed(2)}</p>
-                <p>Platform Fee (10%): $${platformFee.toFixed(2)}</p>
+                <p>Platform Fee (5%): $${platformFee.toFixed(2)}</p>
                 <p>Please review and accept or reject the quote.</p>
                 <a href="${process.env.FRONTEND_URL}/crew/bookings/${booking._id}" style="display:inline-block;background-color:#4CAF50;color:white;padding:14px 20px;text-align:center;text-decoration:none;font-size:16px;margin:4px 2px;cursor:pointer;border-radius:4px;">
                     View Quote
@@ -1268,14 +1270,14 @@ export class BookingService {
             });
         }
 
-        // Add platform fee (10%)
-        const platformFee = booking.platformFee || (booking.totalAmount! * 0.1);
+        // Add platform fee (5%)
+        const platformFee = booking.platformFee || (booking.totalAmount! * CONSTANTS.PLATFORM_FEE_PERCENT);
         await stripe.createInvoiceItems({
             customer: stripeCustomerId,
             invoice: invoice.id,
             amount: Math.round(platformFee * 100),
             currency: 'usd',
-            description: 'Platform Fee (10%)',
+            description: 'Platform Fee (5%)',
             metadata: {
                 bookingId: booking._id.toString(),
                 type: 'platform_fee'

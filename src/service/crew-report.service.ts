@@ -60,26 +60,113 @@ export class CrewReportService {
         const bookingDateFilter = this.getDateFilter(bookingPeriod, bookingStartDate, bookingEndDate);
         const activityDateFilter = this.getDateFilter(activityPeriod, activityStartDate, activityEndDate);
 
-        const orderStats = await Order.aggregate([
-            { $match: { userId: new mongoose.Types.ObjectId(userId), ...orderDateFilter } },
-            {
-                $group: {
-                    _id: '$status',
-                    count: { $sum: 1 },
-                    totalValue: { $sum: '$total' }
+        const [orderResults, bookingResults] = await Promise.all([
+            Order.aggregate([
+                { $match: { userId: new mongoose.Types.ObjectId(userId), ...orderDateFilter } },
+                {
+                    $facet: {
+                        stats: [
+                            {
+                                $group: {
+                                    _id: '$status',
+                                    count: { $sum: 1 },
+                                    totalValue: { $sum: '$total' }
+                                }
+                            }
+                        ],
+                        recent: [
+                            { $match: activityDateFilter },
+                            { $sort: { createdAt: -1 } },
+                            { $limit: 5 },
+                            { $unwind: '$items' },
+                            {
+                                $lookup: {
+                                    from: 'businesses',
+                                    localField: 'items.businessId',
+                                    foreignField: '_id',
+                                    as: 'business'
+                                }
+                            },
+                            { $unwind: { path: '$business', preserveNullAndEmptyArrays: true } },
+                            {
+                                $group: {
+                                    _id: '$_id',
+                                    status: { $first: '$status' },
+                                    total: { $first: '$total' },
+                                    deliveryAddress: { $first: '$deliveryAddress' },
+                                    createdAt: { $first: '$createdAt' },
+                                    businesses: { $addToSet: '$business.businessName' }
+                                }
+                            }
+                        ]
+                    }
                 }
-            }
+            ]),
+            Booking.aggregate([
+                { $match: { userId: new mongoose.Types.ObjectId(userId), ...bookingDateFilter } },
+                {
+                    $lookup: {
+                        from: 'quotes',
+                        localField: 'quoteId',
+                        foreignField: '_id',
+                        as: 'quote'
+                    }
+                },
+                { $unwind: { path: '$quote', preserveNullAndEmptyArrays: true } },
+                {
+                    $facet: {
+                        stats: [
+                            {
+                                $group: {
+                                    _id: '$status',
+                                    count: { $sum: 1 },
+                                    totalValue: { $sum: { $ifNull: ['$quote.amount', 0] } }
+                                }
+                            }
+                        ],
+                        recent: [
+                            { $match: activityDateFilter },
+                            { $sort: { createdAt: -1 } },
+                            { $limit: 5 },
+                            {
+                                $lookup: {
+                                    from: 'services',
+                                    localField: 'serviceId',
+                                    foreignField: '_id',
+                                    as: 'service'
+                                }
+                            },
+                            { $unwind: { path: '$service', preserveNullAndEmptyArrays: true } },
+                            {
+                                $lookup: {
+                                    from: 'businesses',
+                                    localField: 'businessId',
+                                    foreignField: '_id',
+                                    as: 'business'
+                                }
+                            },
+                            { $unwind: { path: '$business', preserveNullAndEmptyArrays: true } },
+                            {
+                                $project: {
+                                    status: 1,
+                                    bookingDate: 1,
+                                    serviceLocation: 1,
+                                    createdAt: 1,
+                                    amount: '$quote.amount',
+                                    serviceId: { _id: '$service._id', name: '$service.name' },
+                                    businessId: { _id: '$business._id', businessName: '$business.businessName' }
+                                }
+                            }
+                        ]
+                    }
+                }
+            ])
         ]);
 
-        const bookingStats = await Booking.aggregate([
-            { $match: { userId: new mongoose.Types.ObjectId(userId), ...bookingDateFilter } },
-            {
-                $group: {
-                    _id: '$status',
-                    count: { $sum: 1 }
-                }
-            }
-        ]);
+        const orderStats = orderResults[0]?.stats || [];
+        const recentOrders = orderResults[0]?.recent || [];
+        const bookingStats = bookingResults[0]?.stats || [];
+        const recentBookings = bookingResults[0]?.recent || [];
 
         const orderSummary: any = {
             pending: 0, declined: 0, confirmed: 0, processing: 0,
@@ -87,7 +174,7 @@ export class CrewReportService {
             total: 0, totalValue: 0, period: orderPeriod
         };
 
-        orderStats.forEach(stat => {
+        orderStats.forEach((stat: any) => {
             if (orderSummary.hasOwnProperty(stat._id)) {
                 orderSummary[stat._id] = stat.count;
             }
@@ -97,27 +184,16 @@ export class CrewReportService {
 
         const bookingSummary: any = {
             pending: 0, confirmed: 0, completed: 0, cancelled: 0, declined: 0,
-            total: 0, period: bookingPeriod
+            total: 0, totalValue: 0, period: bookingPeriod
         };
 
-        bookingStats.forEach(stat => {
+        bookingStats.forEach((stat: any) => {
             if (bookingSummary.hasOwnProperty(stat._id)) {
                 bookingSummary[stat._id] = stat.count;
             }
             bookingSummary.total += stat.count;
+            bookingSummary.totalValue += stat.totalValue || 0;
         });
-
-        const recentOrders = await Order.find({ userId, ...activityDateFilter })
-            .sort({ createdAt: -1 })
-            .limit(5)
-            .select('status total deliveryAddress createdAt');
-
-        const recentBookings = await Booking.find({ userId, ...activityDateFilter })
-            .sort({ createdAt: -1 })
-            .limit(5)
-            .populate('serviceId', 'name')
-            .populate('businessId', 'businessName')
-            .select('status bookingDate serviceLocation createdAt');
 
         return {
             orders: orderSummary,
@@ -131,41 +207,100 @@ export class CrewReportService {
     }
 
     async generateReport(userId: string, body: any) {
-        const { reportType = 'all', startDate, endDate, fileType } = body;
-
-        if (!fileType || !['pdf', 'csv'].includes(fileType)) {
-            throw new Error('Invalid file type');
-        }
+        const { reportType = 'all', startDate, endDate } = body;
 
         const dateFilter = this.getDateFilter(undefined, startDate, endDate);
         const reportData: any = {};
 
+        const queries = [];
+
         if (reportType === 'all' || reportType === 'orders') {
-            reportData.orders = await Order.find({ userId, ...dateFilter })
-                .select('status total deliveryAddress shippingMethod createdAt')
-                .sort({ createdAt: -1 });
+            queries.push(
+                Order.aggregate([
+                    { $match: { userId: new mongoose.Types.ObjectId(userId), ...dateFilter } },
+                    { $sort: { createdAt: -1 } },
+                    { $unwind: '$items' },
+                    {
+                        $lookup: {
+                            from: 'businesses',
+                            localField: 'items.businessId',
+                            foreignField: '_id',
+                            as: 'business'
+                        }
+                    },
+                    { $unwind: { path: '$business', preserveNullAndEmptyArrays: true } },
+                    {
+                        $group: {
+                            _id: '$_id',
+                            status: { $first: '$status' },
+                            total: { $first: '$total' },
+                            deliveryAddress: { $first: '$deliveryAddress' },
+                            shippingMethod: { $first: '$shippingMethod' },
+                            createdAt: { $first: '$createdAt' },
+                            businesses: { $addToSet: '$business.businessName' }
+                        }
+                    },
+                    { $sort: { createdAt: -1 } }
+                ])
+            );
         }
 
         if (reportType === 'all' || reportType === 'bookings') {
-            reportData.bookings = await Booking.find({ userId, ...dateFilter })
-                .populate('serviceId', 'name')
-                .populate('businessId', 'businessName')
-                .select('status bookingDate serviceLocation createdAt')
-                .sort({ createdAt: -1 });
+            queries.push(
+                Booking.aggregate([
+                    { $match: { userId: new mongoose.Types.ObjectId(userId), ...dateFilter } },
+                    { $sort: { createdAt: -1 } },
+                    {
+                        $lookup: {
+                            from: 'quotes',
+                            localField: 'quoteId',
+                            foreignField: '_id',
+                            as: 'quote'
+                        }
+                    },
+                    { $unwind: { path: '$quote', preserveNullAndEmptyArrays: true } },
+                    {
+                        $lookup: {
+                            from: 'services',
+                            localField: 'serviceId',
+                            foreignField: '_id',
+                            as: 'service'
+                        }
+                    },
+                    { $unwind: { path: '$service', preserveNullAndEmptyArrays: true } },
+                    {
+                        $lookup: {
+                            from: 'businesses',
+                            localField: 'businessId',
+                            foreignField: '_id',
+                            as: 'business'
+                        }
+                    },
+                    { $unwind: { path: '$business', preserveNullAndEmptyArrays: true } },
+                    {
+                        $project: {
+                            status: 1,
+                            bookingDate: 1,
+                            serviceLocation: 1,
+                            createdAt: 1,
+                            amount: '$quote.amount',
+                            serviceId: { _id: '$service._id', name: '$service.name' },
+                            businessId: { _id: '$business._id', businessName: '$business.businessName' }
+                        }
+                    }
+                ])
+            );
         }
 
-        if (reportType === 'all' || reportType === 'activities') {
-            const orders = await Order.find({ userId, ...dateFilter })
-                .select('status total deliveryAddress createdAt')
-                .sort({ createdAt: -1 });
+        const results = await Promise.all(queries);
 
-            const bookings = await Booking.find({ userId, ...dateFilter })
-                .populate('serviceId', 'name')
-                .populate('businessId', 'businessName')
-                .select('status bookingDate serviceLocation createdAt')
-                .sort({ createdAt: -1 });
-
-            reportData.activities = { orders, bookings };
+        if (reportType === 'all') {
+            reportData.orders = results[0];
+            reportData.bookings = results[1];
+        } else if (reportType === 'orders') {
+            reportData.orders = results[0];
+        } else if (reportType === 'bookings') {
+            reportData.bookings = results[0];
         }
 
         return reportData;

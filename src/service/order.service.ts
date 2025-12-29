@@ -521,7 +521,10 @@ export class OrderService {
     static async updateUserOrderStatus(userId: string, orderId: string, status: 'confirmed' | 'processing' | 'shipped' | 'out_for_delivery'| 'cancelled', userRole: typeof ROLES[number], reason?: string, notes?: string, trackingNumber?: string) {
         const order = await OrderModel.findById(orderId);
         if (!order) throw new Error('Order not found');
-
+        if(!order.userType){
+            order.userType = "user";
+            await order.save();
+        }
         // if (order.userId.toString() !== userId) throw new Error('Unauthorized to update this order');
 
         if (userRole === 'user') {
@@ -593,7 +596,7 @@ export class OrderService {
 
             const validTransitions: Record<string, string[]> = {
                 'pending': ['confirmed'],
-                'confirmed': ['processing'],
+                'confirmed': ['confirmed', 'processing'],
                 'declined': [],
                 'processing': ['shipped'],
                 'shipped': ['out_for_delivery'],

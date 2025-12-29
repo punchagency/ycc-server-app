@@ -372,7 +372,7 @@ export class AuthController {
             return;
         }
 
-        const { phone, nationality, address, profilePicture } = req.body; // <-- Add this
+        const { firstName, lastName, phone, nationality, address, profilePicture } = req.body; // <-- Add this
         const files = req.files as { [fieldname: string]: any[] };
         const uploadedPicture = files?.profilePicture?.[0]?.location;
 
@@ -399,7 +399,8 @@ export class AuthController {
             }
             updateData.phone = phone ? Validate.formatPhone(phone) || phone : null;
         }
-
+        if(firstName !== undefined) updateData.firstName = firstName?.trim();
+        if(lastName !== undefined) updateData.lastName = lastName?.trim();
         if (nationality !== undefined) updateData.nationality = nationality?.trim() || null;
         if (address !== undefined) updateData.address = address || null;
 

@@ -332,7 +332,7 @@ class OrderController {
                 return res.status(400).json({ success: false, message: 'Order ID and status are required', code: 'VALIDATION_ERROR' });
             }
 
-            if (!['confirmed', 'processing', 'shipped', 'out_for_delivery', 'cancelled'].includes(status)) {
+            if (!['confirmed', 'processing', 'shipped', 'out_for_delivery', 'cancelled', 'declined'].includes(status)) {
                 return res.status(400).json({ success: false, message: 'Invalid status. User can only set confirmed or cancelled', code: 'VALIDATION_ERROR' });
             }
 

@@ -348,6 +348,15 @@ export class OrderService {
         }));
         orderObj.shipments = shipments;
 
+        if (userRole === 'distributor' && (!order.userType || order.userType === 'user')) {
+            const business = await BusinessModel.findOne({ userId });
+            if (business) {
+                orderObj.items = orderObj.items.filter((item: any) => 
+                    item.businessId._id.toString() === business._id.toString()
+                );
+            }
+        }
+
         return orderObj;
     }
     static async getOrders({userId, role, page = 1, limit = 10, status, paymentStatus, startDate, endDate, sortBy = 'createdAt', orderBy = 'desc', userType}:{
@@ -596,7 +605,7 @@ export class OrderService {
 
             const validTransitions: Record<string, string[]> = {
                 'pending': ['confirmed'],
-                'confirmed': ['confirmed', 'processing'],
+                'confirmed': ['processing', 'declined'],
                 'declined': [],
                 'processing': ['shipped'],
                 'shipped': ['out_for_delivery'],

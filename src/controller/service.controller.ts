@@ -478,7 +478,8 @@ export class ServiceController {
                 maxPrice,
                 page = '1',
                 limit = '12',
-                sortBy = 'random'
+                sortBy = 'random',
+                random = true
             } = req.query;
 
             const pageNum = parseInt(page as string) || 1;
@@ -574,7 +575,9 @@ export class ServiceController {
                 aggregationPipeline.push({ $sort: { price: -1 } });
             } else if (sortBy === 'name') {
                 aggregationPipeline.push({ $sort: { name: 1 } });
-            } else {
+            } else if(random == "false"){
+                aggregationPipeline.push({ $sort: { createdAt: -1 } });
+            } else{
                 // Random order
                 aggregationPipeline.push({
                     $addFields: { randomSort: { $rand: {} } }

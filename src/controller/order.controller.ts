@@ -314,6 +314,7 @@ class OrderController {
             `);
         }
     }
+    // update order in distributor dashboard
     static async updateUserOrderStatus(req: AuthenticatedRequest, res: Response) {
         try {
             if (!req.user) {

@@ -50,7 +50,7 @@ const businessSchema = new Schema<IBusiness>({
     },
     website: {
         type: String,
-        required: true,
+        required: false,
         trim: true
     },
     address: {

@@ -15,7 +15,6 @@ export class InvoiceController {
         if (!userId || !userRole) {
             return res.status(401).json({ success: false, message: 'Unauthorized', code: 'UNAUTHORIZED' });
         }
-
         const filters = {
             status: req.query.status,
             startDate: req.query.startDate,

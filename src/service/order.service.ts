@@ -161,7 +161,7 @@ export class OrderService {
 
             const pricePerItem = product.price;
             const discount = productInput.discount || 0;
-            const totalPriceOfItems = (pricePerItem * productInput.quantity) - discount;
+            const totalPriceOfItems = pricePerItem ? (pricePerItem * productInput.quantity) - discount : 0;
             const confirmationToken = uuid();
             const confirmationExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 

@@ -29,6 +29,20 @@ interface Parcel {
     height: number,
     weight: number,
 }
+
+interface CustomInfo {
+    description: string;
+    quantity: number;
+    weight: number;
+    value: number;
+    hs_tariff_number: string;
+    origin_country: string;
+}
+
+interface CustomsInfo {
+    customs_items: CustomInfo[];
+}
+
 export class EasyPostIntegration {
     private apiKey: string;
     private client: EasyPost;
@@ -38,12 +52,18 @@ export class EasyPostIntegration {
         this.client = new EastPost(this.apiKey);
     }
 
-    async createShipmentLogistics({fromAddress, toAddress, parcel}: {fromAddress: FromAddress, toAddress: ToAddress, parcel: Parcel}) {
-        return this.client.Shipment.create({
+    async createShipmentLogistics({fromAddress, toAddress, parcel, customsInfo}: {fromAddress: FromAddress, toAddress: ToAddress, parcel: Parcel, customsInfo?: CustomsInfo}) {
+        const shipmentData: any = {
             from_address: fromAddress,
             to_address: toAddress,
             parcel: parcel
-        });
+        };
+        
+        if (customsInfo) {
+            shipmentData.customs_info = customsInfo;
+        }
+        
+        return this.client.Shipment.create(shipmentData);
     }
 
     async purchaseLabel(shipmentId: string, rateId: string) {
@@ -59,4 +79,6 @@ export class EasyPostIntegration {
         );
         return { error, response };
     }
+
+
 }

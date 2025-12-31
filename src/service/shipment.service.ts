@@ -6,6 +6,7 @@ import { EasyPostIntegration } from "../integration/easypost";
 import catchError from "../utils/catchError";
 import { addNotificationJob, addEmailJob } from "../integration/QueueManager";
 import { generateShippedEmailTemplate, generateDeliveredEmailTemplate, generateFailedEmailTemplate, generateReturnedEmailTemplate } from "../templates/shipment-email-templates";
+import { generateShippingLabelEmail } from "../templates/email-templates";
 import { logInfo, logError } from "../utils/SystemLogs";
 import { AddressFormatter } from "../utils/StateFormatter";
 import BusinessModel from "../models/business.model";
@@ -113,7 +114,10 @@ export class ShipmentService {
                     width: parseFloat(maxWidth.toFixed(1)),
                     height: parseFloat(maxHeight.toFixed(1)),
                     weight: parseFloat(totalWeight.toFixed(1))
-                }
+                },
+                customsInfo: this.isInternational(fromAddr.country || "", toAddr.country || "") 
+                    ? this.buildCustomsInfo(group, products) 
+                    : undefined
             }));
 
             if (error) throw new Error(`EasyPost error: ${error.message}`);
@@ -143,6 +147,9 @@ export class ShipmentService {
                     totalPriceOfItems: item.totalPriceOfItems
                 })),
                 rates,
+                customsInfo: this.isInternational(fromAddr.country || "", toAddr.country || "") 
+                    ? this.buildCustomsInfo(group, products) 
+                    : undefined,
                 status: 'rates_fetched'
             });
 
@@ -399,7 +406,10 @@ export class ShipmentService {
                         width: parseFloat(maxWidth.toFixed(1)),
                         height: parseFloat(maxHeight.toFixed(1)),
                         weight: parseFloat(totalWeight.toFixed(1))
-                    }
+                    },
+                    customsInfo: this.isInternational(fromAddr.country || "", toAddr.country || "") 
+                        ? this.buildCustomsInfo(shipment.items, shipment.items.map(i => i.productId as any)) 
+                        : undefined
                 }));
 
                 if (epError) throw new Error(`EasyPost error: ${epError.message}`);
@@ -415,7 +425,7 @@ export class ShipmentService {
                         parseFloat(current.rate) < parseFloat(lowest.rate) ? current : lowest
                     );
                 }
-
+                // console.log({ shipment: newEpShipment, matchedRate, rateId, matchedRateId: matchedRate.id, rate: rate.id, shipmentId })
                 const [error, purchasedShipment] = await catchError(
                     easypost.purchaseLabel(newEpShipment.id, matchedRate.id)
                 );
@@ -440,6 +450,8 @@ export class ShipmentService {
                 shipment.labelUrl = purchasedShipment.postage_label?.label_url;
                 await shipment.save();
 
+                await this.sendLabelToBusiness(shipment, order, business, user);
+
                 results.push({
                     shipmentId,
                     success: true,
@@ -457,6 +469,46 @@ export class ShipmentService {
             }
         }
         return results;
+    }
+    
+    private static isInternational(fromCountry: string, toCountry: string): boolean {
+        return fromCountry.toUpperCase() !== toCountry.toUpperCase();
+    }
+    
+    private static buildCustomsInfo(items: any[], products: any[]) {
+        return {
+            customs_items: items.map(item => {
+                const product = products.find(p => p._id.toString() === item.productId.toString());
+                return {
+                    description: `${product?.name || 'Product'}\n${product?.description || ''}`,
+                    quantity: item.quantity,
+                    weight: product?.weight || 0,
+                    value: item.pricePerItem,
+                    hs_tariff_number: product?.hsCode || '',
+                    origin_country: product?.wareHouseAddress?.country || 'US'
+                };
+            })
+        };
+    }
+    
+    private static async sendLabelToBusiness(shipment: IShipment, order: IOrder, business: any, user: any) {
+        if (!business?.email || !shipment.labelUrl) return;
+        
+        const deliveryAddr = AddressFormatter.formatAddress(order.deliveryAddress);
+        const emailHtml = generateShippingLabelEmail({
+            businessName: business.businessName,
+            orderNumber: order._id.toString(),
+            trackingNumber: shipment.trackingNumber,
+            labelUrl: shipment.labelUrl,
+            customerName: `${user.firstName} ${user.lastName}`,
+            deliveryAddress: `${deliveryAddr.street}, ${deliveryAddr.city}, ${deliveryAddr.state} ${deliveryAddr.zip}, ${deliveryAddr.country}`
+        });
+        
+        await addEmailJob({
+            email: business.email,
+            subject: `Shipping Label Ready - Order #${order._id}`,
+            html: emailHtml
+        });
     }
     private static async createDraftInvoice(orderId: string) {
         const stripe = StripeService.getInstance();
@@ -479,6 +531,27 @@ export class ShipmentService {
             }
             user.stripeCustomerId = stripeCustomerId;
             await user.save();
+        }else{
+            try{
+                const customer = await stripe.retrieveCustomer(stripeCustomerId);
+                if(!customer){
+                    const customer = await stripe.createCustomer({
+                        email: user.email,
+                        name: `${user.firstName} ${user.lastName}`
+                    });
+                    stripeCustomerId = customer.id;
+                    user.stripeCustomerId = stripeCustomerId;
+                    await user.save();
+                }
+            }catch(error){
+                const customer = await stripe.createCustomer({
+                    email: user.email,
+                    name: `${user.firstName} ${user.lastName}`
+                });
+                stripeCustomerId = customer.id;
+                user.stripeCustomerId = stripeCustomerId;
+                await user.save();
+            }
         }
 
         const invoice = await stripe.createinvoices({

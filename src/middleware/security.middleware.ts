@@ -29,7 +29,7 @@ export const createRateLimit = (windowMs: number, max: number, message?: string)
 // General API rate limit
 export const generalRateLimit = createRateLimit(
   1 * 60 * 1000, // 1 minutes
-  100, // limit each IP to 100 requests per windowMs
+  1000, // limit each IP to 100 requests per windowMs
   'Too many API requests from this IP, please try again after 1 minute'
 );
 

@@ -643,7 +643,7 @@ export class OrderService {
 
             await order.save();
 
-            if ((status === 'cancelled' || status === 'declined') && order.paymentStatus === 'paid') {
+            if (status === 'cancelled' && order.paymentStatus === 'paid') {
                 await this.handleProductOrderEvent(order._id.toString(), 'distributor_cancel');
             }
 

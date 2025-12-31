@@ -81,7 +81,7 @@ export class ProductController {
             return;
         }
 
-        if (!productData.price || productData.price <= 0) {
+        if (productData.price && productData.price <= 0) {
             res.status(400).json({
                 success: false,
                 message: 'Valid price is required',

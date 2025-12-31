@@ -125,7 +125,7 @@ export class CartService {
                 return { cart: null };
             }
             cart.items[existingItemIndex].quantity = newQuantity;
-            cart.items[existingItemIndex].totalPriceOfItems = newQuantity * product.price;
+            cart.items[existingItemIndex].totalPriceOfItems = product.price ? newQuantity * product.price : 0;
         } else {
             const businessIdValue = typeof product.businessId === 'object' ? (product.businessId as any)._id : product.businessId;
             cart.items.push({
@@ -133,12 +133,12 @@ export class CartService {
                 quantity,
                 pricePerItem: product.price,
                 businessId: businessIdValue,
-                totalPriceOfItems: quantity * product.price
+                totalPriceOfItems: product.price ? quantity * product.price : 0
             });
         }
 
         cart.totalItems = cart.items.reduce((sum, item) => sum + item.quantity, 0);
-        cart.totalPrice = cart.items.reduce((sum, item) => sum + item.totalPriceOfItems, 0);
+        cart.totalPrice = cart.items.reduce((sum, item) => sum + (item?.totalPriceOfItems || 0), 0);
         cart.lastUpdated = new Date();
 
         const [saveError] = await catchError(cart.save());
@@ -215,18 +215,18 @@ export class CartService {
                     quantity,
                     pricePerItem: product.price,
                     businessId: businessIdValue,
-                    totalPriceOfItems: quantity * product.price
+                    totalPriceOfItems: product.price ? quantity * product?.price : 0,
                 });
             } else {
                 return { cart: null };
             }
         } else {
             cart.items[itemIndex].quantity = quantity;
-            cart.items[itemIndex].totalPriceOfItems = quantity * product.price;
+            cart.items[itemIndex].totalPriceOfItems = product.price ? quantity * product?.price : 0;
         }
 
         cart.totalItems = cart.items.reduce((sum, item) => sum + item.quantity, 0);
-        cart.totalPrice = cart.items.reduce((sum, item) => sum + item.totalPriceOfItems, 0);
+        cart.totalPrice = cart.items.reduce((sum, item) => sum + (item?.totalPriceOfItems || 0), 0);
         cart.lastUpdated = new Date();
 
         const [saveError] = await catchError(cart.save());
@@ -263,7 +263,7 @@ export class CartService {
         }
 
         cart.totalItems = cart.items.reduce((sum, item) => sum + item.quantity, 0);
-        cart.totalPrice = cart.items.reduce((sum, item) => sum + item.totalPriceOfItems, 0);
+        cart.totalPrice = cart.items.reduce((sum, item) => sum + (item.totalPriceOfItems || 0), 0);
         cart.lastUpdated = new Date();
 
         const [saveError] = await catchError(cart.save());

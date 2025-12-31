@@ -190,8 +190,8 @@ export const generateOrderConfirmationEmail = async ({
         <td>${p.name}</td>
         <td>${p.categoryName}</td>
         <td>${p.quantity}</td>
-        <td>$${p.price.toFixed(2)}</td>
-        <td>$${(p.price * p.quantity).toFixed(2)}</td>
+        ${p.price ? `<td>$${p.price.toFixed(2)}</td>
+        <td>$${(p.price * p.quantity).toFixed(2)}</td>` : ""}
       </tr>
     `
       )
@@ -269,8 +269,8 @@ export const generateUserOrderConfirmationEmail = async ({
         <td>${p.name}</td>
         <td>${p.categoryName}</td>
         <td>${p.quantity}</td>
-        <td>$${p.price.toFixed(2)}</td>
-        <td>$${(p.price * p.quantity).toFixed(2)}</td>
+        ${p.price ? `<td>$${p.price.toFixed(2)}</td>
+        <td>$${(p.price * p.quantity).toFixed(2)}</td>` : ""}
       </tr>
     `
       )
@@ -298,5 +298,41 @@ export const generateUserOrderConfirmationEmail = async ({
   <p>Or copy and paste this URL: ${confirmationUrl}</p>
   <p>This confirmation link will expire in 7 days.</p>
   <p>Thank you for your business!</p>
+`
+};
+
+export const generateShippingLabelEmail = ({
+  businessName,
+  orderNumber,
+  trackingNumber,
+  labelUrl,
+  customerName,
+  deliveryAddress
+}: {
+  businessName: string,
+  orderNumber: string,
+  trackingNumber: string,
+  labelUrl: string,
+  customerName: string,
+  deliveryAddress: string
+}) => {
+  return `
+  <h1>Shipping Label Ready</h1>
+  <p>Dear ${businessName},</p>
+  <p>A shipping label has been purchased for order #${orderNumber}.</p>
+  
+  <h3>Shipment Details:</h3>
+  <p><strong>Tracking Number:</strong> ${trackingNumber}</p>
+  <p><strong>Customer:</strong> ${customerName}</p>
+  <p><strong>Delivery Address:</strong> ${deliveryAddress}</p>
+  
+  <p>Please download and print the shipping label:</p>
+  <a href="${labelUrl}" style="display:inline-block;background-color:#0387D9;color:white;padding:14px 20px;text-align:center;text-decoration:none;font-size:16px;margin:4px 2px;cursor:pointer;border-radius:4px;">
+    Download Shipping Label
+  </a>
+  
+  <p>Or copy and paste this URL: ${labelUrl}</p>
+  <p>Please prepare the shipment and attach this label to the package.</p>
+  <p>Thank you!</p>
 `
 };

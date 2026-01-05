@@ -607,7 +607,7 @@ export class OrderService {
                 'pending': ['confirmed', 'declined', "cancelled"],
                 'confirmed': ['processing', 'declined', "cancelled"],
                 'declined': [],
-                'processing': ['shipped', 'declined', "cancelled"],
+                'processing': ['shipped', 'declined', "cancelled", "out_for_delivery"],
                 'shipped': ['out_for_delivery', 'declined', "cancelled"],
                 'out_for_delivery': ['declined', "cancelled"],
                 'delivered': [],

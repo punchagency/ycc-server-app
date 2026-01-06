@@ -12,6 +12,7 @@ import CONSTANTS from "../config/constant";
 import StripeService from "../integration/stripe";
 import { ShipmentService } from "./shipment.service";
 import ShipmentModel from "../models/shipment.model";
+import InvoiceModel from "../models/invoice.model";
 import 'dotenv/config';
 import { logCritical } from "../utils/SystemLogs";
 
@@ -24,6 +25,228 @@ export interface CreateOrderInput {
 }
 
 export class OrderService {
+    private static async createOrUpdateInvoice(orderId: string, businessId: string) {
+        const order = await OrderModel.findById(orderId).populate('userId');
+        if (!order) throw new Error('Order not found');
+
+        const user: any = order.userId;
+        const stripe = StripeService.getInstance();
+
+        let stripeCustomerId = user.stripeCustomerId;
+        if (!stripeCustomerId) {
+            const customers = await stripe.listCustomers({ email: user.email, limit: 1 });
+            if (customers.data.length > 0) {
+                stripeCustomerId = customers.data[0].id;
+            } else {
+                const customer = await stripe.createCustomer({
+                    email: user.email,
+                    name: `${user.firstName} ${user.lastName}`
+                });
+                stripeCustomerId = customer.id;
+            }
+            user.stripeCustomerId = stripeCustomerId;
+            await user.save();
+        }
+
+        if (order.stripeInvoiceId) {
+            await this.addItemsToExistingInvoice(order, businessId, stripeCustomerId);
+            return order.stripeInvoiceId;
+        } else {
+            const invoiceId = await this.createDraftInvoiceForOrder(order, stripeCustomerId);
+            order.stripeInvoiceId = invoiceId;
+            await order.save();
+            return invoiceId;
+        }
+    }
+
+    private static async createDraftInvoiceForOrder(order: any, stripeCustomerId: string) {
+        const stripe = StripeService.getInstance();
+        const invoice = await stripe.createinvoices({
+            customer: stripeCustomerId,
+            collection_method: 'send_invoice',
+            days_until_due: 7,
+            metadata: {
+                orderId: order._id.toString(),
+                userId: order.userId._id.toString(),
+                customerEmail: order.userId.email,
+                transactionType: 'order'
+            }
+        });
+
+        const confirmedItems = order.items.filter((item: any) => item.status === 'confirmed');
+        const businessIds = [...new Set(confirmedItems.map((item: any) => item.businessId.toString()))];
+
+        for (const businessId of businessIds) {
+            const business = await BusinessModel.findById(businessId);
+            if (!business?.stripeAccountId) continue;
+
+            const businessItems = confirmedItems.filter((item: any) => item.businessId.toString() === businessId);
+            for (const item of businessItems) {
+                const itemIndex = order.items.findIndex((i: any) => i._id?.toString() === item._id?.toString());
+                await stripe.createInvoiceItems({
+                    customer: stripeCustomerId,
+                    invoice: invoice.id,
+                    amount: Math.round(item.totalPriceOfItems * 100),
+                    currency: 'usd',
+                    description: `Product from ${business.businessName}`,
+                    metadata: {
+                        supplierId: businessId as string,
+                        supplierUserId: business.userId.toString(),
+                        type: 'supplier_product',
+                        orderItemIndex: itemIndex.toString()
+                    }
+                });
+            }
+        }
+
+        const shipments = await ShipmentModel.find({ orderId: order._id });
+        for (const shipment of shipments) {
+            if (shipment.isBusinessHandled && shipment.shipmentCost) {
+                const manufacturerBusinessId = shipment.items[0]?.businessId;
+                if (manufacturerBusinessId) {
+                    const business = await BusinessModel.findById(manufacturerBusinessId);
+                    await stripe.createInvoiceItems({
+                        customer: stripeCustomerId,
+                        invoice: invoice.id,
+                        amount: Math.round(shipment.shipmentCost * 100),
+                        currency: 'usd',
+                        description: `Business Shipping - ${business?.businessName || 'Supplier'}`,
+                        metadata: {
+                            type: 'business_shipping',
+                            supplierId: manufacturerBusinessId.toString(),
+                            supplierUserId: business?.userId.toString() || '',
+                            shipmentId: shipment._id.toString()
+                        }
+                    });
+                }
+            }
+        }
+
+        const confirmedTotal = confirmedItems.reduce((sum: number, item: any) => sum + item.totalPriceOfItems, 0);
+        const platformFee = confirmedTotal * CONSTANTS.PLATFORM_FEE_PERCENT;
+        if (platformFee > 0) {
+            await stripe.createInvoiceItems({
+                customer: stripeCustomerId,
+                invoice: invoice.id,
+                amount: Math.round(platformFee * 100),
+                currency: 'usd',
+                description: 'Platform Fee (5%)',
+                metadata: { type: 'platform_fee' }
+            });
+        }
+
+        return invoice.id;
+    }
+
+    private static async addItemsToExistingInvoice(order: any, businessId: string, stripeCustomerId: string) {
+        const stripe = StripeService.getInstance();
+        const business = await BusinessModel.findById(businessId);
+        if (!business?.stripeAccountId) throw new Error('Business missing Stripe account');
+
+        const businessItems = order.items.filter((item: any) => 
+            item.businessId.toString() === businessId && item.status === 'confirmed'
+        );
+
+        for (const item of businessItems) {
+            const itemIndex = order.items.findIndex((i: any) => i._id?.toString() === item._id?.toString());
+            await stripe.createInvoiceItems({
+                customer: stripeCustomerId,
+                invoice: order.stripeInvoiceId,
+                amount: Math.round(item.totalPriceOfItems * 100),
+                currency: 'usd',
+                description: `Product from ${business.businessName}`,
+                metadata: {
+                    supplierId: businessId,
+                    supplierUserId: business.userId.toString(),
+                    type: 'supplier_product',
+                    orderItemIndex: itemIndex.toString()
+                }
+            });
+        }
+
+        const shipments = await ShipmentModel.find({ orderId: order._id, 'items.businessId': businessId });
+        for (const shipment of shipments) {
+            if (shipment.isBusinessHandled && shipment.shipmentCost) {
+                await stripe.createInvoiceItems({
+                    customer: stripeCustomerId,
+                    invoice: order.stripeInvoiceId,
+                    amount: Math.round(shipment.shipmentCost * 100),
+                    currency: 'usd',
+                    description: `Business Shipping - ${business.businessName}`,
+                    metadata: {
+                        type: 'business_shipping',
+                        supplierId: businessId,
+                        supplierUserId: business.userId.toString(),
+                        shipmentId: shipment._id.toString()
+                    }
+                });
+            }
+        }
+
+        const confirmedItems = order.items.filter((item: any) => item.status === 'confirmed');
+        const confirmedTotal = confirmedItems.reduce((sum: number, item: any) => sum + item.totalPriceOfItems, 0);
+        const platformFee = confirmedTotal * CONSTANTS.PLATFORM_FEE_PERCENT;
+        
+        const existingInvoice = await stripe.getInvoice(order.stripeInvoiceId);
+        const existingPlatformFee = existingInvoice.lines.data.find((line: any) => line.metadata?.type === 'platform_fee');
+        
+        if (existingPlatformFee) {
+            const newPlatformFeeAmount = Math.round(platformFee * 100);
+            if (newPlatformFeeAmount !== existingPlatformFee.amount) {
+                await stripe.createInvoiceItems({
+                    customer: stripeCustomerId,
+                    invoice: order.stripeInvoiceId,
+                    amount: newPlatformFeeAmount - existingPlatformFee.amount,
+                    currency: 'usd',
+                    description: 'Platform Fee Adjustment',
+                    metadata: { type: 'platform_fee_adjustment' }
+                });
+            }
+        }
+    }
+
+    private static async shouldFinalizeInvoice(orderId: string): Promise<boolean> {
+        const shipments = await ShipmentModel.find({ orderId });
+        if (shipments.length === 0) return false;
+        return shipments.every(s => s.isBusinessHandled || s.status === 'label_purchased');
+    }
+
+    private static async finalizeInvoiceIfReady(orderId: string) {
+        const order = await OrderModel.findById(orderId);
+        if (!order?.stripeInvoiceId) return;
+
+        const shouldFinalize = await this.shouldFinalizeInvoice(orderId);
+        if (!shouldFinalize) return;
+
+        const stripe = StripeService.getInstance();
+        const invoice = await stripe.getInvoice(order.stripeInvoiceId);
+        if (invoice.status === 'draft') {
+            const finalizedInvoice = await stripe.finalizeInvoice(order.stripeInvoiceId);
+            order.stripeInvoiceUrl = finalizedInvoice.hosted_invoice_url;
+            await order.save();
+
+            await stripe.sendInvoice(order.stripeInvoiceId);
+
+            const businessIds = [...new Set(order.items.map((item: any) => item.businessId))];
+            const confirmedItems = order.items.filter((item: any) => item.status === 'confirmed');
+            const confirmedTotal = confirmedItems.reduce((sum: number, item: any) => sum + item.totalPriceOfItems, 0);
+
+            await InvoiceModel.create({
+                stripeInvoiceId: order.stripeInvoiceId,
+                userId: order.userId,
+                orderId: orderId,
+                businessIds,
+                amount: finalizedInvoice.amount_due / 100,
+                platformFee: confirmedTotal * CONSTANTS.PLATFORM_FEE_PERCENT,
+                distributorAmount: (finalizedInvoice.amount_due / 100) - (confirmedTotal * CONSTANTS.PLATFORM_FEE_PERCENT),
+                currency: 'usd',
+                status: 'pending',
+                invoiceDate: new Date(),
+                dueDate: finalizedInvoice.due_date ? new Date(finalizedInvoice.due_date * 1000) : new Date(),
+                stripeInvoiceUrl: finalizedInvoice.hosted_invoice_url
+            });
+        }
+    }
     private static async notifyOps(order: any, business: any, eventType: string) {
         const subject = `[OPS ALERT] Order ${order._id} - ${eventType.replaceAll('_', ' ').toUpperCase()}`;
         const html = `
@@ -527,7 +750,7 @@ export class OrderService {
 
         return { success: true, orderId: order._id };
     }
-    static async updateUserOrderStatus(userId: string, orderId: string, status: 'confirmed' | 'processing' | 'shipped' | 'out_for_delivery'| 'cancelled', userRole: typeof ROLES[number], reason?: string, notes?: string, trackingNumber?: string) {
+    static async updateUserOrderStatus({orderId, status, userId, userRole, notes, reason, trackingNumber, enableShipping, shipmentCost }:{userId: string, orderId: string, status: 'confirmed' | 'processing' | 'shipped' | 'out_for_delivery'| 'cancelled', userRole: typeof ROLES[number], reason?: string, notes?: string, trackingNumber?: string, enableShipping?: boolean, shipmentCost?: number}) {
         const order = await OrderModel.findById(orderId);
         if (!order) throw new Error('Order not found');
         if(!order.userType){
@@ -543,7 +766,7 @@ export class OrderService {
                 'declined': [],
                 'processing': [],
                 'out_for_delivery': [],
-                'shipped': [],
+                'shipped': ['delivered'],
                 'delivered': [],
                 'cancelled': []
             };
@@ -609,7 +832,7 @@ export class OrderService {
                 'declined': [],
                 'processing': ['shipped', 'declined', "cancelled"],
                 'shipped': ['out_for_delivery', 'declined', "cancelled"],
-                'out_for_delivery': ['declined', "cancelled"],
+                'out_for_delivery': ['declined', "cancelled", 'delivered'],
                 'delivered': [],
                 'cancelled': []
             };
@@ -632,6 +855,10 @@ export class OrderService {
                 });
             }
 
+            if (status === 'confirmed' && enableShipping !== undefined) {
+                order.enableShipping = enableShipping;
+            }
+
             if (status === 'out_for_delivery' && trackingNumber) {
                 order.trackingNumber = trackingNumber;
             }
@@ -639,6 +866,11 @@ export class OrderService {
             const allSameStatus = order.items.every(i => i.status === status);
             if (allSameStatus) {
                 order.status = status;
+            } else {
+                const activeItems = order.items.filter((i: any) => !['declined', 'cancelled'].includes(i.status));
+                if (activeItems.length > 0 && activeItems.every((i: any) => i.status === status)) {
+                    order.status = status;
+                }
             }
 
             await order.save();
@@ -648,13 +880,33 @@ export class OrderService {
             }
 
             if (status === 'confirmed') {
-                const [shipmentError] = await catchError(
-                    ShipmentService.createShipmentsForConfirmedItems(order._id.toString(), business._id.toString())
-                );
-                if (shipmentError) {
-                    logCritical({message: `Shipment creation failed: ${shipmentError.message}`, error: shipmentError, source: "OrderService.updateOrderStatus"});
-                    throw new Error('Shipment creation failed');
+                if (enableShipping) {
+                    const [shipmentError] = await catchError(
+                        ShipmentService.createShipmentsForConfirmedItems(order._id.toString(), business._id.toString())
+                    );
+                    if (shipmentError) {
+                        logCritical({message: `Shipment creation failed: ${shipmentError.message}`, error: shipmentError, source: "OrderService.updateOrderStatus"});
+                        throw new Error('Shipment creation failed');
+                    }
+                } else if (enableShipping === false && shipmentCost) {
+                    const [shipmentError] = await catchError(
+                        ShipmentService.createBusinessHandledShipment(order._id.toString(), business._id.toString(), shipmentCost)
+                    );
+                    if (shipmentError) {
+                        logCritical({message: `Business-handled shipment creation failed: ${shipmentError.message}`, error: shipmentError, source: "OrderService.updateOrderStatus"});
+                        throw new Error('Business-handled shipment creation failed');
+                    }
                 }
+
+                const [invoiceError] = await catchError(
+                    this.createOrUpdateInvoice(order._id.toString(), business._id.toString())
+                );
+                if (invoiceError) {
+                    logCritical({message: `Invoice creation/update failed: ${invoiceError.message}`, error: invoiceError, source: "OrderService.updateOrderStatus"});
+                    throw new Error('Invoice creation/update failed');
+                }
+
+                await this.finalizeInvoiceIfReady(order._id.toString());
             }
 
             const user = await UserModel.findById(order.userId);
@@ -796,7 +1048,7 @@ export class OrderService {
                 }
             } else if (status === 'confirmed' && enableShipping === false && shipmentCost) {
                 const [shipmentError] = await catchError(
-                    ShipmentService.createManufacturerHandledShipment(order._id.toString(), business._id.toString(), shipmentCost)
+                    ShipmentService.createBusinessHandledShipment(order._id.toString(), business._id.toString(), shipmentCost)
                 );
                 if (shipmentError) {
                     logCritical({message: `Manufacturer shipment creation failed: ${shipmentError.message}`, error: shipmentError, source: "OrderService.updateDistributorOrderStatus"});
@@ -804,7 +1056,7 @@ export class OrderService {
                 }
 
                 const [invoiceError] = await catchError(
-                    ShipmentService.createAndFinalizeManufacturerInvoice(order._id.toString())
+                    ShipmentService.createAndFinalizeBusinessInvoice(order._id.toString())
                 );
                 if (invoiceError) {
                     logCritical({message: `Invoice creation failed: ${invoiceError.message}`, error: invoiceError, source: "OrderService.updateDistributorOrderStatus"});

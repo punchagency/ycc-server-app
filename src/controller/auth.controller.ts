@@ -105,7 +105,8 @@ export class AuthController {
                 address: address ? address : undefined,
                 phone,
                 businessPhone,
-                profilePicture
+                profilePicture,
+                website: website ? website : undefined,
             };
             const result = await AuthService.register(registerData);
 

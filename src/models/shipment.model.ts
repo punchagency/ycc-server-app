@@ -65,7 +65,7 @@ export interface IShipment extends Document {
     lastWebhookData: Schema.Types.Mixed;
     status: typeof SHIPMENT_STATUSES[number];
     shipmentCost?: number;
-    isManufacturerHandled: boolean;
+    isBusinessHandled: boolean;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -127,7 +127,7 @@ const ShipmentSchema = new Schema({
         default: 'created' 
     },
     shipmentCost: { type: Number },
-    isManufacturerHandled: { type: Boolean, default: false }
+    isBusinessHandled: { type: Boolean, default: false }
 }, {
     timestamps: true
 });

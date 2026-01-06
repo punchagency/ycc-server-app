@@ -39,6 +39,16 @@ export interface IShipment extends Document {
         pricePerItem: number;
         totalPriceOfItems: number;
     }[];
+    customsInfo?: {
+        customs_items: {
+            description: string;
+            quantity: number;
+            weight: number;
+            value: number;
+            hs_tariff_number: string;
+            origin_country: string;
+        }[];
+    };
     rates: {
         carrier: string;
         rate: number;
@@ -87,6 +97,16 @@ const ShipmentSchema = new Schema({
         pricePerItem: { type: Number, required: true },
         totalPriceOfItems: { type: Number, required: true }
     }],
+    customsInfo: {
+        customs_items: [{
+            description: { type: String },
+            quantity: { type: Number },
+            weight: { type: Number },
+            value: { type: Number },
+            hs_tariff_number: { type: String },
+            origin_country: { type: String }
+        }]
+    },
     rates: [{
         carrier: { type: String, required: true },
         rate: { type: Number, required: true },

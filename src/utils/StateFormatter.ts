@@ -1,4 +1,5 @@
 import { logWarning } from "./SystemLogs";
+import countries from 'world-countries';
 
 interface Address {
     street?: string;
@@ -32,11 +33,15 @@ export class AddressFormatter {
         'armed forces americas': 'AA', 'armed forces europe': 'AE', 'armed forces pacific': 'AP',
     };
 
-    private static readonly COUNTRY_CODES: Record<string, string> = {
-        'united states': 'US', 'united states of america': 'US', 'usa': 'US',
-        'canada': 'CA', 'mexico': 'MX',
-        'united kingdom': 'GB', 'great britain': 'GB', 'uk': 'GB',
-    };
+    private static readonly COUNTRY_MAP: Map<string, string> = new Map(
+        countries.flatMap(c => [
+            [c.name.common.toLowerCase(), c.cca2] as [string, string],
+            [c.name.official.toLowerCase(), c.cca2] as [string, string],
+            [c.cca2.toLowerCase(), c.cca2] as [string, string],
+            [c.cca3.toLowerCase(), c.cca2] as [string, string],
+            ...c.altSpellings.map(alt => [alt.toLowerCase(), c.cca2] as [string, string])
+        ])
+    );
 
     private static readonly CODE_TO_STATE: Record<string, string> = 
         Object.entries(AddressFormatter.US_STATE_CODES).reduce((acc, [name, code]) => {
@@ -61,9 +66,8 @@ export class AddressFormatter {
         if (!country || typeof country !== 'string') return country;
 
         const trimmed = country.trim();
-        if (trimmed.length === 2) return trimmed.toUpperCase();
-
-        const code = this.COUNTRY_CODES[trimmed.toLowerCase()];
+        const code = this.COUNTRY_MAP.get(trimmed.toLowerCase());
+        
         if (code) return code;
 
         logWarning({message: `Country code not found: "${country}"`, source: "AddressFormatter.formatCountryCode"});
@@ -87,7 +91,7 @@ export class AddressFormatter {
 
     static isValidCountryCode(code: string): boolean {
         if (!code || typeof code !== 'string') return false;
-        return code.length === 2 && /^[A-Z]{2}$/.test(code.toUpperCase());
+        return countries.some(c => c.cca2 === code.toUpperCase());
     }
 }
 

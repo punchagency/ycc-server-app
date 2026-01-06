@@ -291,6 +291,19 @@ class StripeService {
         }
     }
 
+    public async retrieveCustomer(customerId: string): Promise<Stripe.Customer | Stripe.DeletedCustomer> {
+        try {
+            const customer = await StripeService.stripe.customers.retrieve(customerId);
+            return customer;
+        } catch (error) {
+            logError({ message: 'Stripe customer retrieval failed', error, source: 'StripeService.retrieveCustomer' });
+            if (error instanceof Error) {
+                throw new Error(`Stripe customer retrieval failed: ${error.message}`);
+            }
+            throw error;
+        }
+    }
+
     public async createinvoices({ customer, collection_method, days_until_due, metadata }: {
         customer: string,
         collection_method: 'send_invoice' | 'charge_automatically',

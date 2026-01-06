@@ -4,14 +4,14 @@ export interface ICart extends Document {
     _id: Schema.Types.ObjectId;
     userId: Schema.Types.ObjectId;
     totalItems: number;
-    totalPrice: number;
+    totalPrice?: number;
     lastUpdated: Date;
     items: {
         productId: Schema.Types.ObjectId;
         quantity: number;
-        pricePerItem: number;
+        pricePerItem?: number;
         businessId: Schema.Types.ObjectId;
-        totalPriceOfItems: number;
+        totalPriceOfItems?: number;
     }[]
 }
 

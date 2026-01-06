@@ -161,7 +161,7 @@ export class OrderService {
 
             const pricePerItem = product.price;
             const discount = productInput.discount || 0;
-            const totalPriceOfItems = (pricePerItem * productInput.quantity) - discount;
+            const totalPriceOfItems = pricePerItem ? (pricePerItem * productInput.quantity) - discount : 0;
             const confirmationToken = uuid();
             const confirmationExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
@@ -604,12 +604,12 @@ export class OrderService {
             if (businessItems.length === 0) throw new Error('No items found for your business in this order');
 
             const validTransitions: Record<string, string[]> = {
-                'pending': ['confirmed'],
-                'confirmed': ['processing', 'declined'],
+                'pending': ['confirmed', 'declined', "cancelled"],
+                'confirmed': ['processing', 'declined', "cancelled"],
                 'declined': [],
-                'processing': ['shipped'],
-                'shipped': ['out_for_delivery'],
-                'out_for_delivery': [],
+                'processing': ['shipped', 'declined', "cancelled", "out_for_delivery"],
+                'shipped': ['out_for_delivery', 'declined', "cancelled"],
+                'out_for_delivery': ['declined', "cancelled"],
                 'delivered': [],
                 'cancelled': []
             };

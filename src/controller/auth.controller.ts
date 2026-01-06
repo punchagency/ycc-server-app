@@ -9,7 +9,7 @@ import { TryParseJSON } from '../utils/Helpers';
 export class AuthController {
     static async register(req: Request, res: Response): Promise<void> {
         try {
-            let { firstName, lastName, email, password, phone, nationality, address, role, businessName, businessEmail, businessPhone, website } = req.body;
+            let { firstName, lastName, email, password, phone, nationality, address, role, businessName, businessEmail, businessPhone } = req.body;
             email = email.toLowerCase().trim();
             firstName = firstName.trim();
             if (phone) phone = phone.trim();
@@ -39,11 +39,12 @@ export class AuthController {
             }
 
             if (phone) {
-                if (!Validate.phone(phone)) {
-                    res.status(400).json({ success: false, message: 'Valid phone number is required', code: "VALIDATION_ERROR" });
-                    return;
-                }
-                phone = Validate.formatPhone(phone) || phone;
+                // if (!Validate.phone(phone)) {
+                //     res.status(400).json({ success: false, message: 'Valid phone number is required', code: "VALIDATION_ERROR" });
+                //     return;
+                // }
+                // phone = Validate.formatPhone(phone) || phone;
+                console.log({phone});
             }
 
             if (businessPhone) {
@@ -99,10 +100,7 @@ export class AuthController {
                     return;
                 }
 
-                if (!website || !Validate.string(website)) {
-                    res.status(400).json({ success: false, message: 'Website is required for business accounts', code: "VALIDATION_ERROR" });
-                    return;
-                }
+                // website is now optional
             }
 
             const registerData: RegisterInput = {
@@ -372,7 +370,7 @@ export class AuthController {
             return;
         }
 
-        const { firstName, lastName, phone, nationality, address, profilePicture } = req.body; // <-- Add this
+        const { firstName, lastName, phone, nationality, address, profilePicture } = req.body;
         const files = req.files as { [fieldname: string]: any[] };
         const uploadedPicture = files?.profilePicture?.[0]?.location;
 
@@ -387,18 +385,21 @@ export class AuthController {
             updateData.profilePicture = null; // This will clear it in DB
         }
         // If neither → do nothing (keep existing picture)
+        console.log({phone});
+        
 
-        if (phone !== undefined) {
-            if (phone && !Validate.phone(phone)) {
-                res.status(400).json({ 
-                    success: false, 
-                    message: 'Valid phone number is required', 
-                    code: "VALIDATION_ERROR" 
-                });
-                return;
-            }
-            updateData.phone = phone ? Validate.formatPhone(phone) || phone : null;
-        }
+        // if (phone !== undefined) {
+        //     if (phone && !Validate.phone(phone)) {
+        //         res.status(400).json({ 
+        //             success: false, 
+        //             message: 'Valid phone number is required', 
+        //             code: "VALIDATION_ERROR" 
+        //         });
+        //         return;
+        //     }
+        //     updateData.phone = phone ? Validate.formatPhone(phone) || phone : null;
+        // }
+
         if(firstName !== undefined) updateData.firstName = firstName?.trim();
         if(lastName !== undefined) updateData.lastName = lastName?.trim();
         if (nationality !== undefined) updateData.nationality = nationality?.trim() || null;

@@ -167,7 +167,7 @@ export class ShipmentService {
 
         return shipments.length === 1 ? shipments[0] : shipments;
     }
-    static async createManufacturerHandledShipment(orderId: string, businessId: string, shipmentCost: number) {
+    static async createBusinessHandledShipment(orderId: string, businessId: string, shipmentCost: number) {
         const order = await OrderModel.findById(orderId);
         if (!order) throw new Error('Order not found');
 
@@ -197,7 +197,7 @@ export class ShipmentService {
             })),
             rates: [],
             shipmentCost,
-            isManufacturerHandled: true,
+            isBusinessHandled: true,
             status: 'created'
         });
 
@@ -205,14 +205,14 @@ export class ShipmentService {
             recipientId: order.userId,
             type: 'order',
             priority: 'high',
-            title: 'Order Confirmed - Manufacturer Handling Shipment',
-            message: `Your order has been confirmed. The manufacturer will handle shipment directly. Shipment cost: $${shipmentCost.toFixed(2)}`,
+            title: 'Order Confirmed - Business Handling Shipment',
+            message: `Your order has been confirmed. The supplier will handle shipment directly. Shipment cost: $${shipmentCost.toFixed(2)}`,
             data: { orderId: order._id, shipmentId: shipment._id, shipmentCost }
         });
 
         return shipment;
     }
-    static async createAndFinalizeManufacturerInvoice(orderId: string) {
+    static async createAndFinalizeBusinessInvoice(orderId: string) {
         try {
             const { invoice, order } = await this.createDraftInvoice(orderId);
             
@@ -248,7 +248,7 @@ export class ShipmentService {
                 message: `Failed to create and finalize manufacturer invoice: ${error.message}`, 
                 error, 
                 additionalData: { orderId, errorStack: error.stack, errorCode: error.code, errorType: error.type },
-                source: 'ShipmentService.createAndFinalizeManufacturerInvoice' 
+                source: 'ShipmentService.createAndFinalizeBusinessInvoice' 
             });
             throw error;
         }
@@ -306,13 +306,43 @@ export class ShipmentService {
         const allSuccess = results && results.every(r => r.success);
 
         if (allSuccess) {
-            let invoiceUrl;
-            try {
-                invoiceUrl = await this.finalizeAndSendInvoice(draftInvoice.invoice.id, orderId.toString());
-            } catch (error: any) {
-                logError({ message: 'Invoice finalization failed', error, source: 'ShipmentService.purchaseShipmentLabel' });
+            const order = await OrderModel.findById(orderId);
+            if (order?.stripeInvoiceId) {
+                const stripe = StripeService.getInstance();
+                const invoice = await stripe.getInvoice(order.stripeInvoiceId);
+                
+                if (invoice.status === 'draft') {
+                    const shipments = await ShipmentModel.find({ orderId });
+                    const allShipmentsHandled = shipments.every(s => s.isBusinessHandled || s.status === 'label_purchased');
+                    
+                    if (allShipmentsHandled) {
+                        const finalizedInvoice = await stripe.finalizeInvoice(order.stripeInvoiceId);
+                        order.stripeInvoiceUrl = finalizedInvoice.hosted_invoice_url;
+                        await order.save();
+                        await stripe.sendInvoice(order.stripeInvoiceId);
+                        
+                        const businessIds = [...new Set(order.items.map((item: any) => item.businessId))];
+                        const confirmedItems = order.items.filter((item: any) => item.status === 'confirmed');
+                        const confirmedTotal = confirmedItems.reduce((sum: number, item: any) => sum + item.totalPriceOfItems, 0);
+                        
+                        await InvoiceModel.create({
+                            stripeInvoiceId: order.stripeInvoiceId,
+                            userId: order.userId,
+                            orderId: orderId.toString(),
+                            businessIds,
+                            amount: finalizedInvoice.amount_due / 100,
+                            platformFee: confirmedTotal * CONSTANTS.PLATFORM_FEE_PERCENT,
+                            distributorAmount: (finalizedInvoice.amount_due / 100) - (confirmedTotal * CONSTANTS.PLATFORM_FEE_PERCENT),
+                            currency: 'usd',
+                            status: 'pending',
+                            invoiceDate: new Date(),
+                            dueDate: finalizedInvoice.due_date ? new Date(finalizedInvoice.due_date * 1000) : new Date(),
+                            stripeInvoiceUrl: finalizedInvoice.hosted_invoice_url
+                        });
+                    }
+                }
             }
-            return { status: true, results, invoiceUrl, labelsPurchased: true };
+            return { status: true, results, labelsPurchased: true };
         } else {
             const stripe = StripeService.getInstance();
             try {
@@ -603,7 +633,7 @@ export class ShipmentService {
         const shipments = await ShipmentModel.find({ orderId });
         let shippingTotal = 0;
         for (const shipment of shipments) {
-            if (shipment.isManufacturerHandled && shipment.shipmentCost) {
+            if (shipment.isBusinessHandled && shipment.shipmentCost) {
                 const manufacturerBusinessId = shipment.items[0]?.businessId;
                 if (manufacturerBusinessId) {
                     const business = await BusinessModel.findById(manufacturerBusinessId);
@@ -628,7 +658,7 @@ export class ShipmentService {
         }
 
         if (shippingTotal > 0) {
-            const platformShipping = shipments.filter(s => !s.isManufacturerHandled && s.rates.some(r => r.isSelected));
+            const platformShipping = shipments.filter(s => !s.isBusinessHandled && s.rates.some(r => r.isSelected));
             if (platformShipping.length > 0) {
                 const platformShippingCost = platformShipping.reduce((sum, s) => {
                     const rate = s.rates.find(r => r.isSelected);
@@ -661,42 +691,6 @@ export class ShipmentService {
         }
 
         return { invoice, stripeCustomerId, order };
-    }
-    private static async finalizeAndSendInvoice(invoiceId: string, orderId: string) {
-        const stripe = StripeService.getInstance();
-        const finalizedInvoice = await stripe.finalizeInvoice(invoiceId);
-
-        const order = await OrderModel.findById(orderId).populate('userId');
-        if (order) {
-            order.stripeInvoiceUrl = finalizedInvoice.hosted_invoice_url;
-            order.stripeInvoiceId = invoiceId;
-            await order.save();
-        }
-
-        await stripe.sendInvoice(invoiceId);
-
-        const businessIds = [...new Set(order!.items.map(item => item!.businessId))];
-        const distributorAmount = (finalizedInvoice.amount_due / 100) - order!.platformFee;
-        try {
-            await InvoiceModel.create({
-                stripeInvoiceId: invoiceId,
-                userId: order!.userId,
-                orderId: orderId,
-                businessIds,
-                amount: finalizedInvoice.amount_due / 100,
-                platformFee: order!.platformFee,
-                distributorAmount,
-                currency: 'usd',
-                status: 'pending',
-                invoiceDate: new Date(),
-                dueDate: finalizedInvoice.due_date ? new Date(finalizedInvoice.due_date * 1000) : null,
-                stripeInvoiceUrl: finalizedInvoice.hosted_invoice_url
-            });
-        } catch (error: any) {
-            logError({ message: 'Invoice record creation failed', error, source: 'ShipmentService.finalizeAndSendInvoice' });
-        }
-
-        return finalizedInvoice.hosted_invoice_url;
     }
     static async processTrackingWebhook(trackingCode: string, easypostStatus: string, webhookData: any) {
         const shipment = await ShipmentModel.findOne({ trackingNumber: trackingCode });

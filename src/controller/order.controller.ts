@@ -321,7 +321,7 @@ class OrderController {
                 res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
                 return;
             }
-            const { orderId, status, reason, notes, trackingNumber }: UpdateOrderStatusDto = req.body;
+            const { orderId, status, reason, notes, enableShipping, trackingNumber, shipmentCost }: UpdateOrderStatusDto = req.body;
             const userId = req.user?._id;
             const userRole = req.user?.role;
 
@@ -333,11 +333,29 @@ class OrderController {
                 return res.status(400).json({ success: false, message: 'Order ID and status are required', code: 'VALIDATION_ERROR' });
             }
 
-            if (!['confirmed', 'processing', 'shipped', 'out_for_delivery', 'cancelled', 'declined'].includes(status)) {
-                return res.status(400).json({ success: false, message: 'Invalid status. User can only set confirmed or cancelled', code: 'VALIDATION_ERROR' });
+            if (!['confirmed', 'processing', 'shipped', 'out_for_delivery', 'cancelled', 'declined', 'delivered'].includes(status)) {
+                return res.status(400).json({ success: false, message: 'Invalid status', code: 'VALIDATION_ERROR' });
             }
 
-            const [error, result] = await catchError(OrderService.updateUserOrderStatus(userId.toString(), orderId, status, userRole, reason, notes, trackingNumber));
+            if (status === 'confirmed' && enableShipping !== undefined && typeof enableShipping !== 'boolean') {
+                return res.status(400).json({ success: false, message: 'enableShipping must be a boolean', code: 'VALIDATION_ERROR' });
+            }
+
+            if (status === 'confirmed' && enableShipping === false && (!shipmentCost || typeof shipmentCost !== 'number' || shipmentCost <= 0)) {
+                return res.status(400).json({ success: false, message: 'shipmentCost is required and must be a positive number when enableShipping is false', code: 'VALIDATION_ERROR' });
+            }
+
+            const [error, result] = await catchError(OrderService.updateUserOrderStatus({
+                orderId,
+                status,
+                userId: userId.toString(),
+                userRole,
+                reason,
+                notes,
+                trackingNumber,
+                enableShipping,
+                shipmentCost
+            }));
 
             if (error) {
                 logError({ message: "Updating order status failed!", source: "OrderController.updateUserOrderStatus", error });
@@ -475,7 +493,7 @@ class OrderController {
                 return res.status(400).json({ success: false, message: 'Order ID and status are required', code: 'VALIDATION_ERROR' });
             }
 
-            if (!['confirmed', 'processing', 'shipped', 'out_for_delivery', 'cancelled'].includes(status)) {
+            if (!['confirmed', 'processing', 'shipped', 'out_for_delivery', 'cancelled', 'delivered'].includes(status)) {
                 return res.status(400).json({ success: false, message: 'Invalid status', code: 'VALIDATION_ERROR' });
             }
 

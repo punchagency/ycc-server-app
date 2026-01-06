@@ -6,6 +6,8 @@ export interface UpdateOrderStatusDto {
     reason?: string;
     trackingNumber?: string;
     notes?: string;
+    enableShipping?: boolean;
+    shipmentCost?: number;
 }
 
 export interface GetOrdersDto{

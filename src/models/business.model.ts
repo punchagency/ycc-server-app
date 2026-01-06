@@ -68,8 +68,8 @@ const businessSchema = new Schema<IBusiness>({
     },
     phone: {
         type: String,
-        required: true,
-        unique: true
+        required: false,
+        default: null
     },
     taxId: {
         type: String,

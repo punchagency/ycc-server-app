@@ -46,6 +46,27 @@ export class OrderService {
             }
             user.stripeCustomerId = stripeCustomerId;
             await user.save();
+        }else{
+            try{
+                const customer = await stripe.retrieveCustomer(stripeCustomerId);
+                if(!customer){
+                    const customer = await stripe.createCustomer({
+                        email: user.email,
+                        name: `${user.firstName} ${user.lastName}`
+                    });
+                    stripeCustomerId = customer.id;
+                    user.stripeCustomerId = stripeCustomerId;
+                    await user.save();
+                }
+            }catch(error){
+                const customer = await stripe.createCustomer({
+                    email: user.email,
+                    name: `${user.firstName} ${user.lastName}`
+                });
+                stripeCustomerId = customer.id;
+                user.stripeCustomerId = stripeCustomerId;
+                await user.save();
+            }
         }
 
         if (order.stripeInvoiceId) {

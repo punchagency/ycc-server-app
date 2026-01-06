@@ -98,11 +98,6 @@ export class AuthController {
                     res.status(400).json({ success: false, message: 'Valid business email is required for business accounts', code: "VALIDATION_ERROR" });
                     return;
                 }
-
-                if (!website || !Validate.string(website)) {
-                    res.status(400).json({ success: false, message: 'Website is required for business accounts', code: "VALIDATION_ERROR" });
-                    return;
-                }
             }
 
             const registerData: RegisterInput = {

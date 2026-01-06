@@ -497,6 +497,13 @@ export class ServiceController {
                 ];
             }
 
+            // Category filter
+            if (category && typeof category === 'string') {
+                if (Types.ObjectId.isValid(category)) {
+                    matchQuery.categoryId = new Types.ObjectId(category);
+                }
+            }
+
             // Price range filter
             if (minPrice !== undefined || maxPrice !== undefined) {
                 matchQuery.price = {};
@@ -533,8 +540,8 @@ export class ServiceController {
                 { $unwind: '$business' }
             ];
 
-            // Add category filter after lookups
-            if (category) {
+            // Add category filter after lookups (for name-based search)
+            if (category && typeof category === 'string' && !Types.ObjectId.isValid(category)) {
                 aggregationPipeline.push({
                     $match: { 'category.name': { $regex: category, $options: 'i' } }
                 });

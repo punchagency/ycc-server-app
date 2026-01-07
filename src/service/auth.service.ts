@@ -163,21 +163,22 @@ export class AuthService {
             userId: savedUser._id,
             businessName: userData.businessName,
             businessType: userData.businessType || userData.role,
-            website: userData.website || '',
+            website: userData.website || null,
             address: userData.address,
-            email: userData.businessEmail || '',
-            phone: userData.businessPhone || '',
-            taxId: userData.taxId || '',
+            email: userData.businessEmail || null,
+            phone: userData.businessPhone || null,
+            taxId: userData.taxId || null,
             stripeAccountId: '',
             stripeAccountLink: '',
-            license: userData.license || '',
+            license: userData.license || null,
             isOnboarded: false
           });
 
           business = await newBusiness.save();
-        } catch (businessError) {
+        } catch (businessError: any) {
           await User.findByIdAndDelete(savedUser._id);
-          throw new Error('Failed to create business record');
+          // Re-throw to be caught by outer handler for specific error messages
+          throw businessError;
         }
       }
 
@@ -197,8 +198,33 @@ export class AuthService {
           } : undefined
         }
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Registration error:', error);
+      
+      // Handle MongoDB duplicate key errors
+      if (error?.code === 11000 || error?.message?.includes('duplicate key')) {
+        const keyPattern = error?.keyPattern || {};
+        const keyValue = error?.keyValue || {};
+        console.error('Duplicate key error details:', { keyPattern, keyValue, message: error?.message });
+        
+        // Check keyPattern first (more reliable), then fall back to message
+        if (keyPattern.email) {
+          return { success: false, error: 'This email is already registered' };
+        }
+        if (keyPattern.phone) {
+          return { success: false, error: 'This phone number is already registered. Note: You may need to drop the old phone_1 index from MongoDB.' };
+        }
+        // Fallback to message matching only if keyPattern is empty
+        if (Object.keys(keyPattern).length === 0) {
+          if (error?.message?.includes('email')) {
+            return { success: false, error: 'This email is already registered' };
+          }
+          if (error?.message?.includes('phone')) {
+            return { success: false, error: 'This phone number is already registered (index conflict - drop phone_1 index)' };
+          }
+        }
+        return { success: false, error: 'A duplicate record was found. Please check your details.' };
+      }
       
       return {
         success: false,
@@ -573,7 +599,7 @@ export class AuthService {
       if (user.isActive) {
         return { success: false, error: 'Account already activated' };
       }
-
+console.log(user);
       if (!user.activationCode || user.activationCode !== code) {
         return { success: false, error: 'Invalid activation code' };
       }

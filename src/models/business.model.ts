@@ -5,7 +5,7 @@ export interface IBusiness extends Document {
     _id: Schema.Types.ObjectId;
     userId: Schema.Types.ObjectId;
     businessName: string;
-    website: string;
+    website?: string;
     address: {
         street: string;
         zipcode: string;
@@ -68,8 +68,8 @@ const businessSchema = new Schema<IBusiness>({
     },
     phone: {
         type: String,
-        required: true,
-        unique: true
+        required: false,
+        default: null
     },
     taxId: {
         type: String,

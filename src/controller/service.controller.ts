@@ -6,6 +6,8 @@ import Validate from '../utils/Validate';
 import UserModel from '../models/user.model';
 import BusinessModel from '../models/business.model';
 import { Types } from 'mongoose';
+import CONSTANTS from '../config/constant';
+import { CurrencyConverter } from '../utils/currencyConverter';
 
 export class ServiceController {
     static async createService(req: AuthenticatedRequest, res: Response): Promise<void> {
@@ -66,7 +68,7 @@ export class ServiceController {
                 return;
             }
 
-            const { name, description, price, categoryId, isQuotable } = req.body;
+            const { name, description, price, currency, categoryId, isQuotable } = req.body;
 
             if (!name || !Validate.stringLength(name, 2, 100)) {
                 res.status(400).json({ success: false, message: 'Service name must be 2-100 characters', code: 'VALIDATION_ERROR' });
@@ -80,6 +82,11 @@ export class ServiceController {
 
             if (!isQuotable && (!price || typeof Number(price) !== 'number' || Number(price) < 1)) {
                 res.status(400).json({ success: false, message: 'Valid price is required for non-quotable services', code: 'VALIDATION_ERROR' });
+                return;
+            }
+
+            if (currency && !CONSTANTS.CURRENCIES_CODES.includes(currency.toUpperCase())) {
+                res.status(400).json({ success: false, message: 'Currency is not supported', code: 'VALIDATION_ERROR' });
                 return;
             }
 
@@ -100,6 +107,7 @@ export class ServiceController {
                 name: name.trim(),
                 description: description?.trim(),
                 price: Number(price),
+                currency: currency ? currency.toLowerCase() : 'usd',
                 businessId,
                 categoryId,
                 isQuotable: isQuotable || false
@@ -159,6 +167,10 @@ export class ServiceController {
                 }
                 if (!service.categoryName || !Validate.string(service.categoryName)) {
                     res.status(400).json({ success: false, message: 'Each service must have a category name', code: 'VALIDATION_ERROR' });
+                    return;
+                }
+                if (service.currency && !CONSTANTS.CURRENCIES_CODES.includes(service.currency.toUpperCase())) {
+                    res.status(400).json({ success: false, message: 'Currency is not supported', code: 'VALIDATION_ERROR' });
                     return;
                 }
             }
@@ -315,7 +327,7 @@ export class ServiceController {
                 });
                 return;
             }
-            const { name, description, price, categoryId, isQuotable } = req.body;
+            const { name, description, price, currency, categoryId, isQuotable } = req.body;
 
             if (name && !Validate.stringLength(name, 2, 50)) {
                 res.status(400).json({ success: false, message: 'Service name must be 2-50 characters', code: 'VALIDATION_ERROR' });
@@ -340,6 +352,11 @@ export class ServiceController {
                 return;
             }
 
+            if (currency && !CONSTANTS.CURRENCIES_CODES.includes(currency.toUpperCase())) {
+                res.status(400).json({ success: false, message: 'Currency is not supported', code: 'VALIDATION_ERROR' });
+                return;
+            }
+
             const files = req.files as { [fieldname: string]: Express.MulterS3.File[] };
             const imageURLs = files?.serviceImage?.map(file => file.location);
 
@@ -352,6 +369,7 @@ export class ServiceController {
             if (name) updateData.name = name.trim();
             if (description) updateData.description = description.trim();
             if (price !== undefined) updateData.price = Number(price);
+            if (currency) updateData.currency = currency.toLowerCase();
             if (categoryId) updateData.categoryId = categoryId;
             if (isQuotable !== undefined) updateData.isQuotable = isQuotable;
 
@@ -504,13 +522,6 @@ export class ServiceController {
                 }
             }
 
-            // Price range filter
-            if (minPrice !== undefined || maxPrice !== undefined) {
-                matchQuery.price = {};
-                if (minPrice !== undefined) matchQuery.price.$gte = parseFloat(minPrice as string);
-                if (maxPrice !== undefined) matchQuery.price.$lte = parseFloat(maxPrice as string);
-            }
-
             // Build aggregation pipeline
             const aggregationPipeline: any[] = [
                 { $match: matchQuery },
@@ -554,6 +565,7 @@ export class ServiceController {
                     name: 1,
                     description: 1,
                     price: 1,
+                    currency: 1,
                     imageURLs: 1,
                     isQuotable: 1,
                     category: {
@@ -592,18 +604,23 @@ export class ServiceController {
                 aggregationPipeline.push({ $sort: { randomSort: 1 } });
             }
 
-            // Get total count
-            const countPipeline = [...aggregationPipeline];
-            countPipeline.push({ $count: 'total' });
-            const countResult = await ServiceService.aggregateServices(countPipeline);
-            const totalServices = countResult[0]?.total || 0;
-
-            // Add pagination
-            aggregationPipeline.push({ $skip: skip });
-            aggregationPipeline.push({ $limit: limitNum });
-
             // Execute aggregation
-            const services = await ServiceService.aggregateServices(aggregationPipeline);
+            let services = await ServiceService.aggregateServices(aggregationPipeline);
+
+            // Apply price filtering with currency conversion
+            if (minPrice !== undefined || maxPrice !== undefined) {
+                services = services.filter(service => {
+                    const priceInUSD = CurrencyConverter.convertToUSD(service.price || 0, service.currency || 'usd');
+                    if (minPrice !== undefined && priceInUSD < parseFloat(minPrice as string)) return false;
+                    if (maxPrice !== undefined && priceInUSD > parseFloat(maxPrice as string)) return false;
+                    return true;
+                });
+            }
+
+            const totalServices = services.length;
+
+            // Apply pagination after filtering
+            services = services.slice(skip, skip + limitNum);
 
             // Calculate pagination info
             const totalPages = Math.ceil(totalServices / limitNum);

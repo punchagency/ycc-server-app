@@ -755,7 +755,7 @@ export class ShipmentService {
 
         const order: any = await OrderModel.findById(shipment.orderId);
         if (order) {
-            const orderStatusMap: Record<string, 'processing' | 'shipped' | 'delivered' | 'cancelled'> = {
+            const orderStatusMap: Record<string, 'processing' | 'shipped' | 'out_for_delivery' | 'delivered' | 'cancelled'> = {
                 'label_purchased': 'processing',
                 'shipped': 'shipped',
                 'delivered': 'delivered',
@@ -765,12 +765,43 @@ export class ShipmentService {
 
             const targetOrderStatus = orderStatusMap[newStatus];
             if (targetOrderStatus) {
+                // Update individual order items for this shipment
                 for (const shipmentItem of shipment.items) {
                     const orderItem = order.items.find((i: any) => 
                         i.productId.toString() === shipmentItem.productId.toString()
                     );
                     if (orderItem) orderItem.status = targetOrderStatus;
                 }
+                
+                // Check if ALL shipments for this order have reached a terminal state
+                const allShipments = await ShipmentModel.find({ orderId: order._id });
+                const allDelivered = allShipments.every(s => s.status === 'delivered');
+                const allFailed = allShipments.every(s => ['failed', 'returned_to_supplier'].includes(s.status));
+                const allShipped = allShipments.every(s => ['shipped', 'delivered'].includes(s.status));
+                
+                // Update overall order status based on all shipments
+                const previousOrderStatus = order.status;
+                if (allDelivered) {
+                    order.status = 'delivered';
+                } else if (allFailed) {
+                    order.status = 'cancelled';
+                } else if (allShipped) {
+                    order.status = 'shipped';
+                }
+                
+                // Add order history entry if status changed
+                if (previousOrderStatus !== order.status) {
+                    order.orderHistory.push({
+                        fromStatus: previousOrderStatus,
+                        toStatus: order.status,
+                        changedBy: 'system',
+                        userRole: 'system',
+                        notes: `Status updated via EasyPost webhook (tracking: ${trackingCode})`,
+                        changedAt: new Date()
+                    });
+                    logInfo({message: `Order ${order._id} status: ${previousOrderStatus} → ${order.status}`, source: 'ShipmentService.processTrackingWebhook'});
+                }
+                
                 await order.save();
             }
         }

@@ -14,10 +14,10 @@ export class AuthController {
             firstName = firstName.trim();
             if (phone) phone = phone.trim();
             if (nationality) nationality = nationality.trim();
-            
+
             const files = req.files as { [fieldname: string]: any[] };
             const profilePicture = files?.profilePicture?.[0]?.location || null;
-            
+
             // Validation
             if (!firstName || !Validate.string(firstName)) {
                 res.status(400).json({ success: false, message: 'Valid first name is required', code: "VALIDATION_ERROR" });
@@ -54,13 +54,13 @@ export class AuthController {
                 businessPhone = Validate.formatPhone(businessPhone) || businessPhone;
             }
 
-            if(!Validate.oneOf({ allowedValues: ROLES as any, value: role})){
+            if (!Validate.oneOf({ allowedValues: ROLES as any, value: role })) {
                 res.status(400).json({ success: false, message: 'Valid role is required', code: "VALIDATION_ERROR" });
                 return;
             }
 
-            if(role !== 'admin'){
-                address = TryParseJSON(address, {street: '', zipcode: '', city: '', state: '', country: ''})
+            if (role !== 'admin') {
+                address = TryParseJSON(address, { street: '', zipcode: '', city: '', state: '', country: '' })
                 // Address validation
                 if (!address || typeof address !== 'object') {
                     res.status(400).json({ success: false, message: 'Valid address is required', code: "VALIDATION_ERROR" });
@@ -87,7 +87,7 @@ export class AuthController {
                     return;
                 }
             }
-            
+
             // Business validation for distributor/manufacturer
             if (role === 'distributor' || role === 'manufacturer') {
                 if (!businessName || !Validate.string(businessName)) {
@@ -341,7 +341,7 @@ export class AuthController {
             if (user.role === 'distributor' || user.role === 'manufacturer') {
                 const business = await Business.findOne({ userId: user._id });
                 if (business) {
-                    responseData.business = business;
+                    responseData.user.business = business;
                 }
             }
 
@@ -359,95 +359,95 @@ export class AuthController {
     }
 
     static async updateProfile(req: AuthenticatedRequest, res: Response): Promise<void> {
-    try {
-        if (!req.user) {
-            res.status(401).json({
-                success: false,
-                message: 'Authentication required',
-                code: 'UNAUTHORIZED'
-            });
-            return;
-        }
-
-        const { firstName, lastName, phone, nationality, address, profilePicture } = req.body;
-        const files = req.files as { [fieldname: string]: any[] };
-        const uploadedPicture = files?.profilePicture?.[0]?.location;
-
-        const updateData: any = {};
-
-        // Handle profile picture explicitly
-        if (uploadedPicture) {
-            // New picture uploaded → use it
-            updateData.profilePicture = uploadedPicture;
-        } else if (profilePicture === null || profilePicture === 'null' || profilePicture === '') {
-            // Client explicitly wants to remove the picture
-            updateData.profilePicture = null; // This will clear it in DB
-        }
-        // If neither → do nothing (keep existing picture)
-        console.log({phone});
-        
-
-        // if (phone !== undefined) {
-        //     if (phone && !Validate.phone(phone)) {
-        //         res.status(400).json({ 
-        //             success: false, 
-        //             message: 'Valid phone number is required', 
-        //             code: "VALIDATION_ERROR" 
-        //         });
-        //         return;
-        //     }
-        //     updateData.phone = phone ? Validate.formatPhone(phone) || phone : null;
-        // }
-
-        if(firstName !== undefined) updateData.firstName = firstName?.trim();
-        if(lastName !== undefined) updateData.lastName = lastName?.trim();
-        if (nationality !== undefined) updateData.nationality = nationality?.trim() || null;
-        if (address !== undefined) updateData.address = address || null;
-
-        const user = await User.findByIdAndUpdate(
-            req.user._id,
-            updateData,
-            { new: true, runValidators: true }
-        ).select('-password -refreshToken');
-
-        if (!user) {
-            res.status(404).json({
-                success: false,
-                message: 'User not found',
-                code: 'USER_NOT_FOUND'
-            });
-            return;
-        }
-
-        res.status(200).json({
-            success: true,
-            message: 'Profile updated successfully',
-            data: {
-                user: {
-                    id: user._id,
-                    firstName: user.firstName,
-                    lastName: user.lastName,
-                    email: user.email,
-                    phone: user.phone,
-                    role: user.role,
-                    profilePicture: user.profilePicture, // Will be null if removed
-                    address: user.address,
-                    nationality: user.nationality,
-                    isVerified: user.isVerified,
-                    isActive: user.isActive,
-                    createdAt: user.createdAt,
-                    updatedAt: user.updatedAt
-                }
+        try {
+            if (!req.user) {
+                res.status(401).json({
+                    success: false,
+                    message: 'Authentication required',
+                    code: 'UNAUTHORIZED'
+                });
+                return;
             }
-        });
-    } catch (error) {
-        console.error('Profile update error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Profile update failed'
-        });
+
+            const { firstName, lastName, phone, nationality, address, profilePicture } = req.body;
+            const files = req.files as { [fieldname: string]: any[] };
+            const uploadedPicture = files?.profilePicture?.[0]?.location;
+
+            const updateData: any = {};
+
+            // Handle profile picture explicitly
+            if (uploadedPicture) {
+                // New picture uploaded → use it
+                updateData.profilePicture = uploadedPicture;
+            } else if (profilePicture === null || profilePicture === 'null' || profilePicture === '') {
+                // Client explicitly wants to remove the picture
+                updateData.profilePicture = null; // This will clear it in DB
+            }
+            // If neither → do nothing (keep existing picture)
+            console.log({ phone });
+
+
+            // if (phone !== undefined) {
+            //     if (phone && !Validate.phone(phone)) {
+            //         res.status(400).json({ 
+            //             success: false, 
+            //             message: 'Valid phone number is required', 
+            //             code: "VALIDATION_ERROR" 
+            //         });
+            //         return;
+            //     }
+            //     updateData.phone = phone ? Validate.formatPhone(phone) || phone : null;
+            // }
+
+            if (firstName !== undefined) updateData.firstName = firstName?.trim();
+            if (lastName !== undefined) updateData.lastName = lastName?.trim();
+            if (nationality !== undefined) updateData.nationality = nationality?.trim() || null;
+            if (address !== undefined) updateData.address = address || null;
+
+            const user = await User.findByIdAndUpdate(
+                req.user._id,
+                updateData,
+                { new: true, runValidators: true }
+            ).select('-password -refreshToken');
+
+            if (!user) {
+                res.status(404).json({
+                    success: false,
+                    message: 'User not found',
+                    code: 'USER_NOT_FOUND'
+                });
+                return;
+            }
+
+            res.status(200).json({
+                success: true,
+                message: 'Profile updated successfully',
+                data: {
+                    user: {
+                        id: user._id,
+                        firstName: user.firstName,
+                        lastName: user.lastName,
+                        email: user.email,
+                        phone: user.phone,
+                        role: user.role,
+                        profilePicture: user.profilePicture, // Will be null if removed
+                        address: user.address,
+                        nationality: user.nationality,
+                        isVerified: user.isVerified,
+                        isActive: user.isActive,
+                        createdAt: user.createdAt,
+                        updatedAt: user.updatedAt
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('Profile update error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Profile update failed'
+            });
+        }
     }
-}
 
     static async updateDistributorProfile(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
@@ -474,28 +474,28 @@ export class AuthController {
 
             const userUpdateData: any = {};
             const businessUpdateData: any = {};
-            
+
             // Note: businessName is not allowed to be updated
-            
+
             if (businessEmail) {
                 if (!Validate.email(businessEmail)) {
-                    res.status(400).json({ 
-                        success: false, 
-                        message: 'Valid business email is required', 
-                        code: "VALIDATION_ERROR" 
+                    res.status(400).json({
+                        success: false,
+                        message: 'Valid business email is required',
+                        code: "VALIDATION_ERROR"
                     });
                     return;
                 }
                 userUpdateData.businessEmail = businessEmail.toLowerCase().trim();
                 businessUpdateData.email = businessEmail.toLowerCase().trim();
             }
-            
+
             if (businessPhone) {
                 if (!Validate.phone(businessPhone)) {
-                    res.status(400).json({ 
-                        success: false, 
-                        message: 'Valid business phone is required', 
-                        code: "VALIDATION_ERROR" 
+                    res.status(400).json({
+                        success: false,
+                        message: 'Valid business phone is required',
+                        code: "VALIDATION_ERROR"
                     });
                     return;
                 }
@@ -503,12 +503,12 @@ export class AuthController {
                 userUpdateData.businessPhone = formattedPhone;
                 businessUpdateData.phone = formattedPhone;
             }
-            
+
             if (website) {
                 userUpdateData.website = website.trim();
                 businessUpdateData.website = website.trim();
             }
-            
+
             if (address) {
                 const parsedAddress = TryParseJSON(address, null);
                 const addressData = parsedAddress || address;
@@ -575,7 +575,6 @@ export class AuthController {
             });
         }
     }
-
 
     static async activateAccount(req: Request, res: Response): Promise<void> {
         try {

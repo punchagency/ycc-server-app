@@ -10,10 +10,13 @@ import StripeService from '../integration/stripe';
 import { CategoryService } from "../service/category.service"
 import OrderModel from '../models/order.model';
 import BusinessModel from '../models/business.model';
+import CONSTANTS from '../config/constant';
+import { CurrencyConverter } from '../utils/currencyConverter';
 
 export interface IProductInput {
     name: string;
     price?: number;
+    currency?: string;
     category: string;
     sku?: string;
     quantity: number;
@@ -39,6 +42,7 @@ export interface IProductSearchQuery {
     category?: string;
     minPrice?: number;
     maxPrice?: number;
+    currency?: string;
     businessId?: string;
     businessName?: string;
     userRole?: string;
@@ -50,6 +54,11 @@ export interface IProductSearchQuery {
 export class ProductService {
     static async createProduct(userId: string, businessId: string, productData: IProductInput, categoryInput: string): Promise<IProduct | null> {
         const stripeService = StripeService.getInstance();
+        const currency = (productData.currency || 'usd').toLowerCase();
+
+        if (!CONSTANTS.CURRENCIES_CODES.includes(currency.toUpperCase())) {
+            throw new Error('Currency is not supported');
+        }
 
         const business = await BusinessModel.findById(businessId).populate('userId');
         if (!business) throw new Error('Business not found');
@@ -93,7 +102,8 @@ export class ProductService {
         const [priceError, stripePrice] = await catchError(
             stripeService.createPrice({
                 productId: stripeProduct.id,
-                unitAmount: Math.round((productData?.price || 0) * 100)
+                unitAmount: Math.round((productData?.price || 0) * 100),
+                currency
             })
         );
 
@@ -103,12 +113,12 @@ export class ProductService {
                 source: 'ProductService.createProduct',
                 additionalData: { stripeProductId: stripeProduct.id, error: priceError.message }
             });
-            // throw new Error('Failed to create Stripe price');
         }
 
         const [error, product] = await catchError(
             ProductModel.create({
                 ...productData,
+                currency,
                 category: new Types.ObjectId(categoryId),
                 userId: new Types.ObjectId(userId),
                 businessId: new Types.ObjectId(businessId),
@@ -220,7 +230,7 @@ export class ProductService {
     }
 
     static async searchProducts(query: IProductSearchQuery): Promise<{ products: IProduct[]; total: number }> {
-        const { name, category, minPrice, maxPrice, businessId, userRole, page = 1, limit = 20, random = false } = query;
+        const { name, category, minPrice, maxPrice, currency = 'usd', businessId, userRole, page = 1, limit = 20, random = false } = query;
         const skip = (page - 1) * limit;
 
         const mongoQuery: any = {};
@@ -241,10 +251,8 @@ export class ProductService {
             mongoQuery.category = new Types.ObjectId(category);
         }
 
-        if (minPrice !== undefined || maxPrice !== undefined) {
-            mongoQuery.price = {};
-            if (minPrice !== undefined) mongoQuery.price.$gte = minPrice;
-            if (maxPrice !== undefined) mongoQuery.price.$lte = maxPrice;
+        if (currency) {
+            mongoQuery.currency = currency.toLowerCase();
         }
 
         let productQuery = ProductModel.find(mongoQuery)
@@ -280,6 +288,16 @@ export class ProductService {
 
         let [products, total] = result;
 
+        if (minPrice !== undefined || maxPrice !== undefined) {
+            products = products.filter(product => {
+                const priceInUSD = CurrencyConverter.convertToUSD(product.price || 0, product.currency || 'usd');
+                if (minPrice !== undefined && priceInUSD < minPrice) return false;
+                if (maxPrice !== undefined && priceInUSD > maxPrice) return false;
+                return true;
+            });
+            total = products.length;
+        }
+
         return { products: products || [], total: total || 0 };
     }
 
@@ -305,9 +323,51 @@ export class ProductService {
         return products || [];
     }
 
-    static async updateProduct(id: string, updateData: Partial<IProductInput>, categoryInput?: string): Promise<IProduct | null> {
+    static async updateProduct(id: string, updateData: Partial<IProductInput & {[key: string]: string}>, categoryInput?: string): Promise<IProduct | null> {
         if (!Types.ObjectId.isValid(id)) {
             return null;
+        }
+
+        const existingProduct = await ProductModel.findById(id);
+        if (!existingProduct) {
+            throw new Error('Product not found');
+        }
+
+        if (updateData.currency && updateData.currency !== existingProduct.currency) {
+            const [orderError, hasOrders] = await catchError(
+                OrderModel.exists({ 'items.productId': new Types.ObjectId(id) })
+            );
+
+            if (orderError) {
+                throw new Error('Failed to check product orders');
+            }
+
+            if (hasOrders) {
+                throw new Error('Cannot change currency for product with existing orders');
+            }
+
+            if (!CONSTANTS.CURRENCIES_CODES.includes(updateData.currency.toUpperCase())) {
+                throw new Error('Currency is not supported');
+            }
+
+            const stripeService = StripeService.getInstance();
+            const [priceError, stripePrice] = await catchError(
+                stripeService.createPrice({
+                    productId: existingProduct.stripeProductId!,
+                    unitAmount: Math.round((updateData.price || existingProduct.price || 0) * 100),
+                    currency: updateData.currency.toLowerCase()
+                })
+            );
+
+            if (priceError) {
+                await logError({
+                    message: 'Failed to create new Stripe price for currency change',
+                    source: 'ProductService.updateProduct',
+                    additionalData: { productId: id, error: priceError.message }
+                });
+            } else {
+                updateData.stripePriceId = stripePrice.id as any;
+            }
         }
 
         const finalUpdateData = { ...updateData };
@@ -339,7 +399,7 @@ export class ProductService {
         }
 
         const [error, product] = await catchError(
-            ProductModel.findByIdAndUpdate(id, finalUpdateData, { new: true }).populate('category', 'name')
+            ProductModel.findByIdAndUpdate(id, {...finalUpdateData, currency: finalUpdateData.currency?.toLowerCase()}, { new: true }).populate('category', 'name')
         );
 
         if (error) {
@@ -565,7 +625,7 @@ export class ProductService {
         }
     }
 
-    static async createMultipleProducts(userId: string, businessId: string, productsData: Array<{ name: string; price?: number; categoryName: string; sku?: string; quantity: number; minRestockLevel: number; description?: string; wareHouseAddress: { street?: string; zipcode?: string; city?: string; state: string; country: string }; hsCode: string; weight: number; length: number; width: number; height: number }>): Promise<{ successful: IProduct[]; failed: Array<{ product: any; error: string }>; newCategories: string[] }> {
+    static async createMultipleProducts(userId: string, businessId: string, productsData: Array<{ name: string; price?: number; currency?: string; categoryName: string; sku?: string; quantity: number; minRestockLevel: number; description?: string; wareHouseAddress: { street?: string; zipcode?: string; city?: string; state: string; country: string }; hsCode: string; weight: number; length: number; width: number; height: number }>): Promise<{ successful: IProduct[]; failed: Array<{ product: any; error: string }>; newCategories: string[] }> {
         const stripeService = StripeService.getInstance();
         const CategoryService = require('./category.service').CategoryService;
         const categoryCache = new Map<string, string>();
@@ -617,7 +677,8 @@ export class ProductService {
                 const [priceError, stripePrice] = await catchError(
                     stripeService.createPrice({
                         productId: stripeProduct.id,
-                        unitAmount: Math.round((productData?.price || 0) * 100)
+                        unitAmount: Math.round((productData?.price || 0) * 100),
+                        currency: (productData.currency || 'usd').toLowerCase()
                     })
                 );
 
@@ -639,6 +700,7 @@ export class ProductService {
                     ProductModel.create({
                         name: productData.name,
                         price: productData.price,
+                        currency: (productData.currency || 'usd').toLowerCase(),
                         category: new Types.ObjectId(categoryId),
                         sku: productData.sku,
                         quantity: productData.quantity,

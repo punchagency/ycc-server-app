@@ -34,8 +34,15 @@ export class StripeAccountService {
             country: business.address.country ? AddressFormatter.formatCountryCode(business.address.country) : 'US'
         });
 
-        const return_url = `${process.env.FRONTEND_URL}/distributor/onboarding/${userId}`;
-        const refresh_url = `${process.env.FRONTEND_URL}/distributor/onboarding/refresh-stripe-account`;
+        let return_url;
+        let refresh_url;
+        if (business.businessType === 'distributor') {
+            return_url = `${process.env.FRONTEND_URL}/distributor/onboarding/${userId}`;
+            refresh_url = `${process.env.FRONTEND_URL}/distributor/onboarding/refresh-stripe-account`;
+        } else {
+            return_url = `${process.env.FRONTEND_URL}/manufacturer/onboarding/${userId}`;
+            refresh_url = `${process.env.FRONTEND_URL}/manufacturer/onboarding/refresh-stripe-account`;
+        }
 
         const accountLink = await stripeService.createAccountLink({
             accountId: stripeAccount.id,
@@ -96,9 +103,9 @@ export class StripeAccountService {
         business.stripeChargesEnabled = stripeAccount.charges_enabled || false;
         business.stripedetailsSubmitted = stripeAccount.details_submitted || false;
         business.stripeTransfersEnabled = stripeAccount.payouts_enabled || false;
-        if(stripeAccount.charges_enabled && stripeAccount.details_submitted && stripeAccount.payouts_enabled){
+        if (stripeAccount.charges_enabled && stripeAccount.details_submitted && stripeAccount.payouts_enabled) {
             business.isOnboarded = true;
-        }else{
+        } else {
             business.isOnboarded = false;
         }
         await business.save();
@@ -109,7 +116,7 @@ export class StripeAccountService {
                 stripeAccountLink: business.stripeAccountLink,
                 stripeChargesEnabled: business.stripeChargesEnabled,
                 stripedetailsSubmitted: business.stripedetailsSubmitted,
-                stripeTransfersEnabled: business.stripeTransfersEnabled
+                stripeTransfersEnabled: business.stripeTransfersEnabled,
             },
             stripe: {
                 id: stripeAccount.id,
@@ -141,9 +148,15 @@ export class StripeAccountService {
         if (!business.stripeAccountId) {
             throw new Error('No Stripe account found for this business');
         }
-
-        const return_url = `${process.env.FRONTEND_URL}/distributor/onboarding/${userId}`;
-        const refresh_url = `${process.env.FRONTEND_URL}/distributor/onboarding/${userId}`;
+        let return_url;
+        let refresh_url;
+        if (business.businessType === 'distributor') {
+            return_url = `${process.env.FRONTEND_URL}/distributor/onboarding/${userId}`;
+            refresh_url = `${process.env.FRONTEND_URL}/distributor/onboarding/${userId}`;
+        } else {
+            return_url = `${process.env.FRONTEND_URL}/manufacturer/onboarding/${userId}`;
+            refresh_url = `${process.env.FRONTEND_URL}/manufacturer/onboarding/${userId}`;
+        }
 
         const stripeService = StripeService.getInstance();
         const accountLink = await stripeService.createAccountLink({

@@ -12,6 +12,7 @@ export interface IQuote extends Document {
         discount?: number,
         tax?: number,
         totalPrice: number,
+        currency: string,
         // Item-level tracking fields
         itemStatus?: 'pending' | 'accepted' | 'rejected' | 'edit_requested' | 'edited',
         editReason?: string,
@@ -55,6 +56,7 @@ const quoteSchema = new Schema<IQuote>({
         discount: { type: Number },
         tax: { type: Number },
         totalPrice: { type: Number, required: true },
+        currency: { type: String, required: true, default: "usd" },
         // Item-level tracking fields
         itemStatus: { type: String, enum: ['pending', 'accepted', 'rejected', 'edit_requested', 'edited'], default: 'pending' },
         editReason: { type: String },
@@ -77,7 +79,7 @@ const quoteSchema = new Schema<IQuote>({
     validUntil: { type: Date },
     amount: { type: Number, required: true },
     platformFee: { type: Number, required: true },
-    currency: { type: String, required: true },
+    currency: { type: String, required: true, default: "usd" },
     quoteDate: { type: Date, required: true },
     expiryDate: { type: Date },
     quoteAmount: { type: Number, required: true },

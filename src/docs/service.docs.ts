@@ -25,6 +25,9 @@
  *               price:
  *                 type: number
  *                 minimum: 1
+ *               currency:
+ *                 type: string
+ *                 description: Currency code (e.g., USD, EUR, GBP). Defaults to USD if not provided.
  *               categoryId:
  *                 type: string
  *                 description: Category ID (valid MongoDB ObjectId) or category name. If name provided and doesn't exist, a new unapproved category will be created.
@@ -43,7 +46,7 @@
  *       201:
  *         description: Service created successfully
  *       400:
- *         description: Validation error or business not found
+ *         description: Validation error, business not found, or currency not supported
  *       401:
  *         description: Unauthorized
  *       403:
@@ -135,6 +138,9 @@
  *               price:
  *                 type: number
  *                 minimum: 0
+ *               currency:
+ *                 type: string
+ *                 description: Currency code (e.g., USD, EUR, GBP)
  *               categoryId:
  *                 type: string
  *                 description: Category ID (valid MongoDB ObjectId) or category name. If name provided and doesn't exist, a new unapproved category will be created.
@@ -150,7 +156,7 @@
  *       200:
  *         description: Service updated successfully
  *       400:
- *         description: Invalid service ID
+ *         description: Invalid service ID or currency not supported
  *       401:
  *         description: Unauthorized
  *       403:
@@ -164,7 +170,8 @@
  * /api/v2/service/{id}:
  *   delete:
  *     tags: [Service]
- *     summary: Delete service
+ *     summary: Delete service (Distributor, Manufacturer or Admin)
+ *     description: Distributors and manufacturers can delete their own services. Admins can delete any distributor's service. Services with existing bookings cannot be deleted.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -176,10 +183,14 @@
  *     responses:
  *       200:
  *         description: Service deleted successfully
+ *       400:
+ *         description: Invalid service ID or cannot delete service with existing bookings
  *       401:
  *         description: Unauthorized
+ *       403:
+ *         description: Access denied
  *       404:
- *         description: Service not found
+ *         description: Service not found or business not found
  */
 
 /**
@@ -214,9 +225,12 @@
  *                     price:
  *                       type: number
  *                       minimum: 1
+ *                     currency:
+ *                       type: string
+ *                       description: Currency code (e.g., USD, EUR, GBP). Defaults to USD if not provided.
  *                     categoryName:
  *                       type: string
- *                       description: Category name (will be created if doesn't exist)
+ *                       description: Category name (will be created as unapproved if doesn't exist)
  *                     isQuotable:
  *                       type: boolean
  *     responses:
@@ -258,7 +272,7 @@
  *                     newCategoriesCreated:
  *                       type: integer
  *       400:
- *         description: Validation error
+ *         description: Validation error or currency not supported
  *       403:
  *         description: User must be a distributor
  */
@@ -269,7 +283,7 @@
  *   get:
  *     tags: [Service]
  *     summary: Fetch services for crew members
- *     description: Retrieve a paginated list of services available to crew members. Services are filtered to only show those from approved categories. Supports search, filtering by category, price range, and multiple sorting options.
+ *     description: Retrieve a paginated list of services available to crew members. Services are filtered to only show those from approved categories. Supports search, filtering by category, price range (with currency conversion to USD), and multiple sorting options.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -290,14 +304,14 @@
  *         schema:
  *           type: number
  *           format: float
- *         description: Minimum price filter
+ *         description: Minimum price filter (in USD, prices are converted from service currency)
  *         example: 50
  *       - in: query
  *         name: maxPrice
  *         schema:
  *           type: number
  *           format: float
- *         description: Maximum price filter
+ *         description: Maximum price filter (in USD, prices are converted from service currency)
  *         example: 500
  *       - in: query
  *         name: page
@@ -321,6 +335,12 @@
  *           default: random
  *         description: Sort order for results
  *         example: price_asc
+ *       - in: query
+ *         name: random
+ *         schema:
+ *           type: boolean
+ *           default: true
+ *         description: Enable random sorting (set to false for chronological order)
  *     responses:
  *       200:
  *         description: Services fetched successfully
@@ -353,6 +373,9 @@
  *                           price:
  *                             type: number
  *                             example: 250
+ *                           currency:
+ *                             type: string
+ *                             example: usd
  *                           imageURLs:
  *                             type: array
  *                             items:

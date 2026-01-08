@@ -9,7 +9,6 @@ const router = Router();
 router.post('/stripe', express.raw({ type: 'application/json' }), handleStripeWebhook);
 
 // EasyPost webhook - uses standard JSON
-router.post('/easypost', EasypostWebhook.handleWebhook);
+router.post('/easypost', express.json(), EasypostWebhook.handleWebhook);
 
 export default router;
- 

@@ -609,8 +609,8 @@ export class ServiceController {
 
             // Apply price filtering with currency conversion
             if (minPrice !== undefined || maxPrice !== undefined) {
-                services = services.filter(service => {
-                    const priceInUSD = CurrencyConverter.convertToUSD(service.price || 0, service.currency || 'usd');
+                services = services.filter(async(service) => {
+                    const priceInUSD = await CurrencyConverter.convertToUSD(service.price || 0, service.currency || 'usd');
                     if (minPrice !== undefined && priceInUSD < parseFloat(minPrice as string)) return false;
                     if (maxPrice !== undefined && priceInUSD > parseFloat(maxPrice as string)) return false;
                     return true;

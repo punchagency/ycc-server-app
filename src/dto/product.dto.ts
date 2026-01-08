@@ -1,6 +1,7 @@
 export interface CreateProductDTO {
     name: string;
     price: number;
+    currency?: string;
     category: string;
     sku?: string;
     quantity: number;
@@ -23,6 +24,7 @@ export interface CreateProductDTO {
 export interface UpdateProductDTO {
     name?: string;
     price?: number;
+    currency?: string;
     category?: string;
     sku?: string;
     quantity?: number;
@@ -48,6 +50,7 @@ export interface ProductSearchDTO {
     category?: string;
     minPrice?: number;
     maxPrice?: number;
+    currency?: string;
     page?: number;
     limit?: number;
     random?: boolean | string;
@@ -60,6 +63,7 @@ export interface UpdateStockDTO {
 export interface BulkProductInput {
     name: string;
     price: number;
+    currency?: string;
     categoryName: string;
     sku?: string;
     quantity: number;

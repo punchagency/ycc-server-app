@@ -10,6 +10,7 @@ export interface ICart extends Document {
         productId: Schema.Types.ObjectId;
         quantity: number;
         pricePerItem?: number;
+        currency?: string;
         businessId: Schema.Types.ObjectId;
         totalPriceOfItems?: number;
     }[]
@@ -24,6 +25,7 @@ const cartSchema = new Schema<ICart>({
         productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
         quantity: { type: Number, required: true },
         pricePerItem: { type: Number, required: true },
+        currency: { type: String, required: false, default: 'usd' },
         businessId: { type: Schema.Types.ObjectId, ref: 'Business', required: true },
         totalPriceOfItems: { type: Number, required: true }
     }]

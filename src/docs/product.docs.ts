@@ -4,7 +4,7 @@
  *   post:
  *     tags: [Product]
  *     summary: Create multiple products in bulk with category names
- *     description: Upload multiple products at once for distributors or manufacturers. Categories will be created automatically if they don't exist. No authentication required.
+ *     description: Upload multiple products at once for distributors or manufacturers. Categories will be created automatically if they don't exist. No authentication required. Returns detailed summary of successful and failed creations.
  *     requestBody:
  *       required: true
  *       content:
@@ -31,9 +31,12 @@
  *                       type: number
  *                       minimum: 0.01
  *                       description: Product price
+ *                     currency:
+ *                       type: string
+ *                       description: Currency code (e.g., USD, EUR, GBP). Defaults to USD if not provided.
  *                     categoryName:
  *                       type: string
- *                       description: Category name (will be created if doesn't exist)
+ *                       description: Category name (will be created as unapproved if doesn't exist)
  *                     sku:
  *                       type: string
  *                       description: Stock Keeping Unit (optional)
@@ -79,9 +82,9 @@
  *                           type: string
  *     responses:
  *       201:
- *         description: Products created successfully with summary including new categories
+ *         description: Bulk upload completed with detailed summary of created products, failed products, and new categories created
  *       400:
- *         description: Validation error or User ID/Business not found
+ *         description: Validation error - Invalid user ID, products array empty, or validation failed for individual products
  *       403:
  *         description: User must be a distributor or manufacturer
  *       500:
@@ -117,6 +120,9 @@
  *                 type: number
  *                 minimum: 0.01
  *                 description: Product price (must be greater than 0)
+ *               currency:
+ *                 type: string
+ *                 description: Currency code (e.g., USD, EUR, GBP). Defaults to USD if not provided.
  *               category:
  *                 type: string
  *                 description: Category ID (valid MongoDB ObjectId) or category name. If name provided and doesn't exist, a new unapproved category will be created.
@@ -173,7 +179,7 @@
  *       201:
  *         description: Product created successfully
  *       400:
- *         description: Validation error or Business ID required
+ *         description: Validation error, Business ID required, or Currency not supported
  *       401:
  *         description: Unauthorized
  *       403:
@@ -190,7 +196,7 @@
  *   get:
  *     tags: [Product]
  *     summary: Search products with filters
- *     description: Regular users only see distributor products. Distributors and admins can see all products.
+ *     description: Regular users only see distributor products. Distributors and admins can see all products. Prices are filtered in USD after currency conversion.
  *     parameters:
  *       - in: query
  *         name: name
@@ -211,12 +217,20 @@
  *         name: minPrice
  *         schema:
  *           type: number
- *         description: Minimum price filter
+ *           minimum: 0
+ *         description: Minimum price filter (in USD, must be non-negative)
  *       - in: query
  *         name: maxPrice
  *         schema:
  *           type: number
- *         description: Maximum price filter
+ *           minimum: 0
+ *         description: Maximum price filter (in USD, must be non-negative, cannot be less than minPrice)
+ *       - in: query
+ *         name: currency
+ *         schema:
+ *           type: string
+ *           default: usd
+ *         description: Currency code for filtering products (e.g., USD, EUR, GBP)
  *       - in: query
  *         name: page
  *         schema:
@@ -237,9 +251,9 @@
  *         description: Randomize the products fetched
  *     responses:
  *       200:
- *         description: Products retrieved successfully
+ *         description: Products search completed with pagination
  *       400:
- *         description: Validation error
+ *         description: Validation error - Invalid price range or currency not supported
  */
 
 /**
@@ -377,7 +391,7 @@
  *   put:
  *     tags: [Product]
  *     summary: Update product (Distributor, Manufacturer or Admin)
- *     description: Distributors and manufacturers can update their own products. Admins can update any distributor or manufacturer product.
+ *     description: Distributors and manufacturers can update their own products. Admins can update any distributor or manufacturer product. Currency cannot be changed if product has existing orders.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -403,6 +417,9 @@
  *                 type: number
  *                 minimum: 0.01
  *                 description: Product price (must be greater than 0)
+ *               currency:
+ *                 type: string
+ *                 description: Currency code (e.g., USD, EUR, GBP). Cannot be changed if product has existing orders.
  *               category:
  *                 type: string
  *                 description: Category ID (valid MongoDB ObjectId) or category name. If name provided and doesn't exist, a new unapproved category will be created.
@@ -453,12 +470,12 @@
  *                 items:
  *                   type: string
  *                   format: binary
- *                 description: Product images
+ *                 description: Product images (replaces existing images)
  *     responses:
  *       200:
  *         description: Product updated successfully
  *       400:
- *         description: Validation error
+ *         description: Validation error, Currency not supported, or Cannot change currency for product with existing orders
  *       401:
  *         description: Unauthorized
  *       403:
@@ -474,7 +491,8 @@
  * /api/v2/product/{id}:
  *   delete:
  *     tags: [Product]
- *     summary: Delete product
+ *     summary: Delete product (Distributor, Manufacturer or Admin)
+ *     description: Distributors and manufacturers can delete their own products. Admins can delete any distributor or manufacturer product. Products with existing orders cannot be deleted.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -483,20 +501,18 @@
  *         required: true
  *         schema:
  *           type: string
- *         description: Product ID
+ *         description: Product ID (valid MongoDB ObjectId)
  *     responses:
  *       200:
  *         description: Product deleted successfully
  *       400:
- *         description: Invalid product ID
+ *         description: Invalid product ID or Cannot delete product with existing orders
  *       401:
  *         description: Unauthorized
  *       403:
- *         description: Access denied - product belongs to different business
+ *         description: Access denied - Only distributors, manufacturers and admins can delete products, or product belongs to different business
  *       404:
- *         description: Product not found
- *       500:
- *         description: Failed to delete product
+ *         description: Product not found or Business not found (admin only)
  */
 
 /**

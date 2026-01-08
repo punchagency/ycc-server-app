@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { addEmailJob } from '../integration/QueueManager';
 import { DateTime } from 'luxon';
 import { logError } from '../utils/SystemLogs';
+import StripeService from '../integration/stripe';
 import 'dotenv/config';
 
 export interface AuthResponse {
@@ -267,6 +268,22 @@ export class AuthService {
       let business = null;
       if (user.role === 'distributor' || user.role === 'manufacturer') {
         business = await Business.findOne({ userId: user._id });
+
+        // Validate Stripe account for onboarded business users
+        if (business?.isOnboarded && business.stripeAccountId) {
+          const stripeService = StripeService.getInstance();
+          const isValid = await stripeService.validateStripeAccount(business.stripeAccountId);
+          
+          if (!isValid) {
+            business.stripeAccountId = undefined;
+            business.stripeAccountLink = undefined;
+            business.stripeChargesEnabled = false;
+            business.stripedetailsSubmitted = false;
+            business.stripeTransfersEnabled = false;
+            business.isOnboarded = false;
+            await business.save();
+          }
+        }
       }
 
       // Generate tokens

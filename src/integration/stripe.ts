@@ -437,6 +437,16 @@ class StripeService {
             throw error;
         }
     }
+
+    public async validateStripeAccount(accountId: string): Promise<boolean> {
+        try {
+            const account = await StripeService.stripe.accounts.retrieve(accountId);
+            return account.charges_enabled && account.details_submitted;
+        } catch (error) {
+            logError({ message: 'Stripe account validation failed', error, source: 'StripeService.validateStripeAccount' });
+            return false;
+        }
+    }
 }
 
 export default StripeService;

@@ -9,6 +9,7 @@ export interface IProduct extends Document {
     stripePriceId?: string
     name: string;
     price?: number;
+    currency?: string;
     category: Schema.Types.ObjectId;
     sku?: string;
     quantity: number;
@@ -37,6 +38,7 @@ const productSchema = new Schema<IProduct>({
     stripePriceId: { type: String, required: false },
     name: { type: String, required: true },
     price: { type: Number, required: false },
+    currency: { type: String, required: false, default: 'usd' },
     category: { type: Schema.Types.ObjectId, required: true, ref: 'Category' },
     sku: { type: String, required: false },
     quantity: { type: Number, required: true, default: 0 },

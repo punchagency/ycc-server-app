@@ -9,6 +9,7 @@ import catchError from '../utils/catchError';
 import { Types } from 'mongoose';
 import UserModel from '../models/user.model';
 import BusinessModel from '../models/business.model';
+import CONSTANTS from '../config/constant';
 
 export class ProductController {
     static async createProduct(req: AuthenticatedRequest, res: Response): Promise<void> {
@@ -126,6 +127,15 @@ export class ProductController {
             return;
         }
 
+        if(productData.currency && !CONSTANTS.CURRENCIES_CODES.includes(productData.currency.toUpperCase())){
+            res.status(400).json({
+                success: false,
+                message: 'Currency is not supported',
+                code: 'VALIDATION_ERROR'
+            });
+            return;
+        }
+
         const productInput: IProductInput = {
             ...productData,
             imageURLs: files?.productImage?.map(file => file.location) || []
@@ -238,7 +248,8 @@ export class ProductController {
             userRole,
             random: query.random == "true" || query.random == true ? true : false, 
             page: Number(query.page) || 1,
-            limit: Number(query.limit) || 20
+            limit: Number(query.limit) || 20,
+            currency: query.currency?.toLowerCase() || 'usd'
         };
 
         if (searchQuery.minPrice && searchQuery.minPrice < 0) {
@@ -263,6 +274,15 @@ export class ProductController {
             res.status(400).json({
                 success: false,
                 message: 'Minimum price cannot be greater than maximum price',
+                code: 'VALIDATION_ERROR'
+            });
+            return;
+        }
+
+        if (searchQuery.currency && !CONSTANTS.CURRENCIES_CODES.includes(searchQuery.currency.toUpperCase())) {
+            res.status(400).json({
+                success: false,
+                message: 'Currency is not supported',
                 code: 'VALIDATION_ERROR'
             });
             return;
@@ -386,6 +406,15 @@ export class ProductController {
             return;
         }
 
+        if(updateData.currency && !CONSTANTS.CURRENCIES_CODES.includes(updateData.currency.toUpperCase())){
+            res.status(400).json({
+                success: false,
+                message: 'Currency is not supported',
+                code: 'VALIDATION_ERROR'
+            });
+            return;
+        }
+
         const { wareHouseAddress, ...restUpdateData } = updateData;
         const productInput: Partial<IProductInput> = {
             ...restUpdateData,
@@ -402,7 +431,22 @@ export class ProductController {
             productInput.imageURLs = files.productImage.map(file => file.location);
         }
 
-        const updatedProduct = await ProductService.updateProduct(id, productInput, updateData.category);
+        const [updateError, updatedProduct] = await catchError(
+            ProductService.updateProduct(id, productInput as any, updateData.category)
+        );
+
+        if (updateError) {
+            const errorMessage = updateError.message || 'Failed to update product';
+            const statusCode = errorMessage.includes('Cannot change currency') ? 400 : 500;
+            
+            res.status(statusCode).json({
+                success: false,
+                message: errorMessage,
+                code: errorMessage.includes('Cannot change currency') ? 'CURRENCY_CHANGE_FORBIDDEN' : 'UPDATE_FAILED'
+            });
+            return;
+        }
+
         if (!updatedProduct) {
             res.status(500).json({
                 success: false,

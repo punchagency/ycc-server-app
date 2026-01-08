@@ -6,6 +6,7 @@ export interface IService extends Document {
     description?: string;
     imageURLs?: string[];
     price: number;
+    currency: string;
     businessId: Schema.Types.ObjectId;
     categoryId: Schema.Types.ObjectId;
     isQuotable?: boolean;
@@ -16,6 +17,7 @@ const serviceSchema = new Schema<IService>({
     description: { type: String, required: false },
     imageURLs: [{ type: String, required: false }],
     price: { type: Number, required: false },
+    currency: { type: String, required: false, default: "usd" },
     businessId: { type: Schema.Types.ObjectId, required: true, ref: 'Business' },
     categoryId: { type: Schema.Types.ObjectId, required: true, ref: 'Category' },
     isQuotable: { type: Boolean, required: false, default: false }

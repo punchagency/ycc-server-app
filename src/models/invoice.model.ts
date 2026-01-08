@@ -29,7 +29,7 @@ const invoiceSchema = new Schema<IInvoice>({
     amount: { type: Number, required: true },
     platformFee: { type: Number, required: true },
     distributorAmount: { type: Number, required: true },
-    currency: { type: String, required: true },
+    currency: { type: String, required: true, default: "usd" },
     status: { type: String, enum: ['pending', 'paid', 'failed', 'cancelled', 'refunded'], required: true },
     invoiceDate: { type: Date, required: true },
     dueDate: { type: Date, required: true },

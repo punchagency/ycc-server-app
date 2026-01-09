@@ -478,6 +478,7 @@ export class ShipmentService {
                 shipment.status = 'label_purchased';
                 shipment.trackingNumber = purchasedShipment.tracking_code;
                 shipment.labelUrl = purchasedShipment.postage_label?.label_url;
+
                 await shipment.save();
 
                 await this.sendLabelToBusiness(shipment, order, business, user);
@@ -720,6 +721,7 @@ export class ShipmentService {
         const oldStatus = shipment.status;
         shipment.status = newStatus;
         shipment.lastWebhookData = webhookData;
+        shipment.publicUrl = webhookData.public_url;
         await shipment.save();
 
         logInfo({message: `Shipment ${shipment._id} status: ${oldStatus} → ${newStatus}`, source: 'ShipmentService.processTrackingWebhook'});

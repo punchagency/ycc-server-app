@@ -61,7 +61,8 @@ export interface IShipment extends Document {
         id: string
     }[];
     carrierName: string;
-    labelUrl: string;
+    labelUrl?: string;
+    publicUrl?: string;
     batchId: string;
     lastWebhookData: Schema.Types.Mixed;
     status: typeof SHIPMENT_STATUSES[number];
@@ -121,6 +122,7 @@ const ShipmentSchema = new Schema({
     }],
     carrierName: { type: String },
     labelUrl: { type: String },
+    publicUrl: { type: String },
     batchId: { type: String },
     lastWebhookData: { type: Schema.Types.Mixed },
     status: { 

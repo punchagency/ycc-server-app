@@ -5,7 +5,7 @@ import { logInfo, logError } from '../utils/SystemLogs';
 
 async function migrateServiceCurrency() {
     try {
-        const mongoUri = "mongodb+srv://alex:pgBNNP4jRaMGJdRl@cluster0.df9pb2y.mongodb.net/version2";
+        const mongoUri = process.env.MONGODB_URI;
         if (!mongoUri) {
             throw new Error('MONGODB_URI not found in environment variables');
         }

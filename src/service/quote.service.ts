@@ -6,6 +6,7 @@ import InvoiceModel from "../models/invoice.model";
 import StripeService from "../integration/stripe";
 import Stripe from 'stripe';
 import { addEmailJob } from "../integration/QueueManager";
+import { CurrencyConverter } from "../utils/currencyConverter";
 import 'dotenv/config';
 
 export class QuoteService {
@@ -59,6 +60,8 @@ export class QuoteService {
         }
 
         if (shouldCreateInvoice) {
+            const quoteCurrency = quote.currency.toLowerCase();
+            
             stripeInvoice = await stripe.invoices.create({
                 customer: stripeCustomerId,
                 collection_method: 'send_invoice',
@@ -70,11 +73,19 @@ export class QuoteService {
             });
 
             for (const service of quote.services) {
+                const serviceCurrency = service.currency.toLowerCase();
+                let amountInQuoteCurrency = service.totalPrice;
+                
+                if (serviceCurrency !== quoteCurrency) {
+                    const amountInUSD = await CurrencyConverter.convertToUSD(service.totalPrice, serviceCurrency);
+                    amountInQuoteCurrency = await CurrencyConverter.convertFromUSD(amountInUSD, quoteCurrency);
+                }
+                
                 await stripe.invoiceItems.create({
                     customer: stripeCustomerId,
                     invoice: stripeInvoice.id,
-                    amount: Math.round(service.totalPrice * 100),
-                    currency: quote.currency.toLowerCase(),
+                    amount: Math.round(amountInQuoteCurrency * 100),
+                    currency: quoteCurrency,
                     description: service.item
                 });
             }
@@ -83,7 +94,7 @@ export class QuoteService {
                 customer: stripeCustomerId,
                 invoice: stripeInvoice.id,
                 amount: Math.round(quote.platformFee * 100),
-                currency: quote.currency.toLowerCase(),
+                currency: quoteCurrency,
                 description: 'Platform Fee'
             });
 

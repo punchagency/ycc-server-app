@@ -11,6 +11,7 @@ export interface IBooking extends Document {
     requiresQuote?: boolean;
     totalAmount?: number;
     platformFee?: number;
+    currency: string;
     serviceLocation: {
         street: string;
         city: string;
@@ -67,6 +68,7 @@ const bookingSchema = new Schema<IBooking>({
     requiresQuote: { type: Boolean, default: false },
     totalAmount: { type: Number },
     platformFee: { type: Number },
+    currency: { type: String, required: true, default: 'usd' },
     serviceLocation: {
         street: { type: String, required: true },
         city: { type: String, required: true },

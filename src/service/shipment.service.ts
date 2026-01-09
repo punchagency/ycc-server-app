@@ -13,6 +13,7 @@ import BusinessModel from "../models/business.model";
 import InvoiceModel from "../models/invoice.model";
 import StripeService from "../integration/stripe";
 import CONSTANTS from "../config/constant";
+import { CurrencyConverter } from "../utils/currencyConverter";
 
 export class ShipmentService {
     static async createShipmentsForConfirmedItems(orderId: string, businessId: string) {
@@ -125,6 +126,7 @@ export class ShipmentService {
             const rates = response.rates?.map((rate: any) => ({
                 carrier: rate.carrier,
                 rate: parseFloat(rate.rate),
+                currency: rate.currency || 'usd',
                 service: rate.service,
                 estimatedDays: rate.delivery_days,
                 guaranteedDeliveryDate: rate.delivery_date_guaranteed || false,
@@ -144,13 +146,15 @@ export class ShipmentService {
                     businessId: item.businessId,
                     discount: item.discount,
                     pricePerItem: item.pricePerItem,
+                    currency: item.currency || 'usd',
                     totalPriceOfItems: item.totalPriceOfItems
                 })),
                 rates,
                 customsInfo: this.isInternational(fromAddr.country || "", toAddr.country || "") 
                     ? this.buildCustomsInfo(group, products) 
                     : undefined,
-                status: 'rates_fetched'
+                status: 'rates_fetched',
+                shipmentCurrency: 'usd'
             });
 
             shipments.push(shipment);
@@ -167,7 +171,7 @@ export class ShipmentService {
 
         return shipments.length === 1 ? shipments[0] : shipments;
     }
-    static async createBusinessHandledShipment(orderId: string, businessId: string, shipmentCost: number) {
+    static async createBusinessHandledShipment(orderId: string, businessId: string, shipmentCost: number, shipmentCurrency: string = 'usd') {
         const order = await OrderModel.findById(orderId);
         if (!order) throw new Error('Order not found');
 
@@ -193,10 +197,12 @@ export class ShipmentService {
                 businessId: item.businessId,
                 discount: item.discount,
                 pricePerItem: item.pricePerItem,
+                currency: item.currency || 'usd',
                 totalPriceOfItems: item.totalPriceOfItems
             })),
             rates: [],
             shipmentCost,
+            shipmentCurrency,
             isBusinessHandled: true,
             status: 'created'
         });
@@ -206,8 +212,8 @@ export class ShipmentService {
             type: 'order',
             priority: 'high',
             title: 'Order Confirmed - Business Handling Shipment',
-            message: `Your order has been confirmed. The supplier will handle shipment directly. Shipment cost: $${shipmentCost.toFixed(2)}`,
-            data: { orderId: order._id, shipmentId: shipment._id, shipmentCost }
+            message: `Your order has been confirmed. The supplier will handle shipment directly. Shipment cost: ${shipmentCost.toFixed(2)} ${shipmentCurrency.toUpperCase()}`,
+            data: { orderId: order._id, shipmentId: shipment._id, shipmentCost, shipmentCurrency }
         });
 
         return shipment;
@@ -278,6 +284,8 @@ export class ShipmentService {
             const rate = shipment.rates.find(r => r.id === selection.rateId);
             if (!rate) throw new Error(`Rate ${selection.rateId} not found`);
             shipment.rates.forEach(r => r.isSelected = r.id === selection.rateId);
+            shipment.shipmentCost = rate.rate;
+            shipment.shipmentCurrency = rate.currency || 'usd';
             shipment.status = 'rate_selected';
             await shipment.save();
         }
@@ -467,6 +475,7 @@ export class ShipmentService {
                 shipment.rates = newEpShipment.rates.map((r: any) => ({
                     carrier: r.carrier || '',
                     rate: parseFloat(r.rate),
+                    currency: r.currency || 'usd',
                     service: r.service || '',
                     estimatedDays: r.delivery_days || 0,
                     guaranteedDeliveryDate: r.delivery_date_guaranteed || false,
@@ -474,6 +483,12 @@ export class ShipmentService {
                     isSelected: r.id === matchedRate.id,
                     id: r.id || ''
                 })) as any;
+
+                const selectedRate = shipment.rates.find(r => r.isSelected);
+                if (selectedRate) {
+                    shipment.shipmentCost = selectedRate.rate;
+                    shipment.shipmentCurrency = selectedRate.currency;
+                }
 
                 shipment.status = 'label_purchased';
                 shipment.trackingNumber = purchasedShipment.tracking_code;
@@ -637,33 +652,47 @@ export class ShipmentService {
                 const manufacturerBusinessId = shipment.items[0]?.businessId;
                 if (manufacturerBusinessId) {
                     const business = await BusinessModel.findById(manufacturerBusinessId);
+                    const shipmentCurrency = shipment.shipmentCurrency || 'usd';
+                    const costInUSD = await CurrencyConverter.convertToUSD(shipment.shipmentCost, shipmentCurrency);
+                    
                     await stripe.createInvoiceItems({
                         customer: stripeCustomerId,
                         invoice: invoice.id,
-                        amount: Math.round(shipment.shipmentCost * 100),
+                        amount: Math.round(costInUSD * 100),
                         currency: 'usd',
                         description: `Manufacturer Shipping - ${business?.businessName || 'Manufacturer'}`,
                         metadata: { 
                             type: 'manufacturer_shipping',
                             supplierId: manufacturerBusinessId.toString(),
-                            supplierUserId: business?.userId.toString() || ''
+                            supplierUserId: business?.userId.toString() || '',
+                            originalCurrency: shipmentCurrency,
+                            originalAmount: shipment.shipmentCost.toString()
                         }
                     });
+                    shippingTotal += costInUSD;
                 }
-                shippingTotal += shipment.shipmentCost;
             } else {
                 const selectedRate = shipment.rates.find(r => r.isSelected);
-                if (selectedRate) shippingTotal += selectedRate.rate;
+                if (selectedRate) {
+                    const rateCurrency = selectedRate.currency || 'usd';
+                    const rateInUSD = await CurrencyConverter.convertToUSD(selectedRate.rate, rateCurrency);
+                    shippingTotal += rateInUSD;
+                }
             }
         }
 
         if (shippingTotal > 0) {
             const platformShipping = shipments.filter(s => !s.isBusinessHandled && s.rates.some(r => r.isSelected));
             if (platformShipping.length > 0) {
-                const platformShippingCost = platformShipping.reduce((sum, s) => {
+                let platformShippingCost = 0;
+                for (const s of platformShipping) {
                     const rate = s.rates.find(r => r.isSelected);
-                    return sum + (rate?.rate || 0);
-                }, 0);
+                    if (rate) {
+                        const rateCurrency = rate.currency || 'usd';
+                        const rateInUSD = await CurrencyConverter.convertToUSD(rate.rate, rateCurrency);
+                        platformShippingCost += rateInUSD;
+                    }
+                }
                 
                 if (platformShippingCost > 0) {
                     await stripe.createInvoiceItems({
@@ -726,7 +755,7 @@ export class ShipmentService {
 
         const order: any = await OrderModel.findById(shipment.orderId);
         if (order) {
-            const orderStatusMap: Record<string, 'processing' | 'shipped' | 'delivered' | 'cancelled'> = {
+            const orderStatusMap: Record<string, 'processing' | 'shipped' | 'out_for_delivery' | 'delivered' | 'cancelled'> = {
                 'label_purchased': 'processing',
                 'shipped': 'shipped',
                 'delivered': 'delivered',
@@ -736,12 +765,43 @@ export class ShipmentService {
 
             const targetOrderStatus = orderStatusMap[newStatus];
             if (targetOrderStatus) {
+                // Update individual order items for this shipment
                 for (const shipmentItem of shipment.items) {
                     const orderItem = order.items.find((i: any) => 
                         i.productId.toString() === shipmentItem.productId.toString()
                     );
                     if (orderItem) orderItem.status = targetOrderStatus;
                 }
+                
+                // Check if ALL shipments for this order have reached a terminal state
+                const allShipments = await ShipmentModel.find({ orderId: order._id });
+                const allDelivered = allShipments.every(s => s.status === 'delivered');
+                const allFailed = allShipments.every(s => ['failed', 'returned_to_supplier'].includes(s.status));
+                const allShipped = allShipments.every(s => ['shipped', 'delivered'].includes(s.status));
+                
+                // Update overall order status based on all shipments
+                const previousOrderStatus = order.status;
+                if (allDelivered) {
+                    order.status = 'delivered';
+                } else if (allFailed) {
+                    order.status = 'cancelled';
+                } else if (allShipped) {
+                    order.status = 'shipped';
+                }
+                
+                // Add order history entry if status changed
+                if (previousOrderStatus !== order.status) {
+                    order.orderHistory.push({
+                        fromStatus: previousOrderStatus,
+                        toStatus: order.status,
+                        changedBy: 'system',
+                        userRole: 'system',
+                        notes: `Status updated via EasyPost webhook (tracking: ${trackingCode})`,
+                        changedAt: new Date()
+                    });
+                    logInfo({message: `Order ${order._id} status: ${previousOrderStatus} → ${order.status}`, source: 'ShipmentService.processTrackingWebhook'});
+                }
+                
                 await order.save();
             }
         }

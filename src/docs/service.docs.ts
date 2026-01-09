@@ -13,23 +13,29 @@
  *         multipart/form-data:
  *           schema:
  *             type: object
- *             required: [name, price, categoryId]
+ *             required: [name, categoryId]
  *             properties:
  *               name:
  *                 type: string
  *                 minLength: 2
- *                 maxLength: 50
+ *                 maxLength: 100
  *               description:
  *                 type: string
+ *                 minLength: 2
  *                 maxLength: 500
  *               price:
  *                 type: number
  *                 minimum: 1
+ *                 description: Required for non-quotable services
+ *               currency:
+ *                 type: string
+ *                 description: Currency code (e.g., USD, EUR, GBP). Defaults to USD if not provided.
  *               categoryId:
  *                 type: string
  *                 description: Category ID (valid MongoDB ObjectId) or category name. If name provided and doesn't exist, a new unapproved category will be created.
  *               isQuotable:
  *                 type: boolean
+ *                 default: false
  *               businessId:
  *                 type: string
  *                 description: Required for admins - the distributor's business ID
@@ -43,11 +49,13 @@
  *       201:
  *         description: Service created successfully
  *       400:
- *         description: Validation error or business not found
+ *         description: Validation error, business not found, or currency not supported
  *       401:
  *         description: Unauthorized
  *       403:
  *         description: Only distributors and admins can create services
+ *       404:
+ *         description: Business not found
  */
 
 /**
@@ -109,7 +117,7 @@
  *   put:
  *     tags: [Service]
  *     summary: Update service (Distributor or Admin)
- *     description: Distributors can update their own services. Admins can update any distributor's service.
+ *     description: Distributors can update their own services. Admins can update any distributor's service. All fields are optional.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -118,6 +126,7 @@
  *         required: true
  *         schema:
  *           type: string
+ *         description: Service ID (MongoDB ObjectId)
  *     requestBody:
  *       required: true
  *       content:
@@ -131,10 +140,15 @@
  *                 maxLength: 50
  *               description:
  *                 type: string
+ *                 minLength: 2
  *                 maxLength: 500
  *               price:
  *                 type: number
  *                 minimum: 0
+ *                 description: Must be >= 1 for non-quotable services
+ *               currency:
+ *                 type: string
+ *                 description: Currency code (e.g., USD, EUR, GBP)
  *               categoryId:
  *                 type: string
  *                 description: Category ID (valid MongoDB ObjectId) or category name. If name provided and doesn't exist, a new unapproved category will be created.
@@ -150,7 +164,7 @@
  *       200:
  *         description: Service updated successfully
  *       400:
- *         description: Invalid service ID
+ *         description: Invalid service ID, validation error, or currency not supported
  *       401:
  *         description: Unauthorized
  *       403:
@@ -164,7 +178,8 @@
  * /api/v2/service/{id}:
  *   delete:
  *     tags: [Service]
- *     summary: Delete service
+ *     summary: Delete service (Distributor, Manufacturer or Admin)
+ *     description: Distributors and manufacturers can delete their own services. Admins can delete any distributor's service. Services with existing bookings cannot be deleted.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -176,10 +191,14 @@
  *     responses:
  *       200:
  *         description: Service deleted successfully
+ *       400:
+ *         description: Invalid service ID or cannot delete service with existing bookings
  *       401:
  *         description: Unauthorized
+ *       403:
+ *         description: Access denied
  *       404:
- *         description: Service not found
+ *         description: Service not found or business not found
  */
 
 /**
@@ -214,9 +233,12 @@
  *                     price:
  *                       type: number
  *                       minimum: 1
+ *                     currency:
+ *                       type: string
+ *                       description: Currency code (e.g., USD, EUR, GBP). Defaults to USD if not provided.
  *                     categoryName:
  *                       type: string
- *                       description: Category name (will be created if doesn't exist)
+ *                       description: Category name (will be created as unapproved if doesn't exist)
  *                     isQuotable:
  *                       type: boolean
  *     responses:
@@ -258,7 +280,7 @@
  *                     newCategoriesCreated:
  *                       type: integer
  *       400:
- *         description: Validation error
+ *         description: Validation error or currency not supported
  *       403:
  *         description: User must be a distributor
  */
@@ -269,7 +291,7 @@
  *   get:
  *     tags: [Service]
  *     summary: Fetch services for crew members
- *     description: Retrieve a paginated list of services available to crew members. Services are filtered to only show those from approved categories. Supports search, filtering by category, price range, and multiple sorting options.
+ *     description: Retrieve a paginated list of services available to crew members. Services are filtered to only show those from approved categories. Supports search, filtering by category (ID or name), price range (with currency conversion to USD), and multiple sorting options.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -283,21 +305,21 @@
  *         name: category
  *         schema:
  *           type: string
- *         description: Filter services by category name (case-insensitive)
+ *         description: Filter services by category ID (MongoDB ObjectId) or category name (case-insensitive)
  *         example: Maintenance
  *       - in: query
  *         name: minPrice
  *         schema:
  *           type: number
  *           format: float
- *         description: Minimum price filter
+ *         description: Minimum price filter (in USD, prices are converted from service currency)
  *         example: 50
  *       - in: query
  *         name: maxPrice
  *         schema:
  *           type: number
  *           format: float
- *         description: Maximum price filter
+ *         description: Maximum price filter (in USD, prices are converted from service currency)
  *         example: 500
  *       - in: query
  *         name: page
@@ -319,8 +341,15 @@
  *           type: string
  *           enum: [random, name, price_asc, price_desc]
  *           default: random
- *         description: Sort order for results
+ *         description: Sort order for results. If random=false, sorts by createdAt descending
  *         example: price_asc
+ *       - in: query
+ *         name: random
+ *         schema:
+ *           type: string
+ *           enum: ['true', 'false']
+ *           default: 'true'
+ *         description: Enable random sorting (set to 'false' for chronological order by createdAt)
  *     responses:
  *       200:
  *         description: Services fetched successfully
@@ -353,6 +382,9 @@
  *                           price:
  *                             type: number
  *                             example: 250
+ *                           currency:
+ *                             type: string
+ *                             example: usd
  *                           imageURLs:
  *                             type: array
  *                             items:

@@ -32,7 +32,7 @@ export class CartService {
             CartModel.findOne({ userId })
                 .populate({
                     path: 'items.productId',
-                    select: 'name price imageURLs description category',
+                    select: 'name price imageURLs description category currency',
                     populate: { path: 'category', select: 'name' }
                 })
                 .populate({
@@ -132,6 +132,7 @@ export class CartService {
                 productId: new Types.ObjectId(productId) as any,
                 quantity,
                 pricePerItem: product.price,
+                currency: product.currency,
                 businessId: businessIdValue,
                 totalPriceOfItems: product.price ? quantity * product.price : 0
             });
@@ -214,6 +215,7 @@ export class CartService {
                     productId: new Types.ObjectId(productId) as any,
                     quantity,
                     pricePerItem: product.price,
+                    currency: product.currency,
                     businessId: businessIdValue,
                     totalPriceOfItems: product.price ? quantity * product?.price : 0,
                 });

@@ -289,8 +289,8 @@ export class ProductService {
         let [products, total] = result;
 
         if (minPrice !== undefined || maxPrice !== undefined) {
-            products = products.filter(product => {
-                const priceInUSD = CurrencyConverter.convertToUSD(product.price || 0, product.currency || 'usd');
+            products = products.filter(async(product) => {
+                const priceInUSD = await CurrencyConverter.convertToUSD(product.price || 0, product.currency || 'usd');
                 if (minPrice !== undefined && priceInUSD < minPrice) return false;
                 if (maxPrice !== undefined && priceInUSD > maxPrice) return false;
                 return true;

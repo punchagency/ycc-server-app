@@ -703,6 +703,13 @@ export class OrderService {
         const allConfirmed = order.items.every(i => i.status === 'confirmed');
         if (allConfirmed) order.status = 'confirmed';
 
+        // Deduct inventory when order is confirmed
+        const product = await ProductModel.findById(item.productId);
+        if (product) {
+            product.quantity = Math.max(0, product.quantity - item.quantity);
+            await product.save();
+        }
+
         await order.save();
 
         const [shipmentError] = await catchError(
@@ -755,6 +762,8 @@ export class OrderService {
 
         item.status = 'declined';
         order.status = 'declined';
+
+        // No inventory restoration needed for declined orders since inventory was never deducted (order was still pending)
 
         await order.save();
 
@@ -826,6 +835,19 @@ export class OrderService {
                 changedAt: new Date()
             });
 
+            // Restore inventory when order is cancelled
+            if (status === 'cancelled') {
+                for (const item of order.items) {
+                    if (item.status === 'confirmed' || item.status === 'processing') {
+                        const product = await ProductModel.findById(item.productId);
+                        if (product) {
+                            product.quantity += item.quantity;
+                            await product.save();
+                        }
+                    }
+                }
+            }
+
             await order.save();
 
             if (status === 'cancelled' && order.paymentStatus === 'paid') {
@@ -883,6 +905,24 @@ export class OrderService {
 
                 const fromStatus = item.status;
                 item.status = status;
+
+                // Deduct inventory when distributor confirms order
+                if (status === 'confirmed' && fromStatus === 'pending') {
+                    const product = await ProductModel.findById(item.productId);
+                    if (product) {
+                        product.quantity = Math.max(0, product.quantity - item.quantity);
+                        await product.save();
+                    }
+                }
+
+                // Restore inventory when distributor cancels order
+                if (status === 'cancelled' && (fromStatus === 'confirmed' || fromStatus === 'processing')) {
+                    const product = await ProductModel.findById(item.productId);
+                    if (product) {
+                        product.quantity += item.quantity;
+                        await product.save();
+                    }
+                }
 
                 order.orderHistory.push({
                     fromStatus,
@@ -1000,6 +1040,17 @@ export class OrderService {
                 changedAt: new Date()
             });
 
+            // Restore inventory when distributor cancels their own order
+            for (const item of order.items) {
+                if (item.status === 'confirmed' || item.status === 'processing') {
+                    const product = await ProductModel.findById(item.productId);
+                    if (product) {
+                        product.quantity += item.quantity;
+                        await product.save();
+                    }
+                }
+            }
+
             await order.save();
 
             if (order.paymentStatus === 'paid') {
@@ -1050,6 +1101,24 @@ export class OrderService {
 
                 const fromStatus = item.status;
                 item.status = status;
+
+                // Deduct inventory when manufacturer confirms order
+                if (status === 'confirmed' && fromStatus === 'pending') {
+                    const product = await ProductModel.findById(item.productId);
+                    if (product) {
+                        product.quantity = Math.max(0, product.quantity - item.quantity);
+                        await product.save();
+                    }
+                }
+
+                // Restore inventory when manufacturer cancels order
+                if (status === 'cancelled' && (fromStatus === 'confirmed' || fromStatus === 'processing')) {
+                    const product = await ProductModel.findById(item.productId);
+                    if (product) {
+                        product.quantity += item.quantity;
+                        await product.save();
+                    }
+                }
 
                 order.orderHistory.push({
                     fromStatus,

@@ -7,13 +7,7 @@ import 'dotenv/config';
 
 
 export class EasypostWebhook {
-    /**
-     * Validates the EasyPost webhook request
-     * Note: EasyPost does NOT use HMAC signatures like Stripe.
-     * Instead, we validate using the x-webhook-user-id header to confirm the request
-     * is from our EasyPost account. For additional security, you can also restrict
-     * IP addresses or use a secret in the webhook URL.
-     */
+
     private static validateWebhookRequest(req: Request): boolean {
         const webhookUserId = req.headers['x-webhook-user-id'] as string;
         const expectedPrefix = 'user_'; // EasyPost user IDs start with 'user_'
@@ -50,32 +44,21 @@ export class EasypostWebhook {
         const startTime = Date.now();
         const webhookEvent = req.body;
         const eventType = webhookEvent?.description;
-        
-        // Console logs for debugging
-        // console.log('\n========== EASYPOST WEBHOOK RECEIVED ==========');
-        // console.log('Event Type:', eventType || 'unknown');
-        // console.log('Body exists:', !!req.body);
-        // console.log('Body type:', typeof req.body);
-        // console.log('Full payload:', JSON.stringify(webhookEvent, null, 2));
-        // console.log('Headers:', JSON.stringify(req.headers, null, 2));
-        // console.log('================================================\n');
-        
-        // Log incoming webhook details
-        // logInfo({
-        //     message: `📥 EasyPost webhook received: ${eventType || 'unknown'}`,
-        //     source: 'EasypostWebhook.handleWebhook',
-        //     additionalData: {
-        //         mode: webhookEvent?.mode,
-        //         objectType: webhookEvent?.object,
-        //         trackingCode: webhookEvent?.result?.tracking_code,
-        //         status: webhookEvent?.result?.status
-        //     }
-        // });
+
+        logInfo({
+            message: `📥 EasyPost webhook received: ${eventType || 'unknown'}`,
+            source: 'EasypostWebhook.handleWebhook',
+            additionalData: {
+                mode: webhookEvent?.mode,
+                objectType: webhookEvent?.object,
+                trackingCode: webhookEvent?.result?.tracking_code,
+                status: webhookEvent?.result?.status
+            }
+        });
 
         // Validate webhook payload structure
         if (!webhookEvent || !eventType) {
-            // console.error('❌ Invalid webhook payload - body:', req.body);
-            logError({ message: 'Invalid webhook payload - missing event description', source: 'EasypostWebhook.handleWebhook', error: { body: req.body } });
+            logError({ message: '❌ Invalid webhook payload - missing event description', source: 'EasypostWebhook.handleWebhook', error: { body: req.body }, additionalData: { body: req.body } });
             return res.status(400).json({ success: false, message: 'Invalid webhook event: missing description' });
         }
 

@@ -37,7 +37,7 @@ export interface IShipment extends Document {
         businessId: Schema.Types.ObjectId;
         discount?: number;
         pricePerItem: number;
-        curreny: string;
+        currency: string;
         totalPriceOfItems: number;
     }[];
     customsInfo?: {
@@ -53,6 +53,7 @@ export interface IShipment extends Document {
     rates: {
         carrier: string;
         rate: number;
+        currency: string;
         service: string;
         estimatedDays: number;
         guaranteedDeliveryDate: boolean;
@@ -67,6 +68,7 @@ export interface IShipment extends Document {
     lastWebhookData: Schema.Types.Mixed;
     status: typeof SHIPMENT_STATUSES[number];
     shipmentCost?: number;
+    shipmentCurrency?: string;
     isBusinessHandled: boolean;
     createdAt: Date;
     updatedAt: Date;
@@ -97,7 +99,7 @@ const ShipmentSchema = new Schema({
         businessId: { type: Schema.Types.ObjectId, ref: 'Business', required: true },
         discount: { type: Number },
         pricePerItem: { type: Number, required: true },
-        curreny: { type: String, required: true, default: 'usd' },
+        currency: { type: String, required: true, default: 'usd' },
         totalPriceOfItems: { type: Number, required: true }
     }],
     customsInfo: {
@@ -113,6 +115,7 @@ const ShipmentSchema = new Schema({
     rates: [{
         carrier: { type: String, required: true },
         rate: { type: Number, required: true },
+        currency: { type: String, required: true, default: "usd" },
         service: { type: String, required: true },
         estimatedDays: { type: Number },
         guaranteedDeliveryDate: { type: Boolean },
@@ -131,6 +134,7 @@ const ShipmentSchema = new Schema({
         default: 'created' 
     },
     shipmentCost: { type: Number },
+    shipmentCurrency: { type: String, default: 'usd' },
     isBusinessHandled: { type: Boolean, default: false }
 }, {
     timestamps: true

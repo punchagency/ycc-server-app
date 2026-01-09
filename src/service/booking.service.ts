@@ -12,6 +12,7 @@ import { logError } from "../utils/SystemLogs";
 import CONSTANTS from "../config/constant";
 import StripeService from "../integration/stripe";
 import InvoiceModel from "../models/invoice.model";
+import { CurrencyConverter } from "../utils/currencyConverter";
 import 'dotenv/config';
 
 export class BookingService {
@@ -45,6 +46,7 @@ export class BookingService {
             isTokenUsed: false,
             requiresQuote: service.isQuotable || false,
             quoteStatus: service.isQuotable ? 'pending' : 'not_required',
+            currency: service.currency || 'usd',
             notes
         });
 
@@ -238,6 +240,7 @@ export class BookingService {
                         quantity: item.quantity || 1,
                         unitPrice: item.price,
                         totalPrice,
+                        currency: service.currency || 'usd',
                         itemStatus: 'pending'
                     });
                 }
@@ -258,7 +261,7 @@ export class BookingService {
                 status: 'pending',
                 amount,
                 platformFee,
-                currency: 'USD',
+                currency: booking.currency,
                 quoteDate: new Date(),
                 quoteAmount,
                 createdBy: userId,
@@ -523,7 +526,7 @@ export class BookingService {
             status: 'pending',
             amount,
             platformFee,
-            currency: 'USD',
+            currency: booking.currency,
             quoteDate: new Date(),
             quoteAmount,
             createdBy: userId,
@@ -1187,6 +1190,8 @@ export class BookingService {
 
         const stripe = StripeService.getInstance();
 
+        const bookingCurrency = booking.currency.toLowerCase();
+
         // Get or create Stripe customer
         let stripeCustomerId = user.stripeCustomerId;
         if (!stripeCustomerId) {
@@ -1236,7 +1241,7 @@ export class BookingService {
                 serviceId: service._id.toString(),
                 businessId: business._id.toString(),
                 customerEmail: user.email,
-                transactionType: 'booking'  // Changed from 'type' to match existing webhook handler
+                transactionType: 'booking'
             }
         });
 
@@ -1246,11 +1251,19 @@ export class BookingService {
             
             // Add each quote item
             for (const quoteService of quote.services) {
+                const serviceCurrency = quoteService.currency.toLowerCase();
+                let amountInBookingCurrency = quoteService.totalPrice;
+                
+                if (serviceCurrency !== bookingCurrency) {
+                    const amountInUSD = await CurrencyConverter.convertToUSD(quoteService.totalPrice, serviceCurrency);
+                    amountInBookingCurrency = await CurrencyConverter.convertFromUSD(amountInUSD, bookingCurrency);
+                }
+                
                 await stripe.createInvoiceItems({
                     customer: stripeCustomerId,
                     invoice: invoice.id,
-                    amount: Math.round(quoteService.totalPrice * 100),
-                    currency: 'usd',
+                    amount: Math.round(amountInBookingCurrency * 100),
+                    currency: bookingCurrency,
                     description: `${quoteService.item}${quoteService.description ? ` - ${quoteService.description}` : ''}`,
                     metadata: {
                         bookingId: booking._id.toString(),
@@ -1265,7 +1278,7 @@ export class BookingService {
                 customer: stripeCustomerId,
                 invoice: invoice.id,
                 amount: Math.round(service.price * 100),
-                currency: 'usd',
+                currency: bookingCurrency,
                 description: `${service.name} - Base Service`,
                 metadata: {
                     bookingId: booking._id.toString(),
@@ -1280,7 +1293,7 @@ export class BookingService {
                 customer: stripeCustomerId,
                 invoice: invoice.id,
                 amount: Math.round(service.price * 100),
-                currency: 'usd',
+                currency: bookingCurrency,
                 description: service.name,
                 metadata: {
                     bookingId: booking._id.toString(),
@@ -1297,7 +1310,7 @@ export class BookingService {
             customer: stripeCustomerId,
             invoice: invoice.id,
             amount: Math.round(platformFee * 100),
-            currency: 'usd',
+            currency: bookingCurrency,
             description: 'Platform Fee (5%)',
             metadata: {
                 bookingId: booking._id.toString(),
@@ -1330,7 +1343,7 @@ export class BookingService {
                 amount: totalAmount,
                 platformFee,
                 distributorAmount,
-                currency: 'usd',
+                currency: booking.currency,
                 status: 'pending',
                 invoiceDate: new Date(),
                 dueDate: finalizedInvoice.due_date ? new Date(finalizedInvoice.due_date * 1000) : null,

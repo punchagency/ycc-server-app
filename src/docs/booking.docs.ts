@@ -4,6 +4,7 @@
  *   post:
  *     tags: [Booking]
  *     summary: Create a new booking
+ *     description: Create a new booking for a service. The booking will inherit the currency from the service.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -50,6 +51,28 @@
  *     responses:
  *       201:
  *         description: Booking created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     currency:
+ *                       type: string
+ *                       description: Booking currency inherited from service
+ *                       example: usd
+ *                     totalAmount:
+ *                       type: number
+ *                       description: Total amount in booking currency
+ *                     platformFee:
+ *                       type: number
+ *                       description: Platform fee (5%) in booking currency
  *       401:
  *         description: Unauthorized
  */
@@ -60,6 +83,7 @@
  *   get:
  *     tags: [Booking]
  *     summary: Get all bookings
+ *     description: Retrieve bookings with currency information. All amounts are returned in the booking's currency.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -104,6 +128,29 @@
  *     responses:
  *       200:
  *         description: Bookings retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       currency:
+ *                         type: string
+ *                         description: Booking currency code
+ *                       totalAmount:
+ *                         type: number
+ *                         description: Total amount in booking currency
+ *                       platformFee:
+ *                         type: number
+ *                         description: Platform fee in booking currency
  *       401:
  *         description: Unauthorized
  */
@@ -114,6 +161,7 @@
  *   get:
  *     tags: [Booking]
  *     summary: Get booking by ID
+ *     description: Retrieve a single booking with currency information. All amounts are in the booking's currency.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -125,6 +173,28 @@
  *     responses:
  *       200:
  *         description: Booking retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     currency:
+ *                       type: string
+ *                       description: Booking currency code
+ *                       example: usd
+ *                     totalAmount:
+ *                       type: number
+ *                       description: Total amount in booking currency
+ *                     platformFee:
+ *                       type: number
+ *                       description: Platform fee (5%) in booking currency
  *       401:
  *         description: Unauthorized
  *       404:
@@ -211,7 +281,7 @@
  *   post:
  *     tags: [Booking]
  *     summary: Add quotes to a booking (Distributor only)
- *     description: Add quote items to a quotable booking. This can only be done for bookings with requiresQuote=true and status=pending. After adding quotes, the distributor can confirm the booking.
+ *     description: Add quote items to a quotable booking. Quote will be created in the booking's currency. All quote items must have the same currency. After adding quotes, the booking is automatically confirmed.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -231,7 +301,7 @@
  *             properties:
  *               quoteItems:
  *                 type: array
- *                 description: Array of quote items
+ *                 description: Array of quote items (all must have same currency)
  *                 items:
  *                   type: object
  *                   required: [name, price]
@@ -246,7 +316,7 @@
  *                       example: "Professional grade cleaning products"
  *                     price:
  *                       type: number
- *                       description: Unit price
+ *                       description: Unit price in booking currency
  *                       example: 25.00
  *                     quantity:
  *                       type: number
@@ -269,15 +339,31 @@
  *                   properties:
  *                     booking:
  *                       type: object
+ *                       properties:
+ *                         currency:
+ *                           type: string
+ *                           description: Booking currency
+ *                         totalAmount:
+ *                           type: number
+ *                           description: Total amount in booking currency
+ *                         platformFee:
+ *                           type: number
+ *                           description: Platform fee (5%) in booking currency
  *                     quote:
  *                       type: object
  *                       properties:
  *                         quoteAmount:
  *                           type: number
+ *                           description: Quote amount in booking currency
  *                         platformFee:
  *                           type: number
+ *                           description: Platform fee in booking currency
  *                         amount:
  *                           type: number
+ *                           description: Total amount in booking currency
+ *                         currency:
+ *                           type: string
+ *                           description: Quote currency (matches booking)
  *       400:
  *         description: Invalid request or business rule violation
  *       401:

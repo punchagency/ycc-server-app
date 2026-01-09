@@ -95,7 +95,8 @@ const OrderSchema = new Schema({
     userType: {
         type: String,
         enum: ['user', 'distributor'],
-        required: true
+        required: false,
+        default: 'user'
     },
     status: {
         type: String,

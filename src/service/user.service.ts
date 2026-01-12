@@ -34,7 +34,10 @@ export class UserService {
         }
 
         if (search) {
-            businessFilter.businessName = { $regex: search, $options: 'i' };
+            businessFilter.$or = [
+                { businessName: { $regex: search, $options: 'i' } },
+                { email: { $regex: search, $options: 'i' } }
+            ];
         }
 
         const businesses = await BusinessModel.find(businessFilter)

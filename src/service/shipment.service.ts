@@ -333,6 +333,12 @@ export class ShipmentService {
                         const confirmedItems = order.items.filter((item: any) => item.status === 'confirmed');
                         const confirmedTotal = confirmedItems.reduce((sum: number, item: any) => sum + item.totalPriceOfItems, 0);
                         
+                        const totalShipmentCost = shipments.reduce((sum, s) => {
+                            if (s.isBusinessHandled) return sum + (s.shipmentCost || 0);
+                            const rate = s.rates.find(r => r.isSelected);
+                            return sum + (rate?.rate || 0);
+                        }, 0);
+                        
                         await InvoiceModel.create({
                             stripeInvoiceId: order.stripeInvoiceId,
                             userId: order.userId,
@@ -340,7 +346,7 @@ export class ShipmentService {
                             businessIds,
                             amount: finalizedInvoice.amount_due / 100,
                             platformFee: confirmedTotal * CONSTANTS.PLATFORM_FEE_PERCENT,
-                            distributorAmount: (finalizedInvoice.amount_due / 100) - (confirmedTotal * CONSTANTS.PLATFORM_FEE_PERCENT),
+                            distributorAmount: (finalizedInvoice.amount_due / 100) - (confirmedTotal * CONSTANTS.PLATFORM_FEE_PERCENT) - totalShipmentCost,
                             currency: 'usd',
                             status: 'pending',
                             invoiceDate: new Date(),
@@ -496,6 +502,26 @@ export class ShipmentService {
 
                 await shipment.save();
 
+                if (order.stripeInvoiceId && user && selectedRate && shipment.shipmentCost) {
+                    const stripe = StripeService.getInstance();
+                    const shipmentCostInUSD = await CurrencyConverter.convertToUSD(shipment.shipmentCost, shipment.shipmentCurrency || 'usd');
+                    
+                    await stripe.createInvoiceItems({
+                        customer: user.stripeCustomerId || "",
+                        invoice: order.stripeInvoiceId,
+                        amount: Math.round(shipmentCostInUSD * 100),
+                        currency: 'usd',
+                        description: `Shipping Label - ${selectedRate.carrier} ${selectedRate.service}`,
+                        metadata: { 
+                            type: 'shipping_label',
+                            shipmentId: shipment._id.toString(),
+                            trackingNumber: shipment.trackingNumber || '',
+                            originalCurrency: shipment.shipmentCurrency || 'usd',
+                            originalAmount: shipment.shipmentCost.toString()
+                        }
+                    });
+                }
+
                 await this.sendLabelToBusiness(shipment, order, business, user);
 
                 results.push({
@@ -516,11 +542,9 @@ export class ShipmentService {
         }
         return results;
     }
-    
     private static isInternational(fromCountry: string, toCountry: string): boolean {
         return fromCountry.toUpperCase() !== toCountry.toUpperCase();
     }
-    
     private static buildCustomsInfo(items: any[], products: any[]) {
         return {
             customs_items: items.map(item => {
@@ -536,7 +560,6 @@ export class ShipmentService {
             })
         };
     }
-    
     private static async sendLabelToBusiness(shipment: IShipment, order: IOrder, business: any, user: any) {
         if (!business?.email || !shipment.labelUrl) return;
         

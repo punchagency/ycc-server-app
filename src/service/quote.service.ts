@@ -73,11 +73,12 @@ export class QuoteService {
             });
 
             for (const service of quote.services) {
-                const serviceCurrency = service.currency.toLowerCase();
+                // const serviceOriginalCurrency = service.originalCurrency.toLowerCase();
+                const serviceConvertedCurrency = service.convertedCurrency.toLowerCase();
                 let amountInQuoteCurrency = service.totalPrice;
                 
-                if (serviceCurrency !== quoteCurrency) {
-                    const amountInUSD = await CurrencyConverter.convertToUSD(service.totalPrice, serviceCurrency);
+                if (serviceConvertedCurrency !== quoteCurrency) {
+                    const amountInUSD = await CurrencyConverter.convertToUSD(service.totalPrice, serviceConvertedCurrency);
                     amountInQuoteCurrency = await CurrencyConverter.convertFromUSD(amountInUSD, quoteCurrency);
                 }
                 

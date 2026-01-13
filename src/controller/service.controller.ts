@@ -200,8 +200,9 @@ export class ServiceController {
     static async getService(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
             const { id } = req.params;
+            const userCurrency = req.user?.preferences?.currency;
 
-            const service = await ServiceService.getServiceById(id);
+            const service = await ServiceService.getServiceById(id, userCurrency);
 
             if (!service) {
                 res.status(404).json({ success: false, message: 'Service not found', code: 'SERVICE_NOT_FOUND' });
@@ -226,6 +227,7 @@ export class ServiceController {
             }
 
             const businessId = req.user.businessId;
+            const userCurrency = req.user?.preferences?.currency;
             if (!businessId) {
                 res.status(400).json({ success: false, message: 'Business not found for user', code: 'BUSINESS_NOT_FOUND' });
                 return;
@@ -234,7 +236,7 @@ export class ServiceController {
             const page = parseInt(req.query.page as string) || 1;
             const limit = parseInt(req.query.limit as string) || 10;
 
-            const result = await ServiceService.getServicesByBusiness(businessId, page, limit);
+            const result = await ServiceService.getServicesByBusiness(businessId, page, limit, userCurrency);
 
             res.status(200).json({
                 success: true,

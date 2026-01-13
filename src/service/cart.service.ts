@@ -1,7 +1,9 @@
 import CartModel, { ICart } from '../models/cart.model';
 import ProductModel from '../models/product.model';
 import BusinessModel from '../models/business.model';
+import UserModel from '../models/user.model';
 import { RedisUtils } from '../utils/RedisUtils';
+import { CurrencyHelper } from '../utils/currencyHelper';
 import catchError from '../utils/catchError';
 import { logError, logInfo } from '../utils/SystemLogs';
 import { Types } from 'mongoose';
@@ -11,6 +13,13 @@ interface CartOperationResult {
     wasCleared?: boolean;
     previousBusinessName?: string;
     newBusinessName?: string;
+    priceChanges?: Array<{
+        productId: string;
+        productName: string;
+        oldPrice: number;
+        newPrice: number;
+        currency: string;
+    }>;
 }
 
 export class CartService {
@@ -61,6 +70,11 @@ export class CartService {
     static async addToCart(userId: string, productId: string, quantity: number, userRole?: string): Promise<CartOperationResult> {
         if (!Types.ObjectId.isValid(productId)) return { cart: null };
 
+        const [userError, user] = await catchError(UserModel.findById(userId));
+        if (userError || !user) return { cart: null };
+
+        const userCurrency = user.preferences?.currency || 'usd';
+
         const [productError, product] = await catchError(ProductModel.findById(productId).populate('businessId'));
         if (productError || !product) {
             await logError({
@@ -79,6 +93,12 @@ export class CartService {
             });
             return { cart: null };
         }
+
+        const displayPrice = await CurrencyHelper.convertPriceToUserCurrency(
+            product.price || 0,
+            product.currency || 'usd',
+            userCurrency
+        );
 
         let cart = await CartModel.findOne({ userId });
         let wasCleared = false;
@@ -106,6 +126,7 @@ export class CartService {
                 totalItems: 0,
                 totalPrice: 0,
                 lastUpdated: new Date(),
+                userCurrency,
                 items: []
             });
         }
@@ -125,16 +146,19 @@ export class CartService {
                 return { cart: null };
             }
             cart.items[existingItemIndex].quantity = newQuantity;
-            cart.items[existingItemIndex].totalPriceOfItems = product.price ? newQuantity * product.price : 0;
+            cart.items[existingItemIndex].totalPriceOfItems = displayPrice * newQuantity;
         } else {
             const businessIdValue = typeof product.businessId === 'object' ? (product.businessId as any)._id : product.businessId;
             cart.items.push({
                 productId: new Types.ObjectId(productId) as any,
                 quantity,
-                pricePerItem: product.price,
-                currency: product.currency,
+                originalPrice: product.price || 0,
+                originalCurrency: product.currency || 'usd',
+                displayPrice,
+                displayCurrency: userCurrency,
                 businessId: businessIdValue,
-                totalPriceOfItems: product.price ? quantity * product.price : 0
+                totalPriceOfItems: displayPrice * quantity,
+                lockedAt: new Date()
             });
         }
 
@@ -167,6 +191,11 @@ export class CartService {
     static async updateCartItem(userId: string, productId: string, quantity: number, userRole?: string): Promise<CartOperationResult> {
         if (!Types.ObjectId.isValid(productId)) return { cart: null };
 
+        const [userError, user] = await catchError(UserModel.findById(userId));
+        if (userError || !user) return { cart: null };
+
+        const userCurrency = user.preferences?.currency || 'usd';
+
         const [productError, product] = await catchError(ProductModel.findById(productId).populate('businessId'));
         if (productError || !product) return { cart: null };
 
@@ -179,6 +208,12 @@ export class CartService {
             return { cart: null };
         }
 
+        const displayPrice = await CurrencyHelper.convertPriceToUserCurrency(
+            product.price || 0,
+            product.currency || 'usd',
+            userCurrency
+        );
+
         let cart = await CartModel.findOne({ userId });
         if (!cart) return { cart: null };
 
@@ -188,7 +223,7 @@ export class CartService {
 
         if (userRole === 'distributor' && cart.items.length > 0) {
             const existingBusinessId = cart.items[0].businessId.toString();
-            const newBusinessId = (product.businessId as any)._id.toString()
+            const newBusinessId = (product.businessId as any)._id.toString();
 
             if (existingBusinessId !== newBusinessId) {
                 const [, previousBusiness] = await catchError(BusinessModel.findById(existingBusinessId));
@@ -201,6 +236,7 @@ export class CartService {
                     totalItems: 0,
                     totalPrice: 0,
                     lastUpdated: new Date(),
+                    userCurrency,
                     items: []
                 });
                 wasCleared = true;
@@ -214,17 +250,20 @@ export class CartService {
                 cart.items.push({
                     productId: new Types.ObjectId(productId) as any,
                     quantity,
-                    pricePerItem: product.price,
-                    currency: product.currency,
+                    originalPrice: product.price || 0,
+                    originalCurrency: product.currency || 'usd',
+                    displayPrice,
+                    displayCurrency: userCurrency,
                     businessId: businessIdValue,
-                    totalPriceOfItems: product.price ? quantity * product?.price : 0,
+                    totalPriceOfItems: displayPrice * quantity,
+                    lockedAt: new Date()
                 });
             } else {
                 return { cart: null };
             }
         } else {
             cart.items[itemIndex].quantity = quantity;
-            cart.items[itemIndex].totalPriceOfItems = product.price ? quantity * product?.price : 0;
+            cart.items[itemIndex].totalPriceOfItems = displayPrice * quantity;
         }
 
         cart.totalItems = cart.items.reduce((sum, item) => sum + item.quantity, 0);
@@ -314,5 +353,47 @@ export class CartService {
 
     private static async invalidateCache(userId: string): Promise<void> {
         await catchError(RedisUtils.deleteTempData(this.getCacheKey(userId)));
+    }
+
+    static async updateCartCurrency(userId: string, newCurrency: string): Promise<{ cart: ICart | null; priceChanges: any[] }> {
+        const cart = await CartModel.findOne({ userId }).populate('items.productId', 'name price currency');
+        if (!cart || cart.items.length === 0) return { cart: null, priceChanges: [] };
+
+        const priceChanges: any[] = [];
+
+        for (const item of cart.items) {
+            const product = item.productId as any;
+            const oldDisplayPrice = item.displayPrice;
+            
+            const newDisplayPrice = await CurrencyHelper.convertPriceToUserCurrency(
+                item.originalPrice,
+                item.originalCurrency,
+                newCurrency
+            );
+
+            if (Math.abs(newDisplayPrice - oldDisplayPrice) > 0.01) {
+                priceChanges.push({
+                    productId: product._id.toString(),
+                    productName: product.name,
+                    oldPrice: oldDisplayPrice,
+                    newPrice: newDisplayPrice,
+                    currency: newCurrency.toUpperCase()
+                });
+            }
+
+            item.displayPrice = newDisplayPrice;
+            item.displayCurrency = newCurrency;
+            item.totalPriceOfItems = newDisplayPrice * item.quantity;
+        }
+
+        cart.userCurrency = newCurrency;
+        cart.totalPrice = cart.items.reduce((sum, item) => sum + (item.totalPriceOfItems || 0), 0);
+        cart.lastUpdated = new Date();
+
+        await cart.save();
+        await this.invalidateCache(userId);
+
+        const updatedCart = await this.getCart(userId);
+        return { cart: updatedCart, priceChanges };
     }
 }

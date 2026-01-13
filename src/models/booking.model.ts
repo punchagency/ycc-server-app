@@ -9,6 +9,14 @@ export interface IBooking extends Document {
     quoteId?: Schema.Types.ObjectId;
     quoteStatus?: 'not_required' | 'pending' | 'provided' | 'accepted' | 'rejected' | 'edit_requested' | 'edited' | 'partially_accepted';
     requiresQuote?: boolean;
+    originalAmount?: number;
+    originalCurrency?: string;
+    convertedAmount?: number;
+    convertedCurrency?: string;
+    conversionRate?: number;
+    conversionTimestamp?: Date;
+    distributorPayoutAmount?: number;
+    distributorPayoutCurrency?: string;
     totalAmount?: number;
     platformFee?: number;
     currency: string;
@@ -66,6 +74,14 @@ const bookingSchema = new Schema<IBooking>({
     quoteId: { type: Schema.Types.ObjectId, ref: 'Quote' },
     quoteStatus: { type: String, enum: ['not_required', 'pending', 'provided', 'accepted', 'rejected', 'edit_requested', 'edited', 'partially_accepted'] },
     requiresQuote: { type: Boolean, default: false },
+    originalAmount: { type: Number },
+    originalCurrency: { type: String },
+    convertedAmount: { type: Number },
+    convertedCurrency: { type: String },
+    conversionRate: { type: Number },
+    conversionTimestamp: { type: Date },
+    distributorPayoutAmount: { type: Number },
+    distributorPayoutCurrency: { type: String },
     totalAmount: { type: Number },
     platformFee: { type: Number },
     currency: { type: String, required: true, default: 'usd' },

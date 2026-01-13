@@ -32,6 +32,11 @@
  *               nationality:
  *                 type: string
  *                 example: United States
+ *               currency:
+ *                 type: string
+ *                 enum: [USD, EUR, GBP, CAD, AUD, JPY, CHF, CNY, INR, MXN, BRL, ZAR, AED, SAR, KRW, SGD, HKD, NOK, SEK, DKK, PLN, THB, MYR, IDR, PHP, TRY, RUB, NZD]
+ *                 default: USD
+ *                 example: USD
  *               address:
  *                 type: object
  *                 required: true
@@ -285,6 +290,10 @@
  *                 type: string
  *               nationality:
  *                 type: string
+ *               currency:
+ *                 type: string
+ *                 enum: [USD, EUR, GBP, CAD, AUD, JPY, CHF, CNY, INR, MXN, BRL, ZAR, AED, SAR, KRW, SGD, HKD, NOK, SEK, DKK, PLN, THB, MYR, IDR, PHP, TRY, RUB, NZD]
+ *                 example: USD
  *               profilePicture:
  *                 type: string
  *                 format: binary

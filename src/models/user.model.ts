@@ -25,6 +25,9 @@ export interface IUser extends Document {
   resetPasswordCodeExpires?: Date;
   isVerified: boolean;
   isActive: boolean;
+  preferences: {
+    currency: string;
+  };
   stripeCustomerId?: string;
   notificationPreferences: {
     emailNotifications: boolean;
@@ -92,6 +95,12 @@ const userSchema = new Schema<IUser>({
   isActive: {
     type: Boolean,
     default: false
+  },
+  preferences: {
+    currency: {
+      type: String,
+      default: 'usd'
+    }
   },
   profilePicture: {
     type: String,

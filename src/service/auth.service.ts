@@ -36,6 +36,7 @@ export interface RegisterInput {
   password: string;
   phone?: string;
   nationality?: string;
+  currency: string;
   role?: typeof ROLES[number];
   profilePicture?: string | null;
   address: {
@@ -128,6 +129,9 @@ export class AuthService {
         phone: userData.phone,
         nationality: userData.nationality,
         address: userData.address,
+        preferences: {
+          currency: userData.currency
+        },
         profilePicture: userData.profilePicture,
         role: userData.role || 'user',
         activationCode,

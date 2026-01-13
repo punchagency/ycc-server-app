@@ -338,6 +338,7 @@ export class AuthController {
                     role: user.role,
                     nationality: user.nationality,
                     profilePicture: user.profilePicture,
+                    preferences: user.preferences,
                     address: user.address,
                     isVerified: user.isVerified,
                     isActive: user.isActive,

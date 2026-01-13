@@ -738,7 +738,7 @@ export class ShipmentService {
                 invoice: invoice.id,
                 amount: Math.round(platformFee * 100),
                 currency: 'usd',
-                description: 'Platform Fee (5%)',
+                description: 'Platform Fee (10%)',
                 metadata: { type: 'platform_fee' }
             });
         }

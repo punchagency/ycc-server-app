@@ -5,12 +5,14 @@ import Business from '../models/business.model';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import Validate from '../utils/Validate';
 import { TryParseJSON } from '../utils/Helpers';
+import CONSTANTS from '../config/constant';
 
 export class AuthController {
     static async register(req: Request, res: Response): Promise<void> {
         try {
-            let { firstName, lastName, email, password, phone, nationality, address, role, businessName, businessEmail, businessPhone, website } = req.body;
+            let { firstName, lastName, email, password, phone, nationality, address, role, businessName, businessEmail, businessPhone, website, currency } = req.body;
             email = email.toLowerCase().trim();
+            currency = currency ? currency.toLowerCase().trim() : 'usd';
             firstName = firstName.trim();
             if (phone) phone = phone.trim();
             if (nationality) nationality = nationality.trim();
@@ -30,6 +32,11 @@ export class AuthController {
 
             if (!email || !Validate.email(email)) {
                 res.status(400).json({ success: false, message: 'Valid email is required', code: "VALIDATION_ERROR" });
+                return;
+            }
+
+            if(!CONSTANTS.CURRENCIES_CODES.includes(currency.toUpperCase())){
+                res.status(400).json({ success: false, message: 'The currency selected is not supported.', code: "VALIDATION_ERROR" });
                 return;
             }
 
@@ -105,6 +112,7 @@ export class AuthController {
                 ...req.body,
                 address: address ? address : undefined,
                 phone,
+                currency,
                 businessPhone,
                 profilePicture,
                 website: website ? website : undefined,
@@ -369,7 +377,7 @@ export class AuthController {
                 return;
             }
 
-            const { firstName, lastName, phone, nationality, address, profilePicture } = req.body;
+            const { firstName, lastName, phone, nationality, address, profilePicture, currency } = req.body;
             const files = req.files as { [fieldname: string]: any[] };
             const uploadedPicture = files?.profilePicture?.[0]?.location;
 
@@ -403,6 +411,7 @@ export class AuthController {
             if (lastName !== undefined) updateData.lastName = lastName?.trim();
             if (nationality !== undefined) updateData.nationality = nationality?.trim() || null;
             if (address !== undefined) updateData.address = address || null;
+            if (currency !== undefined) updateData['preferences.currency'] = currency?.toLowerCase().trim() || 'usd';
 
             const user = await User.findByIdAndUpdate(
                 req.user._id,

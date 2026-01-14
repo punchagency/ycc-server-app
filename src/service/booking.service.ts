@@ -1311,7 +1311,7 @@ export class BookingService {
             invoice: invoice.id,
             amount: Math.round(platformFee * 100),
             currency: bookingCurrency,
-            description: 'Platform Fee (5%)',
+            description: 'Platform Fee (10%)',
             metadata: {
                 bookingId: booking._id.toString(),
                 type: 'platform_fee'

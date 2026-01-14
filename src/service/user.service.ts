@@ -192,7 +192,7 @@ export class UserService {
     }
     static async getUserById(userId: string) {
         const user = await UserModel.findById(userId)
-            .select('_id firstName lastName email phone profilePicture address role isVerified isActive createdAt');
+            .select('_id firstName lastName email phone profilePicture address role currency isVerified isActive createdAt');
 
         if (!user) {
             throw new Error('User not found');

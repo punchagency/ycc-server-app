@@ -145,8 +145,10 @@ export class ShipmentService {
                     quantity: item.quantity,
                     businessId: item.businessId,
                     discount: item.discount,
-                    pricePerItem: item.pricePerItem,
-                    currency: item.currency || 'usd',
+                    originalPrice: item.originalPrice,
+                    originalCurrency: item.originalCurrency,
+                    convertedPrice: item.convertedPrice,
+                    convertedCurrency: item.convertedCurrency,
                     totalPriceOfItems: item.totalPriceOfItems
                 })),
                 rates,
@@ -196,8 +198,10 @@ export class ShipmentService {
                 quantity: item.quantity,
                 businessId: item.businessId,
                 discount: item.discount,
-                pricePerItem: item.pricePerItem,
-                currency: item.currency || 'usd',
+                originalPrice: item.originalPrice,
+                originalCurrency: item.originalCurrency,
+                convertedPrice: item.convertedPrice,
+                convertedCurrency: item.convertedCurrency,
                 totalPriceOfItems: item.totalPriceOfItems
             })),
             rates: [],
@@ -553,7 +557,7 @@ export class ShipmentService {
                     description: `${product?.name || 'Product'}\n${product?.description || ''}`,
                     quantity: item.quantity,
                     weight: product?.weight || 0,
-                    value: item.pricePerItem,
+                    value: item.originalPrice || item.convertedPrice,
                     hs_tariff_number: product?.hsCode || '',
                     origin_country: product?.wareHouseAddress?.country || 'US'
                 };
@@ -652,7 +656,7 @@ export class ShipmentService {
                 await stripe.createInvoiceItems({
                     customer: stripeCustomerId,
                     invoice: invoice.id,
-                    amount: Math.round(item.totalPriceOfItems * 100),
+                    amount: Math.round((item.totalPriceOfItems || 0) * 100),
                     currency: 'usd',
                     description: `Product from ${business.businessName}`,
                     metadata: { 

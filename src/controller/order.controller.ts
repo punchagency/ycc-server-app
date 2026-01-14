@@ -48,6 +48,7 @@ class OrderController {
             }));
 
             if (error) {
+                logError({ message: 'Failed to create order', source: 'OrderController.createOrder', error });
                 return res.status(400).json({ success: false, message: error.message, code: 'ORDER_CREATION_FAILED' });
             }
 
@@ -321,7 +322,7 @@ class OrderController {
                 res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
                 return;
             }
-            const { orderId, status, reason, notes, enableShipping, trackingNumber, shipmentCost }: UpdateOrderStatusDto = req.body;
+            const { orderId, status, reason, notes, enableShipping, trackingNumber, shipmentCost, itemPrices }: UpdateOrderStatusDto = req.body;
             const userId = req.user?._id;
             const userRole = req.user?.role;
 
@@ -354,7 +355,8 @@ class OrderController {
                 notes,
                 trackingNumber,
                 enableShipping,
-                shipmentCost
+                shipmentCost,
+                itemPrices
             }));
 
             if (error) {

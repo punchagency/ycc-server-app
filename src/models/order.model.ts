@@ -11,9 +11,15 @@ export interface IOrder extends Document {
         quantity: number;
         businessId: Schema.Types.ObjectId;
         discount?: number;
-        pricePerItem: number;
-        currency: string;
-        totalPriceOfItems: number;
+        originalPrice?: number;
+        originalCurrency?: string;
+        convertedPrice?: number;
+        convertedCurrency?: string;
+        conversionRate?: number;
+        conversionTimestamp?: Date;
+        distributorPayoutAmount?: number;
+        distributorPayoutCurrency?: string;
+        totalPriceOfItems?: number;
         fromAddress: {
             street: string;
             city: string;
@@ -69,9 +75,15 @@ const OrderSchema = new Schema({
         quantity: { type: Number, required: true },
         businessId: { type: Schema.Types.ObjectId, ref: 'Business', required: true },
         discount: { type: Number },
-        pricePerItem: { type: Number, required: true },
-        currency: { type: String, required: true, default: "usd" },
-        totalPriceOfItems: { type: Number, required: true },
+        originalPrice: { type: Number, required: false },
+        originalCurrency: { type: String, required: false },
+        convertedPrice: { type: Number, required: false },
+        convertedCurrency: { type: String, required: false },
+        conversionRate: { type: Number, required: false },
+        conversionTimestamp: { type: Date, required: false },
+        distributorPayoutAmount: { type: Number, required: false },
+        distributorPayoutCurrency: { type: String, required: false },
+        totalPriceOfItems: { type: Number, required: false },
         fromAddress: {
             street: { type: String, required: true },
             city: { type: String, required: true },

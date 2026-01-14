@@ -36,8 +36,10 @@ export interface IShipment extends Document {
         quantity: number;
         businessId: Schema.Types.ObjectId;
         discount?: number;
-        pricePerItem: number;
-        currency: string;
+        originalPrice: number;
+        originalCurrency: string;
+        convertedPrice: number;
+        convertedCurrency: string;
         totalPriceOfItems: number;
     }[];
     customsInfo?: {
@@ -98,8 +100,10 @@ const ShipmentSchema = new Schema({
         quantity: { type: Number, required: true },
         businessId: { type: Schema.Types.ObjectId, ref: 'Business', required: true },
         discount: { type: Number },
-        pricePerItem: { type: Number, required: true },
-        currency: { type: String, required: true, default: 'usd' },
+        originalPrice: { type: Number, required: true },
+        originalCurrency: { type: String, required: true },
+        convertedPrice: { type: Number, required: true },
+        convertedCurrency: { type: String, required: true },
         totalPriceOfItems: { type: Number, required: true }
     }],
     customsInfo: {

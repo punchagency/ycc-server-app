@@ -16,6 +16,7 @@ import InvoiceModel from "../models/invoice.model";
 import 'dotenv/config';
 import { logCritical } from "../utils/SystemLogs";
 import { CurrencyConverter } from "../utils/currencyConverter";
+import { CurrencyHelper } from "../utils/currencyHelper";
 
 export interface CreateOrderInput {
     userId: Schema.Types.ObjectId | string;
@@ -47,10 +48,10 @@ export class OrderService {
             }
             user.stripeCustomerId = stripeCustomerId;
             await user.save();
-        }else{
-            try{
+        } else {
+            try {
                 const customer = await stripe.retrieveCustomer(stripeCustomerId);
-                if(!customer){
+                if (!customer) {
                     const customer = await stripe.createCustomer({
                         email: user.email,
                         name: `${user.firstName} ${user.lastName}`
@@ -59,7 +60,7 @@ export class OrderService {
                     user.stripeCustomerId = stripeCustomerId;
                     await user.save();
                 }
-            }catch(error){
+            } catch (error) {
                 const customer = await stripe.createCustomer({
                     email: user.email,
                     name: `${user.firstName} ${user.lastName}`
@@ -105,7 +106,7 @@ export class OrderService {
             const businessItems = confirmedItems.filter((item: any) => item.businessId.toString() === businessId);
             for (const item of businessItems) {
                 const itemIndex = order.items.findIndex((i: any) => i._id?.toString() === item._id?.toString());
-                const amountInUSD = await CurrencyConverter.convertToUSD(item.totalPriceOfItems, item.currency || 'usd');
+                const amountInUSD = await CurrencyConverter.convertToUSD(item.totalPriceOfItems, order.currency || 'usd');
                 await stripe.createInvoiceItems({
                     customer: stripeCustomerId,
                     invoice: invoice.id,
@@ -147,7 +148,7 @@ export class OrderService {
 
         let confirmedTotalUSD = 0;
         for (const item of confirmedItems) {
-            confirmedTotalUSD += await CurrencyConverter.convertToUSD(item.totalPriceOfItems, item.currency || 'usd');
+            confirmedTotalUSD += await CurrencyConverter.convertToUSD(item.totalPriceOfItems, order.currency || 'usd');
         }
         const platformFee = confirmedTotalUSD * CONSTANTS.PLATFORM_FEE_PERCENT;
         if (platformFee > 0) {
@@ -169,13 +170,13 @@ export class OrderService {
         const business = await BusinessModel.findById(businessId);
         if (!business?.stripeAccountId) throw new Error('Business missing Stripe account');
 
-        const businessItems = order.items.filter((item: any) => 
+        const businessItems = order.items.filter((item: any) =>
             item.businessId.toString() === businessId && item.status === 'confirmed'
         );
 
         for (const item of businessItems) {
             const itemIndex = order.items.findIndex((i: any) => i._id?.toString() === item._id?.toString());
-            const amountInUSD = await CurrencyConverter.convertToUSD(item.totalPriceOfItems, item.currency || 'usd');
+            const amountInUSD = await CurrencyConverter.convertToUSD(item.totalPriceOfItems, order.currency || 'usd');
             await stripe.createInvoiceItems({
                 customer: stripeCustomerId,
                 invoice: order.stripeInvoiceId,
@@ -213,13 +214,13 @@ export class OrderService {
         const confirmedItems = order.items.filter((item: any) => item.status === 'confirmed');
         let confirmedTotalUSD = 0;
         for (const item of confirmedItems) {
-            confirmedTotalUSD += await CurrencyConverter.convertToUSD(item.totalPriceOfItems, item.currency || 'usd');
+            confirmedTotalUSD += await CurrencyConverter.convertToUSD(item.totalPriceOfItems, order.currency || 'usd');
         }
         const platformFee = confirmedTotalUSD * CONSTANTS.PLATFORM_FEE_PERCENT;
-        
+
         const existingInvoice = await stripe.getInvoice(order.stripeInvoiceId);
         const existingPlatformFee = existingInvoice.lines.data.find((line: any) => line.metadata?.type === 'platform_fee');
-        
+
         if (existingPlatformFee) {
             const newPlatformFeeAmount = Math.round(platformFee * 100);
             if (newPlatformFeeAmount !== existingPlatformFee.amount) {
@@ -261,7 +262,7 @@ export class OrderService {
             const confirmedItems = order.items.filter((item: any) => item.status === 'confirmed');
             let confirmedTotalUSD = 0;
             for (const item of confirmedItems) {
-                confirmedTotalUSD += await CurrencyConverter.convertToUSD(item.totalPriceOfItems, item.currency || 'usd');
+                confirmedTotalUSD += await CurrencyConverter.convertToUSD((item.totalPriceOfItems || 0), order.currency || 'usd');
             }
 
             await InvoiceModel.create({
@@ -338,7 +339,7 @@ export class OrderService {
             case 'client_cancel_after_confirmation': {
                 const totalAmountUSD = await CurrencyConverter.convertToUSD(order.totalAmount, order.currency || 'usd');
                 const refundAmount = Math.round(totalAmountUSD * 0.75);
-                
+
                 await stripeService.getPaymentIntentAndProcessRefund({
                     invoiceId,
                     refundAmount
@@ -347,7 +348,7 @@ export class OrderService {
                 for (const item of order.items) {
                     const business = await BusinessModel.findById(item.businessId);
                     if (business?.stripeAccountId && chargeId) {
-                        const itemAmountUSD = await CurrencyConverter.convertToUSD(item.totalPriceOfItems, item.currency || 'usd');
+                        const itemAmountUSD = await CurrencyConverter.convertToUSD((item.totalPriceOfItems || 0), order.currency || 'usd');
                         const supplierAmount = Math.round(itemAmountUSD * 0.25);
                         await stripeService.createTransfer({
                             amount: supplierAmount,
@@ -365,7 +366,7 @@ export class OrderService {
                 for (const item of order.items) {
                     const business = await BusinessModel.findById(item.businessId);
                     if (business?.stripeAccountId && chargeId) {
-                        const itemAmountUSD = await CurrencyConverter.convertToUSD(item.totalPriceOfItems, item.currency || 'usd');
+                        const itemAmountUSD = await CurrencyConverter.convertToUSD((item.totalPriceOfItems || 0), order.currency || 'usd');
                         await stripeService.createTransfer({
                             amount: Math.round(itemAmountUSD * 100),
                             destination: business.stripeAccountId,
@@ -405,12 +406,14 @@ export class OrderService {
         const [userError, user] = await catchError(UserModel.findById(userId));
         if (userError || !user) throw new Error('User not found');
 
+        const userCurrency = user.preferences?.currency || 'usd';
         const productIds = products.map(p => p.productId);
         const [productsError, productDocs] = await catchError(ProductModel.find({ _id: { $in: productIds } }).populate('businessId'));
         if (productsError || !productDocs || productDocs.length === 0) throw new Error('Products not found');
 
         const items = [];
         let totalAmountUSD = 0;
+        const conversionTimestamp = new Date();
 
         for (const productInput of products) {
             const product = productDocs.find(p => p._id.toString() === productInput.productId);
@@ -419,9 +422,29 @@ export class OrderService {
             const business = await BusinessModel.findById(product.businessId);
             if (!business) throw new Error(`Business not found for product ${productInput.productId}`);
 
-            const pricePerItem = product.price;
+            const businessOwner = await UserModel.findById(business.userId);
+            const distributorCurrency = businessOwner?.preferences?.currency || product.currency || 'usd';
+
+            const originalPrice = product.price || 0;
+            const originalCurrency = product.currency || 'usd';
             const discount = productInput.discount || 0;
-            const totalPriceOfItems = pricePerItem ? (pricePerItem * productInput.quantity) - discount : 0;
+            
+            const conversion = await CurrencyHelper.convertPrice(
+                originalPrice,
+                originalCurrency,
+                userCurrency
+            );
+
+            const convertedPrice = conversion.convertedPrice;
+            const conversionRate = conversion.conversionRate;
+            const totalPriceOfItems = (convertedPrice * productInput.quantity) - discount;
+
+            const distributorPayoutAmount = await CurrencyHelper.convertPriceToUserCurrency(
+                originalPrice * productInput.quantity,
+                originalCurrency,
+                distributorCurrency
+            );
+
             const confirmationToken = uuid();
             const confirmationExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
@@ -430,8 +453,14 @@ export class OrderService {
                 quantity: productInput.quantity,
                 businessId: business._id,
                 discount,
-                pricePerItem,
-                currency: product.currency || 'usd',
+                originalPrice,
+                originalCurrency,
+                convertedPrice,
+                convertedCurrency: userCurrency,
+                conversionRate,
+                conversionTimestamp,
+                distributorPayoutAmount,
+                distributorPayoutCurrency: distributorCurrency,
                 totalPriceOfItems,
                 fromAddress: {
                     street: product.wareHouseAddress.street,
@@ -445,7 +474,7 @@ export class OrderService {
                 confirmationExpires
             });
 
-            totalAmountUSD += await CurrencyConverter.convertToUSD(totalPriceOfItems, product.currency || 'usd');
+            totalAmountUSD += await CurrencyConverter.convertToUSD(totalPriceOfItems, userCurrency);
         }
 
         const platformFee = totalAmountUSD * CONSTANTS.PLATFORM_FEE_PERCENT;
@@ -463,7 +492,7 @@ export class OrderService {
                 zip: deliveryAddress.zipcode,
                 country: deliveryAddress.country
             },
-            currency: 'usd',
+            currency: userCurrency,
             total,
             totalAmount: totalAmountUSD,
             platformFee,
@@ -564,11 +593,11 @@ export class OrderService {
             if (!business) throw new Error('Business not found');
 
             // const isOrderPlacer = order.userId.toString() === userId && order.userType === 'distributor';
-            const isOrderPlacer = order.userId.toString() === userId
+            const isOrderPlacer = order.userId.toString() === userId;
             // const isSupplier = order.userType === 'user' && order.items.some(item => 
             //     item.businessId.toString() === business._id.toString()
             // );
-            const isSupplier = order.items.some(item => 
+            const isSupplier = order.items.some(item =>
                 item.businessId.toString() === business._id.toString()
             );
 
@@ -579,7 +608,7 @@ export class OrderService {
             const business = await BusinessModel.findOne({ userId });
             if (!business) throw new Error('Business not found');
 
-            const isSupplier = order.userType === 'distributor' && order.items.some(item => 
+            const isSupplier = order.userType === 'distributor' && order.items.some(item =>
                 item.businessId.toString() === business._id.toString()
             );
 
@@ -613,7 +642,7 @@ export class OrderService {
         if (userRole === 'distributor' && (!order.userType || order.userType === 'user')) {
             const business = await BusinessModel.findOne({ userId });
             if (business) {
-                orderObj.items = orderObj.items.filter((item: any) => 
+                orderObj.items = orderObj.items.filter((item: any) =>
                     item.businessId._id.toString() === business._id.toString()
                 );
             }
@@ -621,7 +650,7 @@ export class OrderService {
 
         return orderObj;
     }
-    static async getOrders({userId, role, page = 1, limit = 10, status, paymentStatus, startDate, endDate, sortBy = 'createdAt', orderBy = 'desc', userType}:{
+    static async getOrders({ userId, role, page = 1, limit = 10, status, paymentStatus, startDate, endDate, sortBy = 'createdAt', orderBy = 'desc', userType }: {
         userId: string;
         role: typeof ROLES[number];
         page?: number;
@@ -642,7 +671,7 @@ export class OrderService {
         } else if (role === 'distributor') {
             const business = await BusinessModel.findOne({ userId });
             if (!business) throw new Error('Business not found');
-            
+
             if (userType === 'distributor') {
                 query.userId = userId;
                 query.userType = 'distributor';
@@ -798,10 +827,16 @@ export class OrderService {
 
         return { success: true, orderId: order._id };
     }
-    static async updateUserOrderStatus({orderId, status, userId, userRole, notes, reason, trackingNumber, enableShipping, shipmentCost }:{userId: string, orderId: string, status: 'confirmed' | 'processing' | 'shipped' | 'out_for_delivery'| 'cancelled', userRole: typeof ROLES[number], reason?: string, notes?: string, trackingNumber?: string, enableShipping?: boolean, shipmentCost?: number}) {
+    static async updateUserOrderStatus({ orderId, status, userId, userRole, notes, reason, trackingNumber, enableShipping, shipmentCost, itemPrices }: {
+        userId: string, orderId: string, status: 'confirmed' | 'processing' | 'shipped' | 'out_for_delivery' | 'cancelled', userRole: typeof ROLES[number], reason?: string, notes?: string, trackingNumber?: string, enableShipping?: boolean, shipmentCost?: number, itemPrices?: {
+            itemId: string;
+            price: number;
+            currency: string;
+        }[]
+    }) {
         const order = await OrderModel.findById(orderId);
         if (!order) throw new Error('Order not found');
-        if(!order.userType){
+        if (!order.userType) {
             order.userType = "user";
             await order.save();
         }
@@ -887,6 +922,35 @@ export class OrderService {
             const businessItems = order.items.filter(i => i.businessId.toString() === business._id.toString());
             if (businessItems.length === 0) throw new Error('No items found for your business in this order');
 
+            // Validate and update prices when confirming
+            if (status === 'confirmed' && itemPrices && itemPrices.length > 0) {
+                const currencies = new Set(itemPrices.map(ip => ip.currency.toUpperCase()));
+                if (currencies.size > 1) throw new Error('All item prices must have the same currency');
+                
+                const currency = Array.from(currencies)[0];
+                if (!CONSTANTS.CURRENCIES_CODES.includes(currency)) {
+                    throw new Error(`Invalid currency code. Allowed: ${CONSTANTS.CURRENCIES_CODES.join(', ')}`);
+                }
+
+                for (const priceData of itemPrices) {
+                    const item = businessItems.find(i => i._id.toString() === priceData.itemId);
+                    if (!item) throw new Error(`Item ${priceData.itemId} not found in your business items`);
+                    if (priceData.price <= 0) throw new Error('Price must be greater than 0');
+                    
+                    item.originalPrice = priceData.price;
+                    item.originalCurrency = currency;
+                    item.totalPriceOfItems = priceData.price * item.quantity;
+                }
+            }
+
+            // Check for items without prices when confirming
+            if (status === 'confirmed') {
+                const itemsWithoutPrice = businessItems.filter(i => !i.originalPrice || i.originalPrice <= 0);
+                if (itemsWithoutPrice.length > 0) {
+                    throw new Error('Some items do not have prices. Please provide prices for all items.');
+                }
+            }
+
             const validTransitions: Record<string, string[]> = {
                 'pending': ['confirmed', 'declined', "cancelled"],
                 'confirmed': ['processing', 'declined', "cancelled"],
@@ -964,7 +1028,7 @@ export class OrderService {
                         ShipmentService.createShipmentsForConfirmedItems(order._id.toString(), business._id.toString())
                     );
                     if (shipmentError) {
-                        logCritical({message: `Shipment creation failed: ${shipmentError.message}`, error: shipmentError, source: "OrderService.updateOrderStatus"});
+                        logCritical({ message: `Shipment creation failed: ${shipmentError.message}`, error: shipmentError, source: "OrderService.updateOrderStatus" });
                         throw new Error('Shipment creation failed');
                     }
                 } else if (enableShipping === false && shipmentCost) {
@@ -972,7 +1036,7 @@ export class OrderService {
                         ShipmentService.createBusinessHandledShipment(order._id.toString(), business._id.toString(), shipmentCost)
                     );
                     if (shipmentError) {
-                        logCritical({message: `Business-handled shipment creation failed: ${shipmentError.message}`, error: shipmentError, source: "OrderService.updateOrderStatus"});
+                        logCritical({ message: `Business-handled shipment creation failed: ${shipmentError.message}`, error: shipmentError, source: "OrderService.updateOrderStatus" });
                         throw new Error('Business-handled shipment creation failed');
                     }
                 }
@@ -981,7 +1045,7 @@ export class OrderService {
                     this.createOrUpdateInvoice(order._id.toString(), business._id.toString())
                 );
                 if (invoiceError) {
-                    logCritical({message: `Invoice creation/update failed: ${invoiceError.message}`, error: invoiceError, source: "OrderService.updateOrderStatus"});
+                    logCritical({ message: `Invoice creation/update failed: ${invoiceError.message}`, error: invoiceError, source: "OrderService.updateOrderStatus" });
                     throw new Error('Invoice creation/update failed');
                 }
 
@@ -1012,13 +1076,13 @@ export class OrderService {
             </a>
             `
             });
-        } else{
+        } else {
             throw new Error('Invalid user role');
         }
 
         return { success: true, order };
     }
-    static async updateDistributorOrderStatus({userId, orderId, status, userRole, notes, reason, enableShipping, trackingNumber, shipmentCost }: { userId: string, orderId: string, status: 'confirmed' | 'processing' | 'shipped' | 'out_for_delivery' | 'cancelled', reason?: string, notes?: string, userRole: typeof ROLES[number], enableShipping?: boolean, trackingNumber?: string, shipmentCost?: number}){
+    static async updateDistributorOrderStatus({ userId, orderId, status, userRole, notes, reason, enableShipping, trackingNumber, shipmentCost }: { userId: string, orderId: string, status: 'confirmed' | 'processing' | 'shipped' | 'out_for_delivery' | 'cancelled', reason?: string, notes?: string, userRole: typeof ROLES[number], enableShipping?: boolean, trackingNumber?: string, shipmentCost?: number }) {
         const order = await OrderModel.findById(orderId);
         if (!order) throw new Error('Order not found');
 
@@ -1055,7 +1119,7 @@ export class OrderService {
 
             if (order.paymentStatus === 'paid') {
                 await this.handleProductOrderEvent(order._id.toString(), 'distributor_cancel');
-            } else{
+            } else {
                 order.paymentStatus = 'cancelled';
                 await order.save();
             }
@@ -1151,7 +1215,7 @@ export class OrderService {
                     ShipmentService.createShipmentsForConfirmedItems(order._id.toString(), business._id.toString())
                 );
                 if (shipmentError) {
-                    logCritical({message: `Shipment creation failed: ${shipmentError.message}`, error: shipmentError, source: "OrderService.updateDistributorOrderStatus"});
+                    logCritical({ message: `Shipment creation failed: ${shipmentError.message}`, error: shipmentError, source: "OrderService.updateDistributorOrderStatus" });
                     throw new Error('Shipment creation failed');
                 }
             } else if (status === 'confirmed' && enableShipping === false && shipmentCost) {
@@ -1159,7 +1223,7 @@ export class OrderService {
                     ShipmentService.createBusinessHandledShipment(order._id.toString(), business._id.toString(), shipmentCost)
                 );
                 if (shipmentError) {
-                    logCritical({message: `Manufacturer shipment creation failed: ${shipmentError.message}`, error: shipmentError, source: "OrderService.updateDistributorOrderStatus"});
+                    logCritical({ message: `Manufacturer shipment creation failed: ${shipmentError.message}`, error: shipmentError, source: "OrderService.updateDistributorOrderStatus" });
                     throw new Error('Manufacturer shipment creation failed');
                 }
 
@@ -1167,7 +1231,7 @@ export class OrderService {
                     ShipmentService.createAndFinalizeBusinessInvoice(order._id.toString())
                 );
                 if (invoiceError) {
-                    logCritical({message: `Invoice creation failed: ${invoiceError.message}`, error: invoiceError, source: "OrderService.updateDistributorOrderStatus"});
+                    logCritical({ message: `Invoice creation failed: ${invoiceError.message}`, error: invoiceError, source: "OrderService.updateDistributorOrderStatus" });
                     throw new Error('Invoice creation failed');
                 }
             }

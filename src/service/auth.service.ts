@@ -69,6 +69,9 @@ export interface ValidationResponse {
   lastName?: string;
   role?: typeof ROLES[number];
   businessId?: string;
+  preferences?: {
+    currency: string;
+  };
   error?: string;
 }
 
@@ -442,7 +445,10 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
-        businessId: decoded.businessId
+        businessId: decoded.businessId,
+        preferences: {
+          currency: user.preferences.currency
+        }
       };
     } catch (error) {
       console.error('Token validation error:', error);

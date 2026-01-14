@@ -12,6 +12,9 @@ export interface AuthenticatedRequest extends Request {
     lastName: string;
     role: typeof ROLES[number];
     businessId?: string;
+    preferences: {
+      currency: string;
+    };
   };
 }
 
@@ -60,7 +63,10 @@ export const authenticateToken = async (
       firstName: validationResult.firstName!,
       lastName: validationResult.lastName!,
       role: validationResult.role!,
-      businessId: validationResult.businessId
+      businessId: validationResult.businessId,
+      preferences: {
+        currency: validationResult.preferences?.currency!
+      }
     };
 
     next();
@@ -120,7 +126,10 @@ export const optionalAuth = async (
         firstName: validationResult.firstName!,
         lastName: validationResult.lastName!,
         role: validationResult.role!,
-        businessId: validationResult.businessId
+        businessId: validationResult.businessId,
+        preferences: {
+          currency: validationResult.preferences?.currency!
+        }
       };
     }
 

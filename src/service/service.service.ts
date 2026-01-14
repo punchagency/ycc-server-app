@@ -2,6 +2,7 @@ import ServiceModel, { IService } from '../models/service.model';
 import { CategoryService } from './category.service';
 import { CreateServiceDTO, UpdateServiceDTO } from '../dto/service.dto';
 import { pineconeEmitter } from '../integration/pinecone';
+import { CurrencyHelper } from '../utils/currencyHelper';
 import { logError, logInfo } from '../utils/SystemLogs';
 import catchError from '../utils/catchError';
 import { Types } from 'mongoose';
@@ -153,7 +154,7 @@ export class ServiceService {
         return { createdServices, failedServices, newCategories };
     }
 
-    static async getServiceById(id: string): Promise<IService | null> {
+    static async getServiceById(id: string, userCurrency?: string): Promise<IService | any | null> {
         if (!Types.ObjectId.isValid(id)) return null;
 
         const [error, service] = await catchError(
@@ -169,10 +170,27 @@ export class ServiceService {
             return null;
         }
 
+        if (!service) return null;
+
+        if (userCurrency && userCurrency.toLowerCase() !== (service.currency || 'usd').toLowerCase()) {
+            const displayPrice = await CurrencyHelper.convertPriceToUserCurrency(
+                service.price || 0,
+                service.currency || 'usd',
+                userCurrency
+            );
+            return {
+                ...service.toObject(),
+                displayPrice,
+                displayCurrency: userCurrency.toUpperCase(),
+                originalPrice: service.price,
+                originalCurrency: service.currency
+            };
+        }
+
         return service;
     }
 
-    static async getServicesByBusiness(businessId: string, page: number = 1, limit: number = 10) {
+    static async getServicesByBusiness(businessId: string, page: number = 1, limit: number = 10, userCurrency?: string) {
         if (!Types.ObjectId.isValid(businessId)) {
             return { services: [], total: 0, page, pages: 0 };
         }
@@ -195,7 +213,12 @@ export class ServiceService {
             return { services: [], total: 0, page, pages: 0 };
         }
 
-        const [services, total] = result;
+        let [services, total] = result;
+        
+        if (userCurrency && services.length > 0) {
+            services = await CurrencyHelper.convertServicesForDisplay(services, userCurrency);
+        }
+        
         return { services, total, page, pages: Math.ceil(total / limit) };
     }
 

@@ -12,6 +12,7 @@ import OrderModel from '../models/order.model';
 import BusinessModel from '../models/business.model';
 import CONSTANTS from '../config/constant';
 import { CurrencyConverter } from '../utils/currencyConverter';
+import { CurrencyHelper } from '../utils/currencyHelper';
 
 export interface IProductInput {
     name: string;
@@ -118,6 +119,7 @@ export class ProductService {
         const [error, product] = await catchError(
             ProductModel.create({
                 ...productData,
+                price: productData.price && typeof productData.price === "number" && productData.price > 0 ? productData.price : null,
                 currency,
                 category: new Types.ObjectId(categoryId),
                 userId: new Types.ObjectId(userId),
@@ -132,6 +134,7 @@ export class ProductService {
             await logError({
                 message: 'Failed to create product',
                 source: 'ProductService.createProduct',
+                error,
                 additionalData: { userId, businessId, productData, error: error.message }
             });
             throw new Error('Failed to create product');
@@ -157,7 +160,7 @@ export class ProductService {
         return product;
     }
 
-    static async getProductById(id: string): Promise<IProduct | null> {
+    static async getProductById(id: string, userCurrency?: string): Promise<IProduct | any | null> {
         if (!Types.ObjectId.isValid(id)) {
             return null;
         }
@@ -175,10 +178,27 @@ export class ProductService {
             return null;
         }
 
+        if (!product) return null;
+
+        if (userCurrency && userCurrency.toLowerCase() !== (product.currency || 'usd').toLowerCase()) {
+            const displayPrice = await CurrencyHelper.convertPriceToUserCurrency(
+                product.price || 0,
+                product.currency || 'usd',
+                userCurrency
+            );
+            return {
+                ...product.toObject(),
+                displayPrice,
+                displayCurrency: userCurrency.toUpperCase(),
+                originalPrice: product.price,
+                originalCurrency: product.currency
+            };
+        }
+
         return product;
     }
 
-    static async getProductsByBusiness(businessId: string, page: number = 1, limit: number = 20, searchQuery?: string, stockLevel?: 'high' | 'medium' | 'low', category?: string): Promise<{ products: IProduct[]; total: number }> {
+    static async getProductsByBusiness(businessId: string, page: number = 1, limit: number = 20, searchQuery?: string, stockLevel?: 'high' | 'medium' | 'low', category?: string, userCurrency?: string): Promise<{ products: any[]; total: number }> {
         if (!Types.ObjectId.isValid(businessId)) {
             return { products: [], total: 0 };
         }
@@ -226,10 +246,16 @@ export class ProductService {
         }
 
         const [products, total] = result;
+        
+        if (userCurrency && products.length > 0) {
+            const convertedProducts = await CurrencyHelper.convertProductsForDisplay(products, userCurrency);
+            return { products: convertedProducts, total: total || 0 };
+        }
+        
         return { products: products || [], total: total || 0 };
     }
 
-    static async searchProducts(query: IProductSearchQuery): Promise<{ products: IProduct[]; total: number }> {
+    static async searchProducts(query: IProductSearchQuery, userCurrency?: string): Promise<{ products: any[]; total: number }> {
         const { name, category, minPrice, maxPrice, currency = 'usd', businessId, userRole, page = 1, limit = 20, random = false } = query;
         const skip = (page - 1) * limit;
 
@@ -296,6 +322,11 @@ export class ProductService {
                 return true;
             });
             total = products.length;
+        }
+
+        if (userCurrency && products.length > 0) {
+            const convertedProducts = await CurrencyHelper.convertProductsForDisplay(products, userCurrency);
+            return { products: convertedProducts, total };
         }
 
         return { products: products || [], total: total || 0 };

@@ -7,6 +7,12 @@ interface IInvoice extends Document {
     orderId?: Schema.Types.ObjectId;
     bookingId?: Schema.Types.ObjectId;
     businessIds: Schema.Types.ObjectId[];
+    originalAmount: number;
+    originalCurrency: string;
+    convertedAmount: number;
+    convertedCurrency: string;
+    conversionRate: number;
+    conversionTimestamp: Date;
     amount: number;
     platformFee: number;
     distributorAmount: number;
@@ -26,6 +32,12 @@ const invoiceSchema = new Schema<IInvoice>({
     orderId: { type: Schema.Types.ObjectId, ref: 'Order' },
     bookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
     businessIds: [{ type: Schema.Types.ObjectId, ref: 'Business', required: true }],
+    originalAmount: { type: Number, required: true },
+    originalCurrency: { type: String, required: true },
+    convertedAmount: { type: Number, required: true },
+    convertedCurrency: { type: String, required: true },
+    conversionRate: { type: Number, required: true },
+    conversionTimestamp: { type: Date, required: true },
     amount: { type: Number, required: true },
     platformFee: { type: Number, required: true },
     distributorAmount: { type: Number, required: true },

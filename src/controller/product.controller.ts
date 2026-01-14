@@ -162,6 +162,7 @@ export class ProductController {
     }
     static async getProductById(req: AuthenticatedRequest, res: Response): Promise<void> {
         const { id } = req.params;
+        const userCurrency = req.user?.preferences?.currency;
 
         if (!Validate.mongoId(id)) {
             res.status(400).json({
@@ -172,7 +173,7 @@ export class ProductController {
             return;
         }
 
-        const product = await ProductService.getProductById(id);
+        const product = await ProductService.getProductById(id, userCurrency);
         if (!product) {
             res.status(404).json({
                 success: false,
@@ -190,6 +191,7 @@ export class ProductController {
     }
     static async getBusinessProducts(req: AuthenticatedRequest, res: Response): Promise<void> {
         const businessId = req.user!.businessId;
+        const userCurrency = req.user?.preferences?.currency;
         const page = parseInt(req.query.page as string) || 1;
         const limit = parseInt(req.query.limit as string) || 20;
         const searchQuery = req.query.search as string;
@@ -223,7 +225,7 @@ export class ProductController {
             return;
         }
 
-        const result = await ProductService.getProductsByBusiness(businessId, page, limit, searchQuery, stockLevel, category);
+        const result = await ProductService.getProductsByBusiness(businessId, page, limit, searchQuery, stockLevel, category, userCurrency);
 
         res.json({
             success: true,
@@ -241,6 +243,7 @@ export class ProductController {
         const query: ProductSearchDTO = req.query;
         const businessId = req.user?.businessId;
         const userRole = req.user?.role;
+        const userCurrency = req.user?.preferences?.currency;
 
         const searchQuery = {
             ...query,
@@ -288,7 +291,7 @@ export class ProductController {
             return;
         }
 
-        const result = await ProductService.searchProducts(searchQuery);
+        const result = await ProductService.searchProducts(searchQuery, userCurrency);
 
         res.json({
             success: true,

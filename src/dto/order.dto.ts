@@ -8,9 +8,14 @@ export interface UpdateOrderStatusDto {
     notes?: string;
     enableShipping?: boolean;
     shipmentCost?: number;
+    itemPrices?: {
+        itemId: string;
+        price: number;
+        currency: string;
+    }[];
 }
 
-export interface GetOrdersDto{
+export interface GetOrdersDto {
     page: number;
     limit: number;
     status?: typeof ORDER_STATUSES[number];

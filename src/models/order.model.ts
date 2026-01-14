@@ -11,9 +11,9 @@ export interface IOrder extends Document {
         quantity: number;
         businessId: Schema.Types.ObjectId;
         discount?: number;
-        pricePerItem: number;
-        currency: string;
-        totalPriceOfItems: number;
+        pricePerItem?: number;
+        currency?: string;
+        totalPriceOfItems?: number;
         fromAddress: {
             street: string;
             city: string;
@@ -69,9 +69,9 @@ const OrderSchema = new Schema({
         quantity: { type: Number, required: true },
         businessId: { type: Schema.Types.ObjectId, ref: 'Business', required: true },
         discount: { type: Number },
-        pricePerItem: { type: Number, required: true },
-        currency: { type: String, required: true, default: "usd" },
-        totalPriceOfItems: { type: Number, required: true },
+        pricePerItem: { type: Number, required: false },
+        currency: { type: String, required: false, default: "usd" },
+        totalPriceOfItems: { type: Number, required: false },
         fromAddress: {
             street: { type: String, required: true },
             city: { type: String, required: true },

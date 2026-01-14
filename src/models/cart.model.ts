@@ -24,10 +24,10 @@ const cartSchema = new Schema<ICart>({
     items: [{
         productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
         quantity: { type: Number, required: true },
-        pricePerItem: { type: Number, required: true },
+        pricePerItem: { type: Number, required: false },
         currency: { type: String, required: false, default: 'usd' },
         businessId: { type: Schema.Types.ObjectId, ref: 'Business', required: true },
-        totalPriceOfItems: { type: Number, required: true }
+        totalPriceOfItems: { type: Number, required: false }
     }]
 }, {
     timestamps: true

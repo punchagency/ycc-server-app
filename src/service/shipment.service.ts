@@ -652,7 +652,7 @@ export class ShipmentService {
                 await stripe.createInvoiceItems({
                     customer: stripeCustomerId,
                     invoice: invoice.id,
-                    amount: Math.round(item.totalPriceOfItems * 100),
+                    amount: Math.round((item.totalPriceOfItems || 0) * 100),
                     currency: 'usd',
                     description: `Product from ${business.businessName}`,
                     metadata: { 

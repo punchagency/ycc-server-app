@@ -118,6 +118,7 @@ export class ProductService {
         const [error, product] = await catchError(
             ProductModel.create({
                 ...productData,
+                price: productData.price && typeof productData.price === "number" && productData.price > 0 ? productData.price : null,
                 currency,
                 category: new Types.ObjectId(categoryId),
                 userId: new Types.ObjectId(userId),
@@ -132,6 +133,7 @@ export class ProductService {
             await logError({
                 message: 'Failed to create product',
                 source: 'ProductService.createProduct',
+                error,
                 additionalData: { userId, businessId, productData, error: error.message }
             });
             throw new Error('Failed to create product');

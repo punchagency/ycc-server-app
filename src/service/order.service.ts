@@ -937,15 +937,15 @@ export class OrderService {
                     if (!item) throw new Error(`Item ${priceData.itemId} not found in your business items`);
                     if (priceData.price <= 0) throw new Error('Price must be greater than 0');
                     
-                    item.pricePerItem = priceData.price;
-                    item.currency = currency;
+                    item.originalPrice = priceData.price;
+                    item.originalCurrency = currency;
                     item.totalPriceOfItems = priceData.price * item.quantity;
                 }
             }
 
             // Check for items without prices when confirming
             if (status === 'confirmed') {
-                const itemsWithoutPrice = businessItems.filter(i => !i.pricePerItem || i.pricePerItem <= 0);
+                const itemsWithoutPrice = businessItems.filter(i => !i.originalPrice || i.originalPrice <= 0);
                 if (itemsWithoutPrice.length > 0) {
                     throw new Error('Some items do not have prices. Please provide prices for all items.');
                 }

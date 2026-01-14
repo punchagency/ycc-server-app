@@ -366,12 +366,12 @@ export class CartService {
             const oldDisplayPrice = item.displayPrice;
             
             const newDisplayPrice = await CurrencyHelper.convertPriceToUserCurrency(
-                item.originalPrice,
-                item.originalCurrency,
+                (item.originalPrice || 0),
+                (item.originalCurrency || "usd"),
                 newCurrency
             );
 
-            if (Math.abs(newDisplayPrice - oldDisplayPrice) > 0.01) {
+            if (Math.abs(newDisplayPrice - (oldDisplayPrice || 0)) > 0.01) {
                 priceChanges.push({
                     productId: product._id.toString(),
                     productName: product.name,

@@ -12,7 +12,7 @@ import { logError } from "../utils/SystemLogs";
 import CONSTANTS from "../config/constant";
 import StripeService from "../integration/stripe";
 import InvoiceModel from "../models/invoice.model";
-import { CurrencyConverter } from "../utils/currencyConverter";
+import { CurrencyHelper } from "../utils/currencyHelper";
 import 'dotenv/config';
 
 export class BookingService {
@@ -25,6 +25,9 @@ export class BookingService {
 
         const user = await UserModel.findById(userId);
         if (!user) throw new Error('User not found');
+
+        const userCurrency = user.preferences?.currency || 'usd';
+        const originalCurrency = service.currency || 'usd';
 
         const confirmationToken = uuid();
         const confirmationExpires = new Date(Date.now() + (7 * 24 * 60 * 60 * 1000));
@@ -46,7 +49,8 @@ export class BookingService {
             isTokenUsed: false,
             requiresQuote: service.isQuotable || false,
             quoteStatus: service.isQuotable ? 'pending' : 'not_required',
-            currency: service.currency || 'usd',
+            originalCurrency,
+            currency: userCurrency,
             notes
         });
 
@@ -496,26 +500,48 @@ export class BookingService {
             throw new Error('Booking user not found');
         }
 
+        const distributor = await UserModel.findById(userId);
+        const distributorCurrency = distributor?.preferences?.currency || service.currency || 'usd';
+        const userCurrency = bookingUser.preferences?.currency || 'usd';
+
         // Calculate quote amount
         let quoteItemsTotal = 0;
         const services = [];
 
-        // Add only quote items (not the service itself)
+        // Add quote items with currency conversion
         for (const item of quoteItems) {
             const totalPrice = item.price * (item.quantity || 1);
             quoteItemsTotal += totalPrice;
+            
+            const conversion = await CurrencyHelper.convertPrice(
+                item.price,
+                distributorCurrency,
+                userCurrency
+            );
+            
             services.push({
                 serviceId: booking.serviceId,
                 item: item.name,
                 description: item.description,
                 quantity: item.quantity || 1,
-                unitPrice: item.price,
-                totalPrice
+                originalUnitPrice: item.price,
+                originalCurrency: distributorCurrency,
+                convertedUnitPrice: conversion.convertedPrice,
+                convertedCurrency: userCurrency,
+                totalPrice: conversion.convertedPrice * (item.quantity || 1)
             });
         }
 
-        // Total includes service price + quote items
-        const quoteAmount = service.price + quoteItemsTotal;
+        // Convert service price to user currency
+        const serviceConversion = await CurrencyHelper.convertPrice(
+            service.price,
+            service.currency || 'usd',
+            userCurrency
+        );
+
+        // Total in user currency
+        const quoteItemsTotalInUserCurrency = services.reduce((sum, s) => sum + s.totalPrice, 0);
+        const quoteAmount = serviceConversion.convertedPrice + quoteItemsTotalInUserCurrency;
         const platformFee = quoteAmount * CONSTANTS.PLATFORM_FEE_PERCENT;
         const amount = quoteAmount + platformFee;
 
@@ -526,7 +552,7 @@ export class BookingService {
             status: 'pending',
             amount,
             platformFee,
-            currency: booking.currency,
+            currency: userCurrency,
             quoteDate: new Date(),
             quoteAmount,
             createdBy: userId,
@@ -581,7 +607,7 @@ export class BookingService {
     }
 
     static async acceptQuote({ bookingId, userId }: { bookingId: string; userId: string }) {
-        const booking = await BookingModel.findById(bookingId).populate('quoteId');
+        const booking = await BookingModel.findById(bookingId).populate('quoteId').populate('serviceId');
         if (!booking) {
             throw new Error('Booking not found');
         }
@@ -600,6 +626,26 @@ export class BookingService {
         if (booking.quoteStatus !== 'provided') {
             throw new Error('No quote available to accept');
         }
+
+        const quote: any = booking.quoteId;
+        const user = await UserModel.findById(userId);
+        const userCurrency = user?.preferences?.currency || 'usd';
+        const conversionTimestamp = new Date();
+
+        // Lock conversion rates for all quote items
+        for (const quoteService of quote.services) {
+            if (!quoteService.conversionRate) {
+                const conversion = await CurrencyHelper.convertPrice(
+                    quoteService.originalUnitPrice,
+                    quoteService.originalCurrency,
+                    userCurrency
+                );
+                quoteService.conversionRate = conversion.conversionRate;
+                quoteService.conversionTimestamp = conversionTimestamp;
+            }
+        }
+
+        await quote.save();
 
         // Update quote and booking
         booking.quoteStatus = 'accepted';
@@ -965,14 +1011,31 @@ export class BookingService {
         const item = quote.services.find((service: any) => service._id.toString() === itemId);
         if (!item) throw new Error('Quote item not found');
 
+        const bookingUser = await UserModel.findById(booking.userId);
+        const distributor = await UserModel.findById(userId);
+        const distributorCurrency = distributor?.preferences?.currency || item.originalCurrency || 'usd';
+        const userCurrency = bookingUser?.preferences?.currency || item.convertedCurrency || 'usd';
+
         // Update item fields
         if (updatedItem.name) item.item = updatedItem.name;
         if (updatedItem.description !== undefined) item.description = updatedItem.description;
         if (updatedItem.quantity) item.quantity = updatedItem.quantity;
-        if (updatedItem.price) item.unitPrice = updatedItem.price;
+        
+        if (updatedItem.price) {
+            item.originalUnitPrice = updatedItem.price;
+            item.originalCurrency = distributorCurrency;
+            
+            const conversion = await CurrencyHelper.convertPrice(
+                updatedItem.price,
+                distributorCurrency,
+                userCurrency
+            );
+            item.convertedUnitPrice = conversion.convertedPrice;
+            item.convertedCurrency = userCurrency;
+        }
 
         // Recalculate total price
-        item.totalPrice = item.quantity * item.unitPrice;
+        item.totalPrice = item.quantity * item.convertedUnitPrice;
 
         // Update item status
         item.itemStatus = 'edited';
@@ -988,7 +1051,13 @@ export class BookingService {
             quoteItemsTotal += service.totalPrice;
         });
 
-        const quoteAmount = service.price + quoteItemsTotal;
+        const serviceConversion = await CurrencyHelper.convertPrice(
+            service.price,
+            service.currency || 'usd',
+            userCurrency
+        );
+
+        const quoteAmount = serviceConversion.convertedPrice + quoteItemsTotal;
         const platformFee = quoteAmount * CONSTANTS.PLATFORM_FEE_PERCENT;
         const amount = quoteAmount + platformFee;
 
@@ -1190,7 +1259,8 @@ export class BookingService {
 
         const stripe = StripeService.getInstance();
 
-        const bookingCurrency = booking.currency.toLowerCase();
+        const userCurrency = booking.currency || 'usd';
+        const conversionTimestamp = new Date();
 
         // Get or create Stripe customer
         let stripeCustomerId = user.stripeCustomerId;
@@ -1245,40 +1315,48 @@ export class BookingService {
             }
         });
 
+        let totalAmountInUserCurrency = 0;
+        const businessOwner = await UserModel.findById(business.userId);
+        const distributorCurrency = businessOwner?.preferences?.currency || service.currency || 'usd';
+
         // Add invoice items based on booking type
         if (booking.requiresQuote && booking.quoteId) {
             const quote: any = booking.quoteId;
             
-            // Add each quote item
+            // Add each quote item using locked conversion rates
             for (const quoteService of quote.services) {
-                const serviceCurrency = quoteService.currency.toLowerCase();
-                let amountInBookingCurrency = quoteService.totalPrice;
-                
-                if (serviceCurrency !== bookingCurrency) {
-                    const amountInUSD = await CurrencyConverter.convertToUSD(quoteService.totalPrice, serviceCurrency);
-                    amountInBookingCurrency = await CurrencyConverter.convertFromUSD(amountInUSD, bookingCurrency);
-                }
+                const itemTotal = quoteService.convertedUnitPrice * quoteService.quantity;
+                totalAmountInUserCurrency += itemTotal;
                 
                 await stripe.createInvoiceItems({
                     customer: stripeCustomerId,
                     invoice: invoice.id,
-                    amount: Math.round(amountInBookingCurrency * 100),
-                    currency: bookingCurrency,
+                    amount: Math.round(itemTotal * 100),
+                    currency: userCurrency.toLowerCase(),
                     description: `${quoteService.item}${quoteService.description ? ` - ${quoteService.description}` : ''}`,
                     metadata: {
                         bookingId: booking._id.toString(),
                         quoteItemId: quoteService._id.toString(),
-                        type: 'quote_item'
+                        type: 'quote_item',
+                        lockedConversionRate: quoteService.conversionRate?.toString() || '1',
+                        lockedAt: quoteService.conversionTimestamp?.toISOString() || new Date().toISOString()
                     }
                 });
             }
 
             // Add service price
+            const serviceConversion = await CurrencyHelper.convertPrice(
+                service.price,
+                service.currency || 'usd',
+                userCurrency
+            );
+            totalAmountInUserCurrency += serviceConversion.convertedPrice;
+            
             await stripe.createInvoiceItems({
                 customer: stripeCustomerId,
                 invoice: invoice.id,
-                amount: Math.round(service.price * 100),
-                currency: bookingCurrency,
+                amount: Math.round(serviceConversion.convertedPrice * 100),
+                currency: userCurrency.toLowerCase(),
                 description: `${service.name} - Base Service`,
                 metadata: {
                     bookingId: booking._id.toString(),
@@ -1289,11 +1367,18 @@ export class BookingService {
             });
         } else {
             // Non-quotable service - just add service price
+            const serviceConversion = await CurrencyHelper.convertPrice(
+                service.price,
+                service.currency || 'usd',
+                userCurrency
+            );
+            totalAmountInUserCurrency = serviceConversion.convertedPrice;
+            
             await stripe.createInvoiceItems({
                 customer: stripeCustomerId,
                 invoice: invoice.id,
-                amount: Math.round(service.price * 100),
-                currency: bookingCurrency,
+                amount: Math.round(serviceConversion.convertedPrice * 100),
+                currency: userCurrency.toLowerCase(),
                 description: service.name,
                 metadata: {
                     bookingId: booking._id.toString(),
@@ -1304,13 +1389,32 @@ export class BookingService {
             });
         }
 
+        // Calculate conversion rate and distributor payout
+        const conversionRate = await CurrencyHelper.convertPrice(
+            totalAmountInUserCurrency,
+            userCurrency,
+            distributorCurrency
+        );
+
+        booking.originalAmount = service.price;
+        booking.originalCurrency = service.currency || 'usd';
+        booking.convertedAmount = totalAmountInUserCurrency;
+        booking.convertedCurrency = userCurrency;
+        booking.conversionRate = conversionRate.conversionRate;
+        booking.conversionTimestamp = conversionTimestamp;
+        booking.distributorPayoutAmount = conversionRate.convertedPrice;
+        booking.distributorPayoutCurrency = distributorCurrency;
+        booking.totalAmount = totalAmountInUserCurrency;
+
         // Add platform fee (5%)
-        const platformFee = booking.platformFee || (booking.totalAmount! * CONSTANTS.PLATFORM_FEE_PERCENT);
+        const platformFee = totalAmountInUserCurrency * CONSTANTS.PLATFORM_FEE_PERCENT;
+        booking.platformFee = platformFee;
+        
         await stripe.createInvoiceItems({
             customer: stripeCustomerId,
             invoice: invoice.id,
             amount: Math.round(platformFee * 100),
-            currency: bookingCurrency,
+            currency: userCurrency.toLowerCase(),
             description: 'Platform Fee (10%)',
             metadata: {
                 bookingId: booking._id.toString(),
@@ -1340,10 +1444,16 @@ export class BookingService {
                 userId: user._id,
                 bookingId: booking._id,
                 businessIds: [business._id],
+                originalAmount: booking.originalAmount || totalAmount,
+                originalCurrency: booking.originalCurrency || userCurrency,
+                convertedAmount: totalAmount,
+                convertedCurrency: userCurrency,
+                conversionRate: booking.conversionRate || 1,
+                conversionTimestamp: booking.conversionTimestamp || new Date(),
                 amount: totalAmount,
                 platformFee,
                 distributorAmount,
-                currency: booking.currency,
+                currency: userCurrency,
                 status: 'pending',
                 invoiceDate: new Date(),
                 dueDate: finalizedInvoice.due_date ? new Date(finalizedInvoice.due_date * 1000) : null,

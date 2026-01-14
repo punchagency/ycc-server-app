@@ -16,6 +16,7 @@ import InvoiceModel from "../models/invoice.model";
 import 'dotenv/config';
 import { logCritical } from "../utils/SystemLogs";
 import { CurrencyConverter } from "../utils/currencyConverter";
+import { CurrencyHelper } from "../utils/currencyHelper";
 
 export interface CreateOrderInput {
     userId: Schema.Types.ObjectId | string;
@@ -105,7 +106,7 @@ export class OrderService {
             const businessItems = confirmedItems.filter((item: any) => item.businessId.toString() === businessId);
             for (const item of businessItems) {
                 const itemIndex = order.items.findIndex((i: any) => i._id?.toString() === item._id?.toString());
-                const amountInUSD = await CurrencyConverter.convertToUSD(item.totalPriceOfItems, item.currency || 'usd');
+                const amountInUSD = await CurrencyConverter.convertToUSD(item.totalPriceOfItems, order.currency || 'usd');
                 await stripe.createInvoiceItems({
                     customer: stripeCustomerId,
                     invoice: invoice.id,
@@ -147,7 +148,7 @@ export class OrderService {
 
         let confirmedTotalUSD = 0;
         for (const item of confirmedItems) {
-            confirmedTotalUSD += await CurrencyConverter.convertToUSD(item.totalPriceOfItems, item.currency || 'usd');
+            confirmedTotalUSD += await CurrencyConverter.convertToUSD(item.totalPriceOfItems, order.currency || 'usd');
         }
         const platformFee = confirmedTotalUSD * CONSTANTS.PLATFORM_FEE_PERCENT;
         if (platformFee > 0) {
@@ -175,7 +176,7 @@ export class OrderService {
 
         for (const item of businessItems) {
             const itemIndex = order.items.findIndex((i: any) => i._id?.toString() === item._id?.toString());
-            const amountInUSD = await CurrencyConverter.convertToUSD(item.totalPriceOfItems, item.currency || 'usd');
+            const amountInUSD = await CurrencyConverter.convertToUSD(item.totalPriceOfItems, order.currency || 'usd');
             await stripe.createInvoiceItems({
                 customer: stripeCustomerId,
                 invoice: order.stripeInvoiceId,
@@ -213,7 +214,7 @@ export class OrderService {
         const confirmedItems = order.items.filter((item: any) => item.status === 'confirmed');
         let confirmedTotalUSD = 0;
         for (const item of confirmedItems) {
-            confirmedTotalUSD += await CurrencyConverter.convertToUSD(item.totalPriceOfItems, item.currency || 'usd');
+            confirmedTotalUSD += await CurrencyConverter.convertToUSD(item.totalPriceOfItems, order.currency || 'usd');
         }
         const platformFee = confirmedTotalUSD * CONSTANTS.PLATFORM_FEE_PERCENT;
 
@@ -261,7 +262,7 @@ export class OrderService {
             const confirmedItems = order.items.filter((item: any) => item.status === 'confirmed');
             let confirmedTotalUSD = 0;
             for (const item of confirmedItems) {
-                confirmedTotalUSD += await CurrencyConverter.convertToUSD((item.totalPriceOfItems || 0), item.currency || 'usd');
+                confirmedTotalUSD += await CurrencyConverter.convertToUSD((item.totalPriceOfItems || 0), order.currency || 'usd');
             }
 
             await InvoiceModel.create({
@@ -347,7 +348,7 @@ export class OrderService {
                 for (const item of order.items) {
                     const business = await BusinessModel.findById(item.businessId);
                     if (business?.stripeAccountId && chargeId) {
-                        const itemAmountUSD = await CurrencyConverter.convertToUSD((item.totalPriceOfItems || 0), item.currency || 'usd');
+                        const itemAmountUSD = await CurrencyConverter.convertToUSD((item.totalPriceOfItems || 0), order.currency || 'usd');
                         const supplierAmount = Math.round(itemAmountUSD * 0.25);
                         await stripeService.createTransfer({
                             amount: supplierAmount,
@@ -365,7 +366,7 @@ export class OrderService {
                 for (const item of order.items) {
                     const business = await BusinessModel.findById(item.businessId);
                     if (business?.stripeAccountId && chargeId) {
-                        const itemAmountUSD = await CurrencyConverter.convertToUSD((item.totalPriceOfItems || 0), item.currency || 'usd');
+                        const itemAmountUSD = await CurrencyConverter.convertToUSD((item.totalPriceOfItems || 0), order.currency || 'usd');
                         await stripeService.createTransfer({
                             amount: Math.round(itemAmountUSD * 100),
                             destination: business.stripeAccountId,
@@ -405,12 +406,14 @@ export class OrderService {
         const [userError, user] = await catchError(UserModel.findById(userId));
         if (userError || !user) throw new Error('User not found');
 
+        const userCurrency = user.preferences?.currency || 'usd';
         const productIds = products.map(p => p.productId);
         const [productsError, productDocs] = await catchError(ProductModel.find({ _id: { $in: productIds } }).populate('businessId'));
         if (productsError || !productDocs || productDocs.length === 0) throw new Error('Products not found');
 
         const items = [];
         let totalAmountUSD = 0;
+        const conversionTimestamp = new Date();
 
         for (const productInput of products) {
             const product = productDocs.find(p => p._id.toString() === productInput.productId);
@@ -419,9 +422,29 @@ export class OrderService {
             const business = await BusinessModel.findById(product.businessId);
             if (!business) throw new Error(`Business not found for product ${productInput.productId}`);
 
-            const pricePerItem = product.price;
+            const businessOwner = await UserModel.findById(business.userId);
+            const distributorCurrency = businessOwner?.preferences?.currency || product.currency || 'usd';
+
+            const originalPrice = product.price || 0;
+            const originalCurrency = product.currency || 'usd';
             const discount = productInput.discount || 0;
-            const totalPriceOfItems = pricePerItem ? (pricePerItem * productInput.quantity) - discount : 0;
+            
+            const conversion = await CurrencyHelper.convertPrice(
+                originalPrice,
+                originalCurrency,
+                userCurrency
+            );
+
+            const convertedPrice = conversion.convertedPrice;
+            const conversionRate = conversion.conversionRate;
+            const totalPriceOfItems = (convertedPrice * productInput.quantity) - discount;
+
+            const distributorPayoutAmount = await CurrencyHelper.convertPriceToUserCurrency(
+                originalPrice * productInput.quantity,
+                originalCurrency,
+                distributorCurrency
+            );
+
             const confirmationToken = uuid();
             const confirmationExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
@@ -430,8 +453,14 @@ export class OrderService {
                 quantity: productInput.quantity,
                 businessId: business._id,
                 discount,
-                pricePerItem,
-                currency: product.currency || 'usd',
+                originalPrice,
+                originalCurrency,
+                convertedPrice,
+                convertedCurrency: userCurrency,
+                conversionRate,
+                conversionTimestamp,
+                distributorPayoutAmount,
+                distributorPayoutCurrency: distributorCurrency,
                 totalPriceOfItems,
                 fromAddress: {
                     street: product.wareHouseAddress.street,
@@ -445,7 +474,7 @@ export class OrderService {
                 confirmationExpires
             });
 
-            totalAmountUSD += await CurrencyConverter.convertToUSD(totalPriceOfItems, product.currency || 'usd');
+            totalAmountUSD += await CurrencyConverter.convertToUSD(totalPriceOfItems, userCurrency);
         }
 
         const platformFee = totalAmountUSD * CONSTANTS.PLATFORM_FEE_PERCENT;
@@ -463,7 +492,7 @@ export class OrderService {
                 zip: deliveryAddress.zipcode,
                 country: deliveryAddress.country
             },
-            currency: 'usd',
+            currency: userCurrency,
             total,
             totalAmount: totalAmountUSD,
             platformFee,
@@ -564,7 +593,7 @@ export class OrderService {
             if (!business) throw new Error('Business not found');
 
             // const isOrderPlacer = order.userId.toString() === userId && order.userType === 'distributor';
-            const isOrderPlacer = order.userId.toString() === userId
+            const isOrderPlacer = order.userId.toString() === userId;
             // const isSupplier = order.userType === 'user' && order.items.some(item => 
             //     item.businessId.toString() === business._id.toString()
             // );

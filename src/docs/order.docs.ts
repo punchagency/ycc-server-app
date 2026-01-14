@@ -177,7 +177,7 @@
  *                 description: Order ID to update
  *               status:
  *                 type: string
- *                 enum: [confirmed, processing, shipped, out_for_delivery, cancelled]
+ *                 enum: [confirmed, processing, shipped, out_for_delivery, cancelled, declined]
  *                 description: New status for the order
  *               reason:
  *                 type: string
@@ -188,6 +188,28 @@
  *               notes:
  *                 type: string
  *                 description: Optional notes about the status change
+ *               enableShipping:
+ *                 type: boolean
+ *                 description: Enable platform shipping (distributors only, when confirming)
+ *               shipmentCost:
+ *                 type: number
+ *                 description: Shipment cost when enableShipping is false (distributors only)
+ *               itemPrices:
+ *                 type: array
+ *                 description: Prices for items without prices (distributors only, when confirming). All items must use the same currency.
+ *                 items:
+ *                   type: object
+ *                   required: [itemId, price, currency]
+ *                   properties:
+ *                     itemId:
+ *                       type: string
+ *                       description: Order item ID
+ *                     price:
+ *                       type: number
+ *                       description: Price per item (must be greater than 0)
+ *                     currency:
+ *                       type: string
+ *                       description: Currency code (e.g., USD, EUR, GBP)
  *     responses:
  *       200:
  *         description: Order status updated successfully

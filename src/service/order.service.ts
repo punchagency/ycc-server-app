@@ -457,7 +457,7 @@ export class OrderService {
                 originalCurrency,
                 convertedPrice,
                 convertedCurrency: userCurrency,
-                conversionRate,
+                conversionRate: !isNaN(conversionRate) ? conversionRate : 1,
                 conversionTimestamp,
                 distributorPayoutAmount,
                 distributorPayoutCurrency: distributorCurrency,
@@ -479,7 +479,7 @@ export class OrderService {
 
         const platformFee = totalAmountUSD * CONSTANTS.PLATFORM_FEE_PERCENT;
         const total = totalAmountUSD + platformFee;
-
+        console.log({ items })
         const order = await OrderModel.create({
             userId,
             items,
@@ -927,20 +927,56 @@ export class OrderService {
                 const currencies = new Set(itemPrices.map(ip => ip.currency.toUpperCase()));
                 if (currencies.size > 1) throw new Error('All item prices must have the same currency');
                 
-                const currency = Array.from(currencies)[0];
-                if (!CONSTANTS.CURRENCIES_CODES.includes(currency)) {
+                const providedCurrency = Array.from(currencies)[0];
+                if (!CONSTANTS.CURRENCIES_CODES.includes(providedCurrency)) {
                     throw new Error(`Invalid currency code. Allowed: ${CONSTANTS.CURRENCIES_CODES.join(', ')}`);
                 }
+
+                const user = await UserModel.findById(order.userId);
+                const userCurrency = user?.preferences?.currency || 'usd';
+                const businessOwner = await UserModel.findById(business.userId);
+                const distributorCurrency = businessOwner?.preferences?.currency || providedCurrency;
+                const conversionTimestamp = new Date();
 
                 for (const priceData of itemPrices) {
                     const item = businessItems.find(i => i._id.toString() === priceData.itemId);
                     if (!item) throw new Error(`Item ${priceData.itemId} not found in your business items`);
                     if (priceData.price <= 0) throw new Error('Price must be greater than 0');
                     
+                    const conversion = await CurrencyHelper.convertPrice(
+                        priceData.price,
+                        providedCurrency,
+                        userCurrency
+                    );
+
+                    const distributorPayoutAmount = await CurrencyHelper.convertPriceToUserCurrency(
+                        priceData.price * item.quantity,
+                        providedCurrency,
+                        distributorCurrency
+                    );
+
                     item.originalPrice = priceData.price;
-                    item.originalCurrency = currency;
-                    item.totalPriceOfItems = priceData.price * item.quantity;
+                    item.originalCurrency = providedCurrency;
+                    item.convertedPrice = conversion.convertedPrice;
+                    item.convertedCurrency = userCurrency;
+                    item.conversionRate = !isNaN(conversion.conversionRate) ? conversion.conversionRate : 1;
+                    item.conversionTimestamp = conversionTimestamp;
+                    item.distributorPayoutAmount = distributorPayoutAmount;
+                    item.distributorPayoutCurrency = distributorCurrency;
+                    item.totalPriceOfItems = (conversion.convertedPrice * item.quantity) - (item.discount || 0);
                 }
+
+                // Recalculate order totals
+                let totalAmountUSD = 0;
+                for (const item of order.items) {
+                    if (item.totalPriceOfItems) {
+                        const itemCurrency = item.convertedCurrency || order.currency || 'usd';
+                        totalAmountUSD += await CurrencyConverter.convertToUSD(item.totalPriceOfItems, itemCurrency);
+                    }
+                }
+                order.totalAmount = totalAmountUSD;
+                order.platformFee = totalAmountUSD * CONSTANTS.PLATFORM_FEE_PERCENT;
+                order.total = totalAmountUSD + order.platformFee;
             }
 
             // Check for items without prices when confirming

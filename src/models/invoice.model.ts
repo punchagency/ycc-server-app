@@ -36,7 +36,7 @@ const invoiceSchema = new Schema<IInvoice>({
     originalCurrency: { type: String, required: true },
     convertedAmount: { type: Number, required: true },
     convertedCurrency: { type: String, required: true },
-    conversionRate: { type: Number, required: true },
+    conversionRate: { type: Number, required: false },
     conversionTimestamp: { type: Date, required: true },
     amount: { type: Number, required: true },
     platformFee: { type: Number, required: true },

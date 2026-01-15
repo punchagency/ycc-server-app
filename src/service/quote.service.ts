@@ -116,7 +116,11 @@ export class QuoteService {
         }
 
         const existingInvoice = await InvoiceModel.findOne({ stripeInvoiceId: stripeInvoice!.id });
-        const distributorAmount = quote.amount - quote.platformFee;
+        const platformFeeUSD = await CurrencyConverter.convertToUSD(quote.platformFee, quote.currency);
+        const convertedAmountUSD = await CurrencyConverter.convertToUSD(quote.amount, quote.currency);
+        const distributorAmountUSD = convertedAmountUSD - platformFeeUSD;
+        const conversionRate = convertedAmountUSD / quote.amount;
+        
         if (existingInvoice) {
             existingInvoice.status = 'pending';
             existingInvoice.stripeInvoiceUrl = stripeInvoice!.hosted_invoice_url || undefined;
@@ -127,10 +131,16 @@ export class QuoteService {
                 userId: user._id,
                 bookingId: quote.bookingId,
                 businessIds: booking ? [booking.businessId] : [],
-                amount: quote.amount,
-                platformFee: quote.platformFee,
-                distributorAmount,
-                currency: quote.currency,
+                originalAmount: quote.amount,
+                originalCurrency: quote.currency,
+                convertedAmount: convertedAmountUSD,
+                convertedCurrency: 'usd',
+                conversionRate,
+                conversionTimestamp: new Date(),
+                amount: convertedAmountUSD,
+                platformFee: platformFeeUSD,
+                distributorAmount: distributorAmountUSD,
+                currency: 'usd',
                 status: 'pending',
                 invoiceDate: new Date(),
                 dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),

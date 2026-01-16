@@ -25,19 +25,25 @@ export class UserService {
             businessFilter.isOnboarded = isOnboarded;
         }
 
+        const businessOrConditions = [];
+        
         if (status) {
             if (status === 'pending') {
-                businessFilter.$or = [{ status: 'pending' }, { status: { $exists: false } }];
+                businessOrConditions.push({ status: 'pending' }, { status: { $exists: false } });
             } else {
                 businessFilter.status = status;
             }
         }
 
         if (search) {
-            businessFilter.$or = [
+            businessOrConditions.push(
                 { businessName: { $regex: search, $options: 'i' } },
                 { email: { $regex: search, $options: 'i' } }
-            ];
+            );
+        }
+
+        if (businessOrConditions.length > 0) {
+            businessFilter.$or = businessOrConditions;
         }
 
         const businesses = await BusinessModel.find(businessFilter)

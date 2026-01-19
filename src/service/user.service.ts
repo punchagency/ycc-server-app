@@ -15,6 +15,7 @@ export class UserService {
         search?: string
         status?: 'approved' | 'rejected' | 'pending'
     }) {
+        // Step 1: Build business filter (without search initially)
         const businessFilter: any = {};
         
         if (businessType) {
@@ -25,47 +26,71 @@ export class UserService {
             businessFilter.isOnboarded = isOnboarded;
         }
 
-        const businessOrConditions = [];
-        
         if (status) {
             if (status === 'pending') {
-                businessOrConditions.push({ status: 'pending' }, { status: { $exists: false } });
+                businessFilter.$or = [{ status: 'pending' }, { status: { $exists: false } }];
             } else {
                 businessFilter.status = status;
             }
         }
 
-        if (search) {
-            businessOrConditions.push(
-                { businessName: { $regex: search, $options: 'i' } },
-                { email: { $regex: search, $options: 'i' } }
-            );
-        }
-
-        if (businessOrConditions.length > 0) {
-            businessFilter.$or = businessOrConditions;
-        }
-
+        // Step 2: Get all businesses matching the base filters
         const businesses = await BusinessModel.find(businessFilter)
             .select('userId businessName businessType email phone website address ratings isOnboarded status')
             .lean();
 
         const userIds = businesses.map(b => b.userId);
 
-        const userFilter: any = { _id: { $in: userIds }, role: { $in: ['distributor', 'manufacturer'] } };
+        // Step 3: Build user filter
+        const userFilter: any = { 
+            _id: { $in: userIds }, 
+            role: { $in: ['distributor', 'manufacturer'] } 
+        };
         
         if (isVerified !== undefined) {
             userFilter.isVerified = isVerified;
         }
 
+        // Step 4: Apply search across BOTH user and business data
         if (search) {
-            userFilter.$or = [
-                { firstName: { $regex: search, $options: 'i' } },
-                { lastName: { $regex: search, $options: 'i' } },
-                { email: { $regex: search, $options: 'i' } }
-            ];
+            // Get user IDs that match the search in UserModel
+            const userSearchFilter: any = {
+                _id: { $in: userIds },
+                role: { $in: ['distributor', 'manufacturer'] },
+                $or: [
+                    { firstName: { $regex: search, $options: 'i' } },
+                    { lastName: { $regex: search, $options: 'i' } },
+                    { email: { $regex: search, $options: 'i' } }
+                ]
+            };
+
+            if (isVerified !== undefined) {
+                userSearchFilter.isVerified = isVerified;
+            }
+
+            const matchingUsers = await UserModel.find(userSearchFilter).select('_id').lean();
+            const matchingUserIds = matchingUsers.map(u => u._id.toString());
+
+            // Get user IDs that match the search in BusinessModel
+            const businessSearchFilter: any = {
+                userId: { $in: userIds },
+                $or: [
+                    { businessName: { $regex: search, $options: 'i' } },
+                    { email: { $regex: search, $options: 'i' } }
+                ]
+            };
+
+            const matchingBusinesses = await BusinessModel.find(businessSearchFilter).select('userId').lean();
+            const matchingBusinessUserIds = matchingBusinesses.map(b => b.userId.toString());
+
+            // Combine both sets of user IDs
+            const combinedUserIds = [...new Set([...matchingUserIds, ...matchingBusinessUserIds])];
+
+            // Update user filter to only include users that match the search
+            userFilter._id = { $in: combinedUserIds };
         }
 
+        // Step 5: Get total count and paginated users
         const total = await UserModel.countDocuments(userFilter);
         const usePagination = page !== undefined && limit !== undefined;
         const skip = usePagination ? (page! - 1) * limit! : 0;
@@ -79,6 +104,7 @@ export class UserService {
 
         const users = await userQuery.lean();
 
+        // Step 6: Map businesses to users
         const businessMap = new Map(businesses.map(b => [b.userId.toString(), b]));
 
         const data = users.map(user => ({
@@ -112,6 +138,7 @@ export class UserService {
 
         return response;
     }
+    
     static async respondToBusinessApproval({ userId, status, subject, emailBody }: {
         userId: string,
         status: 'approved' | 'rejected',
@@ -196,6 +223,7 @@ export class UserService {
             businessName: business.businessName
         };
     }
+    
     static async getUserById(userId: string) {
         const user = await UserModel.findById(userId)
             .select('_id firstName lastName email phone profilePicture address role isVerified isActive preferences createdAt');

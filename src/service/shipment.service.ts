@@ -237,14 +237,32 @@ export class ShipmentService {
             await stripe.sendInvoice(invoice.id);
     
             const businessIds = [...new Set(order.items.map(item => item.businessId))];
+            const confirmedItems = order.items.filter((item: any) => item.status === 'confirmed');
+            
+            let confirmedTotal = 0;
+            for (const item of confirmedItems) {
+                confirmedTotal += item.totalPriceOfItems || 0;
+            }
+            
+            const platformFeeInOriginal = confirmedTotal * CONSTANTS.PLATFORM_FEE_PERCENT;
+            const platformFeeUSD = await CurrencyConverter.convertToUSD(platformFeeInOriginal, order.currency || 'usd');
+            const convertedAmountUSD = await CurrencyConverter.convertToUSD(confirmedTotal, order.currency || 'usd');
+            const conversionRate = convertedAmountUSD / confirmedTotal;
             
             await InvoiceModel.create({
                 stripeInvoiceId: invoice.id,
                 userId: order.userId,
                 orderId: orderId,
                 businessIds,
+                originalAmount: confirmedTotal,
+                originalCurrency: order.currency || 'usd',
+                convertedAmount: finalizedInvoice.amount_due / 100,
+                convertedCurrency: 'usd',
+                conversionRate,
+                conversionTimestamp: new Date(),
                 amount: finalizedInvoice.amount_due / 100,
-                platformFee: order.platformFee,
+                platformFee: platformFeeUSD,
+                distributorAmount: (finalizedInvoice.amount_due / 100) - platformFeeUSD,
                 currency: 'usd',
                 status: 'pending',
                 invoiceDate: new Date(),
@@ -343,14 +361,26 @@ export class ShipmentService {
                             return sum + (rate?.rate || 0);
                         }, 0);
                         
+                        const platformFeeInOriginal = confirmedTotal * CONSTANTS.PLATFORM_FEE_PERCENT;
+                        const platformFeeUSD = await CurrencyConverter.convertToUSD(platformFeeInOriginal, order.currency || 'usd');
+                        const convertedAmountUSD = await CurrencyConverter.convertToUSD(confirmedTotal, order.currency || 'usd');
+                        const conversionRate = convertedAmountUSD / confirmedTotal;
+                        const totalShipmentCostUSD = await CurrencyConverter.convertToUSD(totalShipmentCost, order.currency || 'usd');
+                        
                         await InvoiceModel.create({
                             stripeInvoiceId: order.stripeInvoiceId,
                             userId: order.userId,
                             orderId: orderId.toString(),
                             businessIds,
+                            originalAmount: confirmedTotal,
+                            originalCurrency: order.currency || 'usd',
+                            convertedAmount: finalizedInvoice.amount_due / 100,
+                            convertedCurrency: 'usd',
+                            conversionRate,
+                            conversionTimestamp: new Date(),
                             amount: finalizedInvoice.amount_due / 100,
-                            platformFee: confirmedTotal * CONSTANTS.PLATFORM_FEE_PERCENT,
-                            distributorAmount: (finalizedInvoice.amount_due / 100) - (confirmedTotal * CONSTANTS.PLATFORM_FEE_PERCENT) - totalShipmentCost,
+                            platformFee: platformFeeUSD,
+                            distributorAmount: (finalizedInvoice.amount_due / 100) - platformFeeUSD - totalShipmentCostUSD,
                             currency: 'usd',
                             status: 'pending',
                             invoiceDate: new Date(),

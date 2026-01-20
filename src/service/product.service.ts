@@ -17,6 +17,7 @@ import { CurrencyHelper } from '../utils/currencyHelper';
 export interface IProductInput {
     name: string;
     price?: number;
+    isPriceOnRequest?: boolean;
     currency?: string;
     category: string;
     sku?: string;
@@ -100,33 +101,39 @@ export class ProductService {
             throw new Error('Failed to create Stripe product');
         }
 
-        const [priceError, stripePrice] = await catchError(
-            stripeService.createPrice({
-                productId: stripeProduct.id,
-                unitAmount: Math.round((productData?.price || 0) * 100),
-                currency
-            })
-        );
+        let stripePriceId: string | undefined;
+        if (!productData.isPriceOnRequest && productData.price && productData.price > 0) {
+            const [priceError, stripePrice] = await catchError(
+                stripeService.createPrice({
+                    productId: stripeProduct.id,
+                    unitAmount: Math.round((productData?.price || 0) * 100),
+                    currency
+                })
+            );
 
-        if (priceError) {
-            await logError({
-                message: 'Failed to create Stripe price',
-                source: 'ProductService.createProduct',
-                additionalData: { stripeProductId: stripeProduct.id, error: priceError.message }
-            });
+            if (priceError) {
+                await logError({
+                    message: 'Failed to create Stripe price',
+                    source: 'ProductService.createProduct',
+                    additionalData: { stripeProductId: stripeProduct.id, error: priceError.message }
+                });
+            } else {
+                stripePriceId = stripePrice?.id;
+            }
         }
 
         const [error, product] = await catchError(
             ProductModel.create({
                 ...productData,
-                price: productData.price && typeof productData.price === "number" && productData.price > 0 ? productData.price : null,
+                price: productData.isPriceOnRequest ? null : (productData.price && typeof productData.price === "number" && productData.price > 0 ? productData.price : null),
+                isPriceOnRequest: !!productData.isPriceOnRequest,
                 currency,
                 category: new Types.ObjectId(categoryId),
                 userId: new Types.ObjectId(userId),
                 businessId: new Types.ObjectId(businessId),
                 businessType,
                 stripeProductId: stripeProduct.id,
-                stripePriceId: stripePrice?.id || undefined
+                stripePriceId: stripePriceId
             })
         );
 
@@ -148,7 +155,8 @@ export class ProductService {
             name: product.name,
             description: product.description || '',
             categoryName: category?.name || '',
-            price: product.price
+            price: product.price,
+            isPriceOnRequest: product.isPriceOnRequest
         });
 
         await logInfo({
@@ -401,6 +409,36 @@ export class ProductService {
             }
         }
 
+        const isPriceOnRequest = updateData.isPriceOnRequest !== undefined ? updateData.isPriceOnRequest : existingProduct.isPriceOnRequest;
+        const newPrice = updateData.price !== undefined ? updateData.price : existingProduct.price;
+        const currency = (updateData.currency || existingProduct.currency || 'usd').toLowerCase();
+
+        if (!isPriceOnRequest && newPrice && newPrice > 0 && !updateData.stripePriceId && (!existingProduct.stripePriceId || updateData.price !== undefined || updateData.isPriceOnRequest === false)) {
+            // If we are moving from PriceOnRequest to fixed price, or price is updated, create/update Stripe price
+            const stripeService = StripeService.getInstance();
+            const [priceError, stripePrice] = await catchError(
+                stripeService.createPrice({
+                    productId: existingProduct.stripeProductId!,
+                    unitAmount: Math.round(newPrice * 100),
+                    currency
+                })
+            );
+
+            if (priceError) {
+                await logError({
+                    message: 'Failed to create Stripe price during product update',
+                    source: 'ProductService.updateProduct',
+                    additionalData: { productId: id, error: priceError.message }
+                });
+            } else {
+                updateData.stripePriceId = stripePrice.id as any;
+            }
+        }
+
+        if (isPriceOnRequest) {
+            updateData.price = null as any;
+        }
+
         const finalUpdateData = { ...updateData };
 
         if (categoryInput) {
@@ -455,7 +493,8 @@ export class ProductService {
                 name: product.name,
                 description: product.description || '',
                 categoryName: category?.name || '',
-                price: product.price
+                price: product.price,
+                isPriceOnRequest: product.isPriceOnRequest
             });
         }
 
@@ -656,7 +695,7 @@ export class ProductService {
         }
     }
 
-    static async createMultipleProducts(userId: string, businessId: string, productsData: Array<{ name: string; price?: number; currency?: string; categoryName: string; sku?: string; quantity: number; minRestockLevel: number; description?: string; wareHouseAddress: { street?: string; zipcode?: string; city?: string; state: string; country: string }; hsCode: string; weight: number; length: number; width: number; height: number }>): Promise<{ successful: IProduct[]; failed: Array<{ product: any; error: string }>; newCategories: string[] }> {
+    static async createMultipleProducts(userId: string, businessId: string, productsData: Array<{ name: string; price?: number; isPriceOnRequest?: boolean; currency?: string; categoryName: string; sku?: string; quantity: number; minRestockLevel: number; description?: string; wareHouseAddress: { street?: string; zipcode?: string; city?: string; state: string; country: string }; hsCode: string; weight: number; length: number; width: number; height: number }>): Promise<{ successful: IProduct[]; failed: Array<{ product: any; error: string }>; newCategories: string[] }> {
         const stripeService = StripeService.getInstance();
         const CategoryService = require('./category.service').CategoryService;
         const categoryCache = new Map<string, string>();
@@ -705,22 +744,25 @@ export class ProductService {
                     continue;
                 }
 
-                const [priceError, stripePrice] = await catchError(
-                    stripeService.createPrice({
-                        productId: stripeProduct.id,
-                        unitAmount: Math.round((productData?.price || 0) * 100),
-                        currency: (productData.currency || 'usd').toLowerCase()
-                    })
-                );
+                let stripePriceId: string | undefined;
+                if (!productData.isPriceOnRequest && productData.price && productData.price > 0) {
+                    const [priceError, stripePrice] = await catchError(
+                        stripeService.createPrice({
+                            productId: stripeProduct.id,
+                            unitAmount: Math.round((productData?.price || 0) * 100),
+                            currency: (productData.currency || 'usd').toLowerCase()
+                        })
+                    );
 
-                if (priceError) {
-                    logError({
-                        message: 'Failed to create Stripe price',
-                        source: 'ProductService.createMultipleProducts',
-                        additionalData: { productId: stripeProduct.id, error: priceError.message }
-                    });
-                    // failed.push({ product: productData, error: `Stripe price creation failed: ${priceError.message}` });
-                    // continue;
+                    if (priceError) {
+                        logError({
+                            message: 'Failed to create Stripe price',
+                            source: 'ProductService.createMultipleProducts',
+                            additionalData: { productId: stripeProduct.id, error: priceError.message }
+                        });
+                    } else {
+                        stripePriceId = stripePrice?.id;
+                    }
                 }
 
                 const business = await BusinessModel.findById(businessId).populate('userId');
@@ -730,7 +772,8 @@ export class ProductService {
                 const [error, product] = await catchError(
                     ProductModel.create({
                         name: productData.name,
-                        price: productData.price,
+                        price: productData.isPriceOnRequest ? null : productData.price,
+                        isPriceOnRequest: !!productData.isPriceOnRequest,
                         currency: (productData.currency || 'usd').toLowerCase(),
                         category: new Types.ObjectId(categoryId),
                         sku: productData.sku,
@@ -748,7 +791,7 @@ export class ProductService {
                         businessId: new Types.ObjectId(businessId),
                         businessType,
                         stripeProductId: stripeProduct.id,
-                        stripePriceId: stripePrice?.id || undefined
+                        stripePriceId: stripePriceId
                     })
                 );
 
@@ -766,7 +809,8 @@ export class ProductService {
                         name: product.name,
                         description: product.description || '',
                         categoryName: category.name,
-                        price: product.price
+                        price: product.price,
+                        isPriceOnRequest: product.isPriceOnRequest
                     });
                 }
 

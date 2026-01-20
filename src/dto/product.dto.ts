@@ -1,6 +1,7 @@
 export interface CreateProductDTO {
     name: string;
-    price: number;
+    price?: number;
+    isPriceOnRequest?: boolean;
     currency?: string;
     category: string;
     sku?: string;
@@ -24,6 +25,7 @@ export interface CreateProductDTO {
 export interface UpdateProductDTO {
     name?: string;
     price?: number;
+    isPriceOnRequest?: boolean;
     currency?: string;
     category?: string;
     sku?: string;
@@ -62,7 +64,8 @@ export interface UpdateStockDTO {
 
 export interface BulkProductInput {
     name: string;
-    price: number;
+    price?: number;
+    isPriceOnRequest?: boolean;
     currency?: string;
     categoryName: string;
     sku?: string;

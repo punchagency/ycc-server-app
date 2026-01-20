@@ -10,6 +10,8 @@ export interface IService extends Document {
     businessId: Schema.Types.ObjectId;
     categoryId: Schema.Types.ObjectId;
     isQuotable?: boolean;
+    createdAt: Date;
+    updatedAt: Date;
 }
 
 const serviceSchema = new Schema<IService>({

@@ -4,6 +4,7 @@ import { createAdapter } from '@socket.io/redis-adapter';
 import { RedisObject } from '../integration/Redis';
 import Redis from 'ioredis';
 import CONFIG from '../config/config';
+import { handleAIChat } from './ai-chat.handler';
 
 let io: SocketIOServer | null = null;
 const connectedSockets = new Map<string, Socket>();
@@ -34,7 +35,8 @@ export const initializeWebSocket = (httpServer: HTTPServer, allowedOrigins: stri
     io.on('connection', socket => {
         console.log('New client connected');
 
-        // Handle crew member authentication
+        handleAIChat(socket);
+
         socket.on('authenticate', async userId => {
             try {
                 if (!userId) {

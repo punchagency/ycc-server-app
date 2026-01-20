@@ -29,6 +29,8 @@ export interface IProduct extends Document {
     length: number;
     width: number;
     height: number;
+    createdAt: Date;
+    updatedAt: Date;
 }
 
 const productSchema = new Schema<IProduct>({

@@ -19,6 +19,15 @@ export class ProductController {
         let userId = req.user!._id;
         let businessId = req.user!.businessId;
 
+        // Parse FormData string values to proper types
+        // FormData sends all values as strings, so "false" is truthy and needs explicit parsing
+        const isPriceOnRequest = (productData.isPriceOnRequest as unknown) === true || (productData.isPriceOnRequest as unknown) === 'true';
+        const price = typeof productData.price === 'string' ? parseFloat(productData.price) : productData.price;
+        
+        // Update productData with parsed values
+        productData.isPriceOnRequest = isPriceOnRequest;
+        productData.price = price;
+
         // Admin flow: validate and fetch business details
         if (userRole === 'admin') {
             const adminProvidedBusinessId = req.body.businessId;
@@ -82,10 +91,10 @@ export class ProductController {
             return;
         }
 
-        if (productData.price && productData.price <= 0) {
+        if (!productData.isPriceOnRequest && (!productData.price || productData.price <= 0)) {
             res.status(400).json({
                 success: false,
-                message: 'Valid price is required',
+                message: 'Valid price is required unless "Price on Request" is enabled',
                 code: 'VALIDATION_ERROR'
             });
             return;
@@ -312,6 +321,14 @@ export class ProductController {
         const userRole = req.user!.role;
         const businessId = req.user!.businessId;
 
+        // Parse FormData string values to proper types
+        if (updateData.isPriceOnRequest !== undefined) {
+            updateData.isPriceOnRequest = (updateData.isPriceOnRequest as unknown) === true || (updateData.isPriceOnRequest as unknown) === 'true';
+        }
+        if (updateData.price !== undefined) {
+            updateData.price = typeof updateData.price === 'string' ? parseFloat(updateData.price) : updateData.price;
+        }
+
         if (!Validate.mongoId(id)) {
             res.status(400).json({
                 success: false,
@@ -381,10 +398,12 @@ export class ProductController {
             return;
         }
 
-        if (updateData.price !== undefined && updateData.price <= 0) {
+        const isPriceOnRequestValue = updateData.isPriceOnRequest !== undefined ? updateData.isPriceOnRequest : existingProduct.isPriceOnRequest;
+
+        if (!isPriceOnRequestValue && updateData.price !== undefined && updateData.price <= 0) {
             res.status(400).json({
                 success: false,
-                message: 'Price must be greater than 0',
+                message: 'Price must be greater than 0 unless "Price on Request" is enabled',
                 code: 'VALIDATION_ERROR'
             });
             return;
@@ -662,7 +681,7 @@ export class ProductController {
         });
     }
     static async createMultipleProducts(req: Request, res: Response): Promise<void> {
-        const { products, userId }: { products: BulkProductInput, userId: string } = req.body;
+        const { products, userId }: { products: BulkProductInput[], userId: string } = req.body;
 
 
         if (!userId || !Types.ObjectId.isValid(userId)) {
@@ -695,8 +714,8 @@ export class ProductController {
                 res.status(400).json({ success: false, message: 'Each product name must be 2-200 characters', code: 'VALIDATION_ERROR' });
                 return;
             }
-            if (!product.price || product.price <= 0) {
-                res.status(400).json({ success: false, message: 'Each product must have a valid price', code: 'VALIDATION_ERROR' });
+            if (!product.isPriceOnRequest && (!product.price || product.price <= 0)) {
+                res.status(400).json({ success: false, message: `Product "${product.name}" must have a valid price unless "Price on Request" is enabled`, code: 'VALIDATION_ERROR' });
                 return;
             }
             if (!product.categoryName || !Validate.string(product.categoryName)) {

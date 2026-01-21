@@ -4,10 +4,6 @@ import { ChatService } from "../service/chat.service";
 
 export class ChatController {
     static async getChatHistory(req: Request, res: Response){
-        // if(!req.user){
-        //     res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
-        //     return;
-        // }
 
         const { userId, page, limit } = req.query;
 

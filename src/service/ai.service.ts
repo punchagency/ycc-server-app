@@ -8,7 +8,7 @@ import OrderModel from '../models/order.model';
 import BookingModel from '../models/booking.model';
 import ProductModel from '../models/product.model';
 import ServiceModel from '../models/service.model';
-import BusinessModel from '../models/business.model';
+import UserModel from '../models/user.model';
 import { addEmailJob } from '../integration/QueueManager';
 import { logError, logInfo } from '../utils/SystemLogs';
 import catchError from '../utils/catchError';
@@ -132,31 +132,67 @@ export class AIService {
     }
 
     private static async getOrders({ userId, status, limit = 10 }: { userId: string; status?: string; limit?: number }) {
-        const query: any = { userId };
-        if (status) query.status = status;
+        try {
+            const query: any = { userId };
+            if (status) query.status = status;
 
-        const orders = await OrderModel.find(query)
-            .populate('items.productId', 'name price')
-            .populate('items.businessId', 'businessName')
-            .sort({ createdAt: -1 })
-            .limit(limit)
-            .lean();
+            const orders = await OrderModel.find(query)
+                .populate('items.productId', 'name price')
+                .populate('items.businessId', 'businessName')
+                .sort({ createdAt: -1 })
+                .limit(limit)
+                .lean();
 
-        return { orders, total: orders.length };
+            return {
+                success: true,
+                orders: orders.map(o => ({
+                    orderId: o._id,
+                    status: o.status,
+                    totalAmount: o.totalAmount,
+                    createdAt: o.createdAt,
+                    items: o.items?.map((item: any) => ({
+                        product: item.productId?.name || 'Unknown',
+                        quantity: item.quantity,
+                        price: item.price,
+                        business: item.businessId?.businessName || 'Unknown'
+                    })) || []
+                })),
+                total: orders.length
+            };
+        } catch (error) {
+            await logError({ message: 'Error fetching orders', source: 'AIService.getOrders', error });
+            return { success: false, orders: [], total: 0, error: 'Failed to fetch orders' };
+        }
     }
 
     private static async getBookings({ userId, status, limit = 10 }: { userId: string; status?: string; limit?: number }) {
-        const query: any = { userId };
-        if (status) query.status = status;
+        try {
+            const query: any = { userId };
+            if (status) query.status = status;
 
-        const bookings = await BookingModel.find(query)
-            .populate('serviceId', 'name price')
-            .populate('businessId', 'businessName')
-            .sort({ createdAt: -1 })
-            .limit(limit)
-            .lean();
+            const bookings = await BookingModel.find(query)
+                .populate('serviceId', 'name price')
+                .populate('businessId', 'businessName')
+                .sort({ createdAt: -1 })
+                .limit(limit)
+                .lean();
 
-        return { bookings, total: bookings.length };
+            return {
+                success: true,
+                bookings: bookings.map(b => ({
+                    bookingId: b._id,
+                    status: b.status,
+                    service: (b.serviceId as any)?.name || 'Unknown',
+                    price: (b.serviceId as any)?.price,
+                    business: (b.businessId as any)?.businessName || 'Unknown',
+                    createdAt: b.createdAt
+                })),
+                total: bookings.length
+            };
+        } catch (error) {
+            await logError({ message: 'Error fetching bookings', source: 'AIService.getBookings', error });
+            return { success: false, bookings: [], total: 0, error: 'Failed to fetch bookings' };
+        }
     }
 
     private static async getProducts({ userId, userRole, productName, limit = 20 }: { userId?: string; userRole?: string; productName?: string; limit?: number }) {
@@ -267,24 +303,28 @@ export class AIService {
         const sid = sessionId || uuid();
         const context = await this.retrieveContext(message);
 
-        const chatHistory = userId ? await ChatModel.findOne({ userId, sessionId: sid }).lean() : null;
+        const isGuestUser = userId?.startsWith('guest_');
+        const actualUserId = (userId && !isGuestUser) ? userId : undefined;
+        const user = actualUserId ? await UserModel.findById(actualUserId).select('firstName lastName email role').lean() : null;
+        const chatHistory = actualUserId ? await ChatModel.findOne({ userId: actualUserId, sessionId: sid }).lean() : null;
         const previousMessages = chatHistory?.messages.slice(-10).map(m => ({
             role: m.type === 'human' ? 'user' as const : 'assistant' as const,
             content: m.data.content
         })) || [];
 
-        const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = userId ? [
+        const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = actualUserId ? [
             {
                 type: 'function',
                 function: {
                     name: 'get_orders',
-                    description: 'Fetch user orders with optional filtering',
+                    description: 'Fetch the authenticated user\'s orders. Use this when user asks about "my orders", "my last order", "order status", "recent purchases", or any order-related queries.',
                     parameters: {
                         type: 'object',
                         properties: {
-                            status: { type: 'string', enum: ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'] },
-                            limit: { type: 'number', default: 10 }
-                        }
+                            status: { type: 'string', enum: ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'], description: 'Filter by order status' },
+                            limit: { type: 'number', description: 'Number of orders to fetch' }
+                        },
+                        required: []
                     }
                 }
             },
@@ -292,13 +332,14 @@ export class AIService {
                 type: 'function',
                 function: {
                     name: 'get_bookings',
-                    description: 'Fetch user bookings with optional filtering',
+                    description: 'Fetch the authenticated user\'s bookings. Use this when user asks about "my bookings", "my appointments", "booking status", or any booking-related queries.',
                     parameters: {
                         type: 'object',
                         properties: {
-                            status: { type: 'string', enum: ['pending', 'confirmed', 'cancelled', 'completed'] },
-                            limit: { type: 'number', default: 10 }
-                        }
+                            status: { type: 'string', enum: ['pending', 'confirmed', 'cancelled', 'completed'], description: 'Filter by booking status' },
+                            limit: { type: 'number', description: 'Number of bookings to fetch' }
+                        },
+                        required: []
                     }
                 }
             },
@@ -306,13 +347,14 @@ export class AIService {
                 type: 'function',
                 function: {
                     name: 'get_products',
-                    description: 'Search products by name or get random products',
+                    description: 'Search for products by name or description. Use when user asks about finding products, checking availability, or searching for specific items like "life jackets", "boats", etc. Can search by location if mentioned.',
                     parameters: {
                         type: 'object',
                         properties: {
-                            productName: { type: 'string', description: 'Product name to search for' },
-                            limit: { type: 'number', default: 20 }
-                        }
+                            productName: { type: 'string', description: 'Product name or keywords to search for (e.g., "life jacket", "boat", "anchor")' },
+                            limit: { type: 'number', description: 'Number of products to return' }
+                        },
+                        required: []
                     }
                 }
             },
@@ -320,19 +362,24 @@ export class AIService {
                 type: 'function',
                 function: {
                     name: 'get_services',
-                    description: 'Search services by name or get random services',
+                    description: 'Search for services by name or type. Use when user asks about finding services, service providers, or specific service types like "boat repair", "maintenance", etc.',
                     parameters: {
                         type: 'object',
                         properties: {
-                            serviceName: { type: 'string', description: 'Service name or type to search for' },
-                            limit: { type: 'number', default: 20 }
-                        }
+                            serviceName: { type: 'string', description: 'Service name or type to search for (e.g., "repair", "maintenance", "cleaning")' },
+                            limit: { type: 'number', description: 'Number of services to return' }
+                        },
+                        required: []
                     }
                 }
             }
         ] : [];
 
-        const systemPrompt = `${context}\n\nYou are a helpful customer service agent for Yacht Crew Center. Use the provided context to answer questions accurately. If you cannot find relevant information, indicate that you need to escalate.`;
+        const userContext = user 
+            ? `The user is authenticated:\n- Name: ${user.firstName} ${user.lastName}\n- Email: ${user.email}\n- Role: ${user.role}` 
+            : `The user is NOT authenticated.`;
+        
+        const systemPrompt = `${context}\n\n${userContext}\n\nYou are a helpful customer service agent for Yacht Crew Center. ${user ? 'Use the provided context to answer questions accurately. When users ask about their orders, bookings, products, or services, use the available functions to fetch their data.' : 'When users ask about their personal data (orders, bookings, account information), politely advise them to register or login first to access personalized features.'} If you cannot find relevant information, indicate that you need to escalate. Always format your responses in markdown for better readability.`;
 
         const [error, completion] = await catchError(
             this.openai.chat.completions.create({
@@ -342,8 +389,8 @@ export class AIService {
                     ...previousMessages,
                     { role: 'user', content: message }
                 ],
-                tools: tools.length > 0 ? tools : undefined,
-                tool_choice: tools.length > 0 ? 'auto' : undefined,
+                tools: tools.length > 0 && !stream ? tools : undefined,
+                tool_choice: tools.length > 0 && !stream ? 'auto' : undefined,
                 stream
             })
         );
@@ -361,55 +408,73 @@ export class AIService {
         let finalResponse = responseMessage.content || '';
         const toolCalls = responseMessage.tool_calls || [];
 
-        if (toolCalls.length > 0 && userId) {
-            const user = await BusinessModel.findOne({ userId }).lean();
-            const userRole = user ? 'distributor' : 'user';
+        if (toolCalls.length > 0 && actualUserId) {
+            const userRole = user?.role || 'user';
+
+            const toolMessages: any[] = [];
 
             for (const toolCall of toolCalls) {
-                const functionName = toolCall.function.name;
-                const args = JSON.parse(toolCall.function.arguments);
+                try {
+                    const functionName = toolCall.function.name;
+                    const args = JSON.parse(toolCall.function.arguments);
 
-                let functionResult: any;
+                    let functionResult: any;
 
-                switch (functionName) {
-                    case 'get_orders':
-                        functionResult = await this.getOrders({ userId, ...args });
-                        break;
-                    case 'get_bookings':
-                        functionResult = await this.getBookings({ userId, ...args });
-                        break;
-                    case 'get_products':
-                        functionResult = await this.getProducts({ userId, userRole, ...args });
-                        break;
-                    case 'get_services':
-                        functionResult = await this.getServices(args);
-                        break;
+                    switch (functionName) {
+                        case 'get_orders':
+                            functionResult = await this.getOrders({ userId: actualUserId, ...args });
+                            break;
+                        case 'get_bookings':
+                            functionResult = await this.getBookings({ userId: actualUserId, ...args });
+                            break;
+                        case 'get_products':
+                            functionResult = await this.getProducts({ userId: actualUserId, userRole, ...args });
+                            break;
+                        case 'get_services':
+                            functionResult = await this.getServices(args);
+                            break;
+                        default:
+                            functionResult = { error: 'Unknown function' };
+                    }
+
+                    toolMessages.push({
+                        role: 'tool',
+                        tool_call_id: toolCall.id,
+                        content: JSON.stringify(functionResult)
+                    });
+                } catch (error) {
+                    await logError({ message: `Error executing ${toolCall.function.name}`, source: 'AIService.chat', error });
+                    toolMessages.push({
+                        role: 'tool',
+                        tool_call_id: toolCall.id,
+                        content: JSON.stringify({ error: 'Function execution failed' })
+                    });
                 }
-
-                const [, followUp] = await catchError(
-                    this.openai.chat.completions.create({
-                        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-                        messages: [
-                            { role: 'system', content: systemPrompt },
-                            ...previousMessages,
-                            { role: 'user', content: message },
-                            responseMessage,
-                            { role: 'tool', tool_call_id: toolCall.id, content: JSON.stringify(functionResult) }
-                        ]
-                    })
-                );
-
-                finalResponse = followUp?.choices[0].message.content || finalResponse;
             }
+
+            const [, followUp] = await catchError(
+                this.openai.chat.completions.create({
+                    model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        ...previousMessages,
+                        { role: 'user', content: message },
+                        responseMessage,
+                        ...toolMessages
+                    ]
+                })
+            );
+
+            finalResponse = followUp?.choices[0].message.content || finalResponse;
         }
 
         if (!context && !toolCalls.length) {
-            finalResponse = await this.escalateToSupport(message, userId);
+            finalResponse = await this.escalateToSupport(message, actualUserId);
         }
 
-        if (userId) {
+        if (actualUserId) {
             await ChatModel.findOneAndUpdate(
-                { userId, sessionId: sid },
+                { userId: actualUserId, sessionId: sid },
                 {
                     $push: {
                         messages: {
@@ -419,14 +484,35 @@ export class AIService {
                             ]
                         }
                     },
+                    $setOnInsert: { createdAt: new Date(), userId: actualUserId }
+                },
+                { upsert: true, new: true }
+            );
+
+            await ChatModel.deleteMany({
+                userId: actualUserId,
+                createdAt: { $lt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+            });
+        } else {
+            await ChatModel.findOneAndUpdate(
+                { sessionId: sid, userId: { $exists: false } },
+                {
+                    $push: {
+                        messages: {
+                            $each: [
+                                { type: 'human', data: { content: message, tool_calls: [], invalid_tool_calls: [], additional_kwargs: {}, response_metadata: {} }, createdAt: new Date() },
+                                { type: 'ai', data: { content: finalResponse, tool_calls: [], invalid_tool_calls: [], additional_kwargs: {}, response_metadata: {} }, createdAt: new Date() }
+                            ]
+                        }
+                    },
                     $setOnInsert: { createdAt: new Date() }
                 },
                 { upsert: true, new: true }
             );
 
             await ChatModel.deleteMany({
-                userId,
-                createdAt: { $lt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+                userId: { $exists: false },
+                createdAt: { $lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
             });
         }
 

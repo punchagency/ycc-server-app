@@ -157,7 +157,7 @@ const Validate = {
         allowedTypes.includes(mimeType),
     bvn: (value: string): boolean => /^\d{11}$/.test(value),
     nin: (value: string): boolean => /^\d{11}$/.test(value),
-    mongoId: (value: string): boolean => Boolean(new Types.ObjectId(value)),
+    mongoId: (value: string): boolean => Types.ObjectId.isValid(value),
 };
 
 export default Validate;

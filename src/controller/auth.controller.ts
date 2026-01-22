@@ -412,6 +412,7 @@ export class AuthController {
             if (lastName !== undefined) updateData.lastName = lastName?.trim();
             if (nationality !== undefined) updateData.nationality = nationality?.trim() || null;
             if (address !== undefined) updateData.address = address || null;
+            if (address !== undefined) updateData.address = address || null;
             if (currency !== undefined) updateData['preferences.currency'] = currency?.toLowerCase().trim() || 'usd';
 
             const user = await User.findByIdAndUpdate(

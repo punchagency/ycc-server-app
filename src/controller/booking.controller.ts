@@ -647,6 +647,42 @@ export class BookingController {
         }
     }
 
+    static async createBalancePayment(req: AuthenticatedRequest, res: Response) {
+        try {
+            if (!req.user) {
+                res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
+                return;
+            }
+
+            const { id } = req.params;
+
+            if (!Validate.mongoId(id)) {
+                res.status(400).json({ success: false, message: 'Invalid booking ID', code: 'INVALID_BOOKING_ID' });
+                return;
+            }
+
+            const [error, result] = await catchError(BookingService.createBalancePayment({
+                bookingId: id,
+                userId: req.user._id.toString()
+            }));
+
+            if (error) {
+                logError({ message: "Creating balance payment failed!", source: "BookingController.createBalancePayment", error });
+                res.status(400).json({ success: false, message: error.message || 'Failed to create balance payment', code: 'BALANCE_PAYMENT_FAILED' });
+                return;
+            }
+
+            res.status(200).json({ 
+                success: true, 
+                message: 'Balance invoice created successfully', 
+                data: result 
+            });
+        } catch (error) {
+            logError({ message: "Creating balance payment failed!", source: "BookingController.createBalancePayment", error });
+            res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
+        }
+    }
+
     static async updateCompletedStatus(req: AuthenticatedRequest, res: Response) {
         try {
             if (!req.user) {

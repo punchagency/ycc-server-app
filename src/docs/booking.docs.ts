@@ -104,7 +104,7 @@
  *         name: paymentStatus
  *         schema:
  *           type: string
- *           enum: [pending, paid, failed, cancelled, refunded]
+ *           enum: [pending, deposit_paid, paid, failed, cancelled, refunded]
  *       - in: query
  *         name: startDate
  *         schema:
@@ -477,11 +477,11 @@
 
 /**
  * @swagger
- * /api/v2/booking/{id}/confirm-completion:
- *   put:
+ * /api/v2/booking/{id}/payment:
+ *   post:
  *     tags: [Booking]
- *     summary: Confirm job completion (Crew/User only)
- *     description: Confirm satisfaction with the completed job. This triggers payment release to the distributor. Requires booking to be in 'completed' status and payment to be 'paid'.
+ *     summary: Create 50% deposit invoice (Crew/User only)
+ *     description: Creates a Stripe invoice for 50% deposit payment. Booking must be confirmed and quote accepted (if quotable). The remaining 50% balance will be due upon service completion.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -493,7 +493,7 @@
  *         description: Booking ID
  *     responses:
  *       200:
- *         description: Job completion confirmed successfully
+ *         description: Deposit invoice created successfully
  *         content:
  *           application/json:
  *             schema:
@@ -503,12 +503,145 @@
  *                   type: boolean
  *                 message:
  *                   type: string
+ *                   example: "Payment invoice created successfully"
  *                 data:
  *                   type: object
  *                   properties:
- *                     notes:
+ *                     invoiceUrl:
  *                       type: string
- *                       description: Updated notes with confirmation
+ *                       description: Stripe hosted invoice URL
+ *                     invoiceId:
+ *                       type: string
+ *                       description: Stripe invoice ID
+ *                     status:
+ *                       type: string
+ *                       example: "pending"
+ *                     dueDate:
+ *                       type: number
+ *                       description: Unix timestamp
+ *                     amount:
+ *                       type: number
+ *                       description: Deposit amount (50% of total)
+ *                     invoiceType:
+ *                       type: string
+ *                       example: "deposit"
+ *       400:
+ *         description: Invalid request or business rule violation
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Booking not found
+ *
+ * @swagger
+ * /api/v2/booking/{id}/balance-payment:
+ *   post:
+ *     tags: [Booking]
+ *     summary: Create 50% balance invoice (Crew/User only)
+ *     description: Creates a Stripe invoice for the remaining 50% balance payment. Requires deposit to be paid and service to be marked as completed by distributor.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Booking ID
+ *     responses:
+ *       200:
+ *         description: Balance invoice created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                   example: "Balance invoice created successfully"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     invoiceUrl:
+ *                       type: string
+ *                       description: Stripe hosted invoice URL
+ *                     invoiceId:
+ *                       type: string
+ *                       description: Stripe invoice ID
+ *                     status:
+ *                       type: string
+ *                       example: "pending"
+ *                     dueDate:
+ *                       type: number
+ *                       description: Unix timestamp
+ *                     amount:
+ *                       type: number
+ *                       description: Balance amount (50% of total)
+ *                     invoiceType:
+ *                       type: string
+ *                       example: "balance"
+ *       400:
+ *         description: Invalid request - deposit not paid or service not completed
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Booking not found
+ *
+ * @swagger
+ * /api/v2/booking/{id}/completed-status:
+ *   patch:
+ *     tags: [Booking]
+ *     summary: Update booking completion status
+ *     description: |
+ *       Distributor: Mark service as completed (completedStatus: 'request_completed'). Requires deposit to be paid.
+ *       
+ *       Customer: Confirm service completion (completedStatus: 'completed') or reject (completedStatus: 'rejected'). Requires balance to be paid for confirmation.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Booking ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [completedStatus]
+ *             properties:
+ *               completedStatus:
+ *                 type: string
+ *                 enum: [pending, request_completed, completed, rejected]
+ *                 description: |
+ *                   - pending: Initial state
+ *                   - request_completed: Distributor marks as done (triggers balance invoice)
+ *                   - completed: Customer confirms completion (triggers payout)
+ *                   - rejected: Customer rejects completion claim
+ *               rejectionReason:
+ *                 type: string
+ *                 description: Required when completedStatus is 'rejected'
+ *     responses:
+ *       200:
+ *         description: Completion status updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 code:
+ *                   type: string
+ *                   example: "STATUS_UPDATED"
+ *                 data:
+ *                   type: object
  *       400:
  *         description: Invalid request or business rule violation
  *       401:

@@ -43,6 +43,7 @@ router.delete('/:id/quote-items/:itemId', authenticateToken, BookingController.d
 
 // Payment routes
 router.post('/:id/payment', authenticateToken, BookingController.createPayment);
+router.post('/:id/balance-payment', authenticateToken, BookingController.createBalancePayment);
 
 // Completed status management
 router.patch('/:id/completed-status', authenticateToken, BookingController.updateCompletedStatus);

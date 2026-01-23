@@ -2,7 +2,7 @@ import { Schema, model, Document } from "mongoose";
 
 export interface IChat extends Document {
     _id: Schema.Types.ObjectId;
-    userId: Schema.Types.ObjectId;
+    userId?: Schema.Types.ObjectId;
     sessionId: string;
     messages: {
         type: 'human' | 'ai';
@@ -20,7 +20,7 @@ export interface IChat extends Document {
 }
 
 const chatSchema = new Schema<IChat>({
-    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: false },
     sessionId: { type: String, required: true },
     messages: [{
         type: { type: String, enum: ['human', 'ai'], required: true },

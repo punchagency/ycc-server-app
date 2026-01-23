@@ -408,6 +408,22 @@ export class AuthController {
             //     updateData.phone = phone ? Validate.formatPhone(phone) || phone : null;
             // }
 
+            if (phone !== undefined) {
+                if (phone && !Validate.phone(phone)) {
+                    res.status(400).json({
+                        success: false,
+                        message: 'Valid phone number is required',
+                        code: 'VALIDATION_ERROR'
+                    });
+                    return;
+                }
+
+                updateData.phone = phone
+                    ? Validate.formatPhone(phone) || phone
+                    : null;
+            }
+
+
             if (firstName !== undefined) updateData.firstName = firstName?.trim();
             if (lastName !== undefined) updateData.lastName = lastName?.trim();
             if (nationality !== undefined) updateData.nationality = nationality?.trim() || null;

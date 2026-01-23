@@ -292,26 +292,52 @@ async function handleBookingPaymentSuccess(bookingId: string, stripeInvoice: Str
         .populate('businessId');
     if (!booking) return;
 
-    booking.paymentStatus = 'paid';
-    if (invoiceId) {
-        booking.invoiceId = invoiceId as any;
+    const invoice = await Invoice.findById(invoiceId);
+    const invoiceType = invoice?.invoiceType || stripeInvoice.metadata?.invoiceType || 'full';
+
+    if (invoiceType === 'deposit') {
+        booking.paymentStatus = 'deposit_paid';
+        booking.depositPaidAt = new Date(stripeInvoice.status_transitions.paid_at! * 1000);
+        if (invoiceId) {
+            booking.depositInvoiceId = invoiceId as any;
+        }
+    } else if (invoiceType === 'balance') {
+        booking.paymentStatus = 'paid';
+        booking.balancePaidAt = new Date(stripeInvoice.status_transitions.paid_at! * 1000);
+        if (invoiceId) {
+            booking.balanceInvoiceId = invoiceId as any;
+        }
+    } else {
+        booking.paymentStatus = 'paid';
+        if (invoiceId) {
+            booking.invoiceId = invoiceId as any;
+        }
     }
-    booking.paidAt = new Date(stripeInvoice.status_transitions.paid_at! * 1000); // Set payment timestamp
+
+    booking.paidAt = new Date(stripeInvoice.status_transitions.paid_at! * 1000);
     booking.statusHistory?.push({
         fromStatus: booking.status,
         toStatus: booking.status,
         changedBy: 'stripe_webhook',
         userRole: 'system',
-        notes: `Payment received via Stripe - Invoice ${stripeInvoice.id}`,
+        notes: `${invoiceType === 'deposit' ? 'Deposit' : invoiceType === 'balance' ? 'Balance' : 'Full'} payment received via Stripe - Invoice ${stripeInvoice.id}`,
         changedAt: new Date()
     });
     await booking.save();
 
+    // Process distributor payout immediately
+    await processBookingDistributorPayout(booking, stripeInvoice, invoice, invoiceType);
+
     if (booking.quoteId) {
         const quote = await Quote.findById(booking.quoteId);
-        if (quote && quote.status !== 'deposit_paid' && quote.status !== 'completed') {
-            quote.status = 'deposit_paid';
-            await quote.save();
+        if (quote) {
+            if (invoiceType === 'deposit' && quote.status !== 'completed') {
+                quote.status = 'deposit_paid';
+                await quote.save();
+            } else if (invoiceType === 'balance' && quote.status !== 'completed') {
+                quote.status = 'completed';
+                await quote.save();
+            }
         }
     }
 
@@ -319,45 +345,157 @@ async function handleBookingPaymentSuccess(bookingId: string, stripeInvoice: Str
     const service: any = booking.serviceId;
     const business: any = booking.businessId;
 
-    // Send email to crew
     if (user?.email) {
+        const paymentTypeText = invoiceType === 'deposit' ? '50% Deposit' : invoiceType === 'balance' ? 'Final Balance (50%)' : 'Full Payment';
         await SendMail({
             email: user.email,
-            subject: 'Payment Confirmation - Booking Confirmed',
+            subject: `Payment Confirmation - ${paymentTypeText}`,
             html: `
                 <h2>Payment Confirmation</h2>
                 <p>Dear ${user.firstName},</p>
-                <p>Your payment has been successfully processed!</p>
+                <p>Your ${paymentTypeText.toLowerCase()} has been successfully processed!</p>
                 <ul>
                     <li>Booking ID: ${booking._id}</li>
                     <li>Service: ${service?.name || 'N/A'}</li>
                     <li>Amount Paid: $${(stripeInvoice.amount_paid! / 100).toFixed(2)}</li>
                     <li>Payment Date: ${new Date().toLocaleDateString()}</li>
                 </ul>
-                <p>Your booking is now confirmed and the distributor will proceed with service delivery.</p>
+                ${invoiceType === 'deposit' ? '<p>Your booking is now confirmed. The remaining 50% balance will be due upon service completion.</p>' : '<p>Thank you for your payment. Your booking is now fully paid.</p>'}
             `
         });
     }
 
-    // Send email to distributor
     if (business?.email) {
+        const paymentTypeText = invoiceType === 'deposit' ? 'Deposit (50%)' : invoiceType === 'balance' ? 'Balance (50%)' : 'Full Payment';
         await SendMail({
             email: business.email,
-            subject: 'Payment Received for Booking',
+            subject: `Payment Received - ${paymentTypeText}`,
             html: `
                 <h2>Payment Received</h2>
-                <p>A payment has been received for booking #${booking._id}</p>
+                <p>A ${paymentTypeText.toLowerCase()} has been received for booking #${booking._id}</p>
                 <ul>
                     <li>Service: ${service?.name || 'N/A'}</li>
                     <li>Customer: ${user?.firstName} ${user?.lastName}</li>
                     <li>Amount: $${(stripeInvoice.amount_paid! / 100).toFixed(2)}</li>
                 </ul>
-                <p>You can now proceed with service delivery.</p>
+                ${invoiceType === 'deposit' ? '<p>You can now proceed with service delivery. The remaining balance will be collected upon completion.</p>' : '<p>The booking is now fully paid.</p>'}
             `
         });
     }
 
-    logInfo({ message: `Booking payment success: ${bookingId}`, source: 'handleBookingPaymentSuccess' });
+    logInfo({ message: `Booking ${invoiceType} payment success: ${bookingId}`, source: 'handleBookingPaymentSuccess' });
+}
+
+async function processBookingDistributorPayout(
+    booking: any,
+    stripeInvoice: Stripe.Invoice,
+    invoice: any,
+    invoiceType: string
+) {
+    try {
+        const business = booking.businessId;
+        if (!business || !business.stripeAccountId) {
+            logError({
+                message: `Business missing Stripe account for booking ${booking._id}`,
+                source: 'processBookingDistributorPayout',
+                additionalData: { bookingId: booking._id, hasStripeAccount: !!business?.stripeAccountId }
+            });
+            return;
+        }
+
+        if (!business.stripeTransfersEnabled) {
+            logError({
+                message: `Stripe transfers not enabled for business ${business._id}`,
+                source: 'processBookingDistributorPayout',
+                additionalData: { bookingId: booking._id, businessId: business._id }
+            });
+            return;
+        }
+
+        if (!invoice || !invoice.distributorAmount || invoice.distributorAmount <= 0) {
+            logError({
+                message: `No distributor amount to payout for booking ${booking._id}`,
+                source: 'processBookingDistributorPayout',
+                additionalData: { bookingId: booking._id, distributorAmount: invoice?.distributorAmount }
+            });
+            return;
+        }
+
+        // Get charge ID from the invoice
+        const chargeId = (stripeInvoice as any).charge as string;
+        if (!chargeId) {
+            logError({
+                message: `No charge ID found for invoice ${stripeInvoice.id}`,
+                source: 'processBookingDistributorPayout',
+                additionalData: { bookingId: booking._id, invoiceId: stripeInvoice.id }
+            });
+            return;
+        }
+
+        // Calculate payout amount (distributor gets their share minus platform fee)
+        const payoutAmount = Math.round(invoice.distributorAmount * 100);
+        const payoutCurrency = invoice.currency || 'usd';
+
+        logInfo({
+            message: `Initiating ${invoiceType} payout for booking ${booking._id}`,
+            source: 'processBookingDistributorPayout',
+            additionalData: {
+                bookingId: booking._id,
+                businessId: business._id,
+                amount: invoice.distributorAmount,
+                currency: payoutCurrency,
+                invoiceType
+            }
+        });
+
+        // Create transfer to distributor
+        const transfer = await stripe.transfers.create({
+            amount: payoutAmount,
+            currency: payoutCurrency.toLowerCase(),
+            destination: business.stripeAccountId,
+            source_transaction: chargeId,
+            description: `${invoiceType === 'deposit' ? 'Deposit (50%)' : 'Balance (50%)'} payout for booking ${booking._id}`,
+            metadata: {
+                bookingId: booking._id.toString(),
+                businessId: business._id.toString(),
+                invoiceId: stripeInvoice.id,
+                invoiceType,
+                transactionType: 'booking'
+            }
+        });
+
+        // Update booking with payout info
+        if (invoiceType === 'deposit') {
+            booking.depositPayoutId = transfer.id;
+            booking.depositPayoutStatus = 'paid';
+        } else if (invoiceType === 'balance') {
+            booking.balancePayoutId = transfer.id;
+            booking.balancePayoutStatus = 'paid';
+        }
+        await booking.save();
+
+        logInfo({
+            message: `${invoiceType} payout completed for booking ${booking._id}`,
+            source: 'processBookingDistributorPayout',
+            additionalData: {
+                bookingId: booking._id,
+                transferId: transfer.id,
+                amount: invoice.distributorAmount,
+                currency: payoutCurrency
+            }
+        });
+    } catch (error: any) {
+        logError({
+            message: `Payout failed for booking ${booking._id}: ${error.message}`,
+            error,
+            source: 'processBookingDistributorPayout',
+            additionalData: {
+                bookingId: booking._id,
+                invoiceType,
+                errorCode: error.code
+            }
+        });
+    }
 }
 
 async function handlePaymentFailed(

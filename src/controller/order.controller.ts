@@ -14,7 +14,7 @@ class OrderController {
                 res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
                 return;
             }
-            const { products, deliveryAddress, estimatedDeliveryDate } = req.body;
+            const { products, deliveryAddress, estimatedDeliveryDate, notes } = req.body;
             const userId = req.user?._id;
 
             if (!userId) {
@@ -44,7 +44,8 @@ class OrderController {
                 userType: req.user?.role as "user" | "distributor",
                 products,
                 deliveryAddress,
-                estimatedDeliveryDate: estimatedDeliveryDate ? new Date(estimatedDeliveryDate) : undefined
+                estimatedDeliveryDate: estimatedDeliveryDate ? new Date(estimatedDeliveryDate) : undefined,
+                notes
             }));
 
             if (error) {

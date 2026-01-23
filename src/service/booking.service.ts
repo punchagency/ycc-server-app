@@ -16,7 +16,7 @@ import { CurrencyHelper } from "../utils/currencyHelper";
 import 'dotenv/config';
 
 export class BookingService {
-    static async createBooking({ userId, businessId, serviceId, serviceLocation, bookingDate, startTime, customerEmail, customerPhone, attachments, notes }: { userId: string; businessId: string; serviceId: string; serviceLocation: { street: string; city: string; state: string;zip: string; country: string }; bookingDate: Date; startTime: Date; customerEmail?: string; customerPhone?: string; attachments?: string[]; notes?: string }) {
+    static async createBooking({ userId, businessId, serviceId, serviceLocation, bookingDate, startTime, customerEmail, customerPhone, attachments, notes }: { userId: string; businessId: string; serviceId: string; serviceLocation: { street: string; city: string; state: string; zip: string; country: string }; bookingDate: Date; startTime: Date; customerEmail?: string; customerPhone?: string; attachments?: string[]; notes?: string }) {
         const business = await BusinessModel.findById(businessId);
         if (!business) throw new Error('Business not found');
 
@@ -174,8 +174,8 @@ export class BookingService {
         return booking;
     }
 
-    static async updateBookingStatus({bookingId, userId, userRole, status, notes, reason, quoteItems}:{bookingId: string; userId: string; userRole: string; status: typeof BOOKING_STATUSES[number]; notes?: string; reason?: string; quoteItems?: {name: string; price: number; quantity?: number}[]}) {
-        const USER_BOOKING_STATUS_RULES: Record<string, {allowedTransitions: string[]; canBeChangedBy: string[]}> = {
+    static async updateBookingStatus({ bookingId, userId, userRole, status, notes, reason, quoteItems }: { bookingId: string; userId: string; userRole: string; status: typeof BOOKING_STATUSES[number]; notes?: string; reason?: string; quoteItems?: { name: string; price: number; quantity?: number }[] }) {
+        const USER_BOOKING_STATUS_RULES: Record<string, { allowedTransitions: string[]; canBeChangedBy: string[] }> = {
             pending: {
                 allowedTransitions: ['confirmed', 'declined', 'cancelled'],
                 canBeChangedBy: ['distributor', 'admin', 'user', 'manufacturer']
@@ -324,7 +324,7 @@ export class BookingService {
             } else {
                 booking.declinedAt = new Date();
                 if (reason) booking.declineReason = reason;
-                
+
                 if (booking.paymentStatus === 'pending' || booking.paymentStatus === 'deposit_paid') {
                     booking.paymentStatus = 'cancelled';
                 }
@@ -384,7 +384,7 @@ export class BookingService {
         return booking;
     }
 
-    static async getBookings({userId, role, page = 1, limit = 10, status, paymentStatus, startDate, endDate, sortBy = 'createdAt', sortOrder = 'desc' }: {userId: string; role: string; page?: number; limit?: number; status?: string; paymentStatus?: string; startDate?: Date; endDate?: Date; sortBy?: string; sortOrder?: string}) {
+    static async getBookings({ userId, role, page = 1, limit = 10, status, paymentStatus, startDate, endDate, sortBy = 'createdAt', sortOrder = 'desc', completedStatus }: { userId: string; role: string; page?: number; limit?: number; status?: string; paymentStatus?: string; startDate?: Date; endDate?: Date; sortBy?: string; sortOrder?: string, completedStatus?: string }) {
         const query: any = {};
 
         // For admin, fetch all bookings (no user/business filter)
@@ -401,6 +401,7 @@ export class BookingService {
 
         if (status) query.status = status;
         if (paymentStatus) query.paymentStatus = paymentStatus;
+        if (completedStatus) query.completedStatus = completedStatus;
         if (startDate || endDate) {
             query.createdAt = {};
             if (startDate) query.createdAt.$gte = startDate;
@@ -516,13 +517,13 @@ export class BookingService {
         for (const item of quoteItems) {
             const totalPrice = item.price * (item.quantity || 1);
             quoteItemsTotal += totalPrice;
-            
+
             const conversion = await CurrencyHelper.convertPrice(
                 item.price,
                 distributorCurrency,
                 userCurrency
             );
-            
+
             services.push({
                 serviceId: booking.serviceId,
                 item: item.name,
@@ -588,7 +589,7 @@ export class BookingService {
 
         // Send email to crew
         console.log('Sending email to crew', bookingUser.email);
-        
+
         await addEmailJob({
             email: bookingUser.email,
             subject: 'Quote Provided for Your Booking',
@@ -966,10 +967,10 @@ export class BookingService {
         return { booking, quote };
     }
 
-    static async updateQuoteItem({ bookingId, itemId, userId, userRole, updatedItem }: { 
-        bookingId: string; 
-        itemId: string; 
-        userId: string; 
+    static async updateQuoteItem({ bookingId, itemId, userId, userRole, updatedItem }: {
+        bookingId: string;
+        itemId: string;
+        userId: string;
         userRole: string;
         updatedItem: { name?: string; description?: string; quantity?: number; price?: number }
     }) {
@@ -1004,11 +1005,11 @@ export class BookingService {
         if (updatedItem.name) item.item = updatedItem.name;
         if (updatedItem.description !== undefined) item.description = updatedItem.description;
         if (updatedItem.quantity) item.quantity = updatedItem.quantity;
-        
+
         if (updatedItem.price) {
             item.originalUnitPrice = updatedItem.price;
             item.originalCurrency = distributorCurrency;
-            
+
             const conversion = await CurrencyHelper.convertPrice(
                 updatedItem.price,
                 distributorCurrency,
@@ -1178,7 +1179,7 @@ export class BookingService {
             .populate('serviceId')
             .populate('quoteId')
             .populate('businessId');
-        
+
         if (!booking) throw new Error('Booking not found');
         if (booking.userId.toString() !== userId) throw new Error('Unauthorized: This booking does not belong to you');
 
@@ -1194,12 +1195,12 @@ export class BookingService {
             throw new Error('Quote must be accepted before payment');
         }
 
-        // Check if deposit invoice already exists
+        // Check if deposit invoice already exists and is valid
         if (booking.stripeInvoiceId) {
             const stripe = StripeService.getInstance();
             try {
                 const existingInvoice = await stripe.getInvoice(booking.stripeInvoiceId);
-                if (existingInvoice.status !== 'void') {
+                if (existingInvoice.status !== 'void' && existingInvoice.status !== 'uncollectible') {
                     return {
                         invoiceUrl: existingInvoice.hosted_invoice_url,
                         invoiceId: existingInvoice.id,
@@ -1208,7 +1209,7 @@ export class BookingService {
                     };
                 }
             } catch (error) {
-                logError({ message: 'Existing invoice retrieval failed', error, source: 'BookingService.createBookingPayment' });
+                logError({ message: 'Existing invoice retrieval failed, will create new invoice', error, source: 'BookingService.createBookingPayment' });
             }
         }
 
@@ -1243,10 +1244,10 @@ export class BookingService {
             }
             user.stripeCustomerId = stripeCustomerId;
             await user.save();
-        }else{
-            try{
+        } else {
+            try {
                 const customer = await stripe.retrieveCustomer(stripeCustomerId);
-                if(!customer){
+                if (!customer) {
                     const customer = await stripe.createCustomer({
                         email: user.email,
                         name: `${user.firstName} ${user.lastName}`
@@ -1255,7 +1256,7 @@ export class BookingService {
                     user.stripeCustomerId = stripeCustomerId;
                     await user.save();
                 }
-            }catch(error){
+            } catch (error) {
                 const customer = await stripe.createCustomer({
                     email: user.email,
                     name: `${user.firstName} ${user.lastName}`
@@ -1287,11 +1288,11 @@ export class BookingService {
 
         if (booking.requiresQuote && booking.quoteId) {
             const quote: any = booking.quoteId;
-            
+
             for (const quoteService of quote.services) {
                 const itemTotal = quoteService.convertedUnitPrice * quoteService.quantity;
                 totalAmountInUserCurrency += itemTotal;
-                
+
                 await stripe.createInvoiceItems({
                     customer: stripeCustomerId,
                     invoice: invoice.id,
@@ -1314,7 +1315,7 @@ export class BookingService {
                 userCurrency
             );
             totalAmountInUserCurrency += serviceConversion.convertedPrice;
-            
+
             await stripe.createInvoiceItems({
                 customer: stripeCustomerId,
                 invoice: invoice.id,
@@ -1335,7 +1336,7 @@ export class BookingService {
                 userCurrency
             );
             totalAmountInUserCurrency = serviceConversion.convertedPrice;
-            
+
             await stripe.createInvoiceItems({
                 customer: stripeCustomerId,
                 invoice: invoice.id,
@@ -1369,7 +1370,7 @@ export class BookingService {
 
         const platformFee = totalAmountInUserCurrency * CONSTANTS.PLATFORM_FEE_PERCENT;
         booking.platformFee = platformFee;
-        
+
         await stripe.createInvoiceItems({
             customer: stripeCustomerId,
             invoice: invoice.id,
@@ -1409,7 +1410,7 @@ export class BookingService {
 
         const totalAmount = finalizedInvoice.amount_due / 100;
         const distributorAmount = totalAmount - (platformFee * 0.5);
-        
+
         try {
             const invoiceRecord = await InvoiceModel.create({
                 stripeInvoiceId: invoice.id,
@@ -1463,7 +1464,7 @@ export class BookingService {
             .populate('serviceId')
             .populate('quoteId')
             .populate('businessId');
-        
+
         if (!booking) throw new Error('Booking not found');
         if (booking.userId.toString() !== userId) throw new Error('Unauthorized: This booking does not belong to you');
 
@@ -1471,21 +1472,27 @@ export class BookingService {
             throw new Error('Deposit must be paid before requesting balance invoice');
         }
 
-        if (booking.status !== 'completed') {
-            throw new Error('Booking must be completed before balance payment');
+        if (!['confirmed', 'completed'].includes(booking.status)) {
+            throw new Error('Booking must be confirmed before balance payment');
         }
 
         if (booking.balanceInvoiceId) {
             const existingInvoice = await InvoiceModel.findById(booking.balanceInvoiceId);
             if (existingInvoice && existingInvoice.status !== 'cancelled') {
                 const stripe = StripeService.getInstance();
-                const stripeInvoice = await stripe.getInvoice(existingInvoice.stripeInvoiceId);
-                return {
-                    invoiceUrl: stripeInvoice.hosted_invoice_url,
-                    invoiceId: stripeInvoice.id,
-                    status: stripeInvoice.status,
-                    invoiceType: 'balance'
-                };
+                try {
+                    const stripeInvoice = await stripe.getInvoice(existingInvoice.stripeInvoiceId);
+                    if (stripeInvoice.status !== 'void' && stripeInvoice.status !== 'uncollectible') {
+                        return {
+                            invoiceUrl: stripeInvoice.hosted_invoice_url,
+                            invoiceId: stripeInvoice.id,
+                            status: stripeInvoice.status,
+                            invoiceType: 'balance'
+                        };
+                    }
+                } catch (error) {
+                    logError({ message: 'Existing balance invoice retrieval failed, will create new invoice', error, source: 'BookingService.createBalancePayment' });
+                }
             }
         }
 
@@ -1560,6 +1567,7 @@ export class BookingService {
         });
 
         booking.balanceInvoiceId = invoiceRecord._id as any;
+        booking.status = "completed"
         await booking.save();
 
         await addNotificationJob({
@@ -1641,17 +1649,9 @@ export class BookingService {
         if (completedStatus === 'completed') {
             booking.status = 'completed';
             booking.completedAt = new Date();
-            booking.paymentStatus = 'paid';
-            booking.balancePaidAt = new Date();
         }
 
         await booking.save();
-
-        if (completedStatus === 'completed') {
-            this.processDistributorPayout(bookingId).catch(err => {
-                logError({ message: 'Async payout trigger failed', error: err, source: 'BookingService.updateCompletedStatus' });
-            });
-        }
 
         if (completedStatus === 'request_completed') {
             await addNotificationJob({
@@ -1666,7 +1666,7 @@ export class BookingService {
             await addNotificationJob({
                 recipientId: (booking.businessId as any)._id,
                 type: 'booking',
-                priority:  'medium',
+                priority: 'medium',
                 title: 'Booking Completed',
                 message: `${(booking.userId as any).firstName} has confirmed completion of the booking.`,
                 data: { bookingId: booking._id }
@@ -1684,71 +1684,5 @@ export class BookingService {
         }
 
         return booking;
-    }
-
-    private static async processDistributorPayout(bookingId: string) {
-        try {
-            const booking = await BookingModel.findById(bookingId).populate('invoiceId businessId');
-            if (!booking) {
-                console.error(`[Payout Error] Booking ${bookingId} not found`);
-                return;
-            }
-
-            if (booking.distributorPayoutStatus === 'paid') {
-                console.log(`[Payout Skip] Booking ${bookingId} already paid out`);
-                return;
-            }
-
-            const invoice = booking.invoiceId as any;
-            if (!invoice || !invoice.distributorAmount || invoice.distributorAmount <= 0) {
-                console.warn(`[Payout Skip] Booking ${bookingId} has no distributorAmount to pay out`);
-                return;
-            }
-
-            const business = booking.businessId as any;
-            if (!business || !business.stripeAccountId) {
-                console.error(`[Payout Error] Business ${business?._id} for Booking ${bookingId} has no Stripe account linked`);
-                booking.distributorPayoutStatus = 'failed';
-                await booking.save();
-                return;
-            }
-
-            // Get the charge ID from the Stripe invoice to use as source_transaction
-            const stripe = StripeService.getInstance();
-            let chargeId: string;
-            try {
-                chargeId = await stripe.getLatestChargeId(invoice.stripeInvoiceId);
-            } catch (error) {
-                console.error(`[Payout Error] Failed to get charge ID for Booking ${bookingId}:`, error);
-                booking.distributorPayoutStatus = 'failed';
-                await booking.save();
-                return;
-            }
-
-            // Create transfer
-            // Note: amount is in cents for Stripe, distributorAmount is in major currency
-            const amountInCents = Math.round(invoice.distributorAmount * 100);
-            
-            console.log(`[Payout Initiating] Booking ${bookingId}: Transferring $${invoice.distributorAmount} to ${business.stripeAccountId}`);
-            
-            const transfer = await stripe.createTransfer({
-                amount: amountInCents,
-                destination: business.stripeAccountId,
-                source_transaction: chargeId
-            });
-
-            booking.distributorPayoutStatus = 'paid';
-            booking.distributorPayoutId = transfer.id;
-            await booking.save();
-
-            console.log(`[Payout Success] Booking ${bookingId}: Transfer ${transfer.id} completed for $${invoice.distributorAmount}`);
-        } catch (error) {
-            console.error(`[Payout Fatal Error] Booking ${bookingId}:`, error);
-            try {
-                await BookingModel.findByIdAndUpdate(bookingId, { distributorPayoutStatus: 'failed' });
-            } catch (e) {
-                logError({ message: 'Failed to update failed payout status', error: e, source: 'BookingService.processDistributorPayout' });
-            }
-        }
     }
 } 

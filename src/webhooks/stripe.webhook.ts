@@ -325,6 +325,9 @@ async function handleBookingPaymentSuccess(bookingId: string, stripeInvoice: Str
     });
     await booking.save();
 
+    // Process distributor payout immediately
+    await processBookingDistributorPayout(booking, stripeInvoice, invoice, invoiceType);
+
     if (booking.quoteId) {
         const quote = await Quote.findById(booking.quoteId);
         if (quote) {
@@ -381,6 +384,118 @@ async function handleBookingPaymentSuccess(bookingId: string, stripeInvoice: Str
     }
 
     logInfo({ message: `Booking ${invoiceType} payment success: ${bookingId}`, source: 'handleBookingPaymentSuccess' });
+}
+
+async function processBookingDistributorPayout(
+    booking: any,
+    stripeInvoice: Stripe.Invoice,
+    invoice: any,
+    invoiceType: string
+) {
+    try {
+        const business = booking.businessId;
+        if (!business || !business.stripeAccountId) {
+            logError({
+                message: `Business missing Stripe account for booking ${booking._id}`,
+                source: 'processBookingDistributorPayout',
+                additionalData: { bookingId: booking._id, hasStripeAccount: !!business?.stripeAccountId }
+            });
+            return;
+        }
+
+        if (!business.stripeTransfersEnabled) {
+            logError({
+                message: `Stripe transfers not enabled for business ${business._id}`,
+                source: 'processBookingDistributorPayout',
+                additionalData: { bookingId: booking._id, businessId: business._id }
+            });
+            return;
+        }
+
+        if (!invoice || !invoice.distributorAmount || invoice.distributorAmount <= 0) {
+            logError({
+                message: `No distributor amount to payout for booking ${booking._id}`,
+                source: 'processBookingDistributorPayout',
+                additionalData: { bookingId: booking._id, distributorAmount: invoice?.distributorAmount }
+            });
+            return;
+        }
+
+        // Get charge ID from the invoice
+        const chargeId = (stripeInvoice as any).charge as string;
+        if (!chargeId) {
+            logError({
+                message: `No charge ID found for invoice ${stripeInvoice.id}`,
+                source: 'processBookingDistributorPayout',
+                additionalData: { bookingId: booking._id, invoiceId: stripeInvoice.id }
+            });
+            return;
+        }
+
+        // Calculate payout amount (distributor gets their share minus platform fee)
+        const payoutAmount = Math.round(invoice.distributorAmount * 100);
+        const payoutCurrency = invoice.currency || 'usd';
+
+        logInfo({
+            message: `Initiating ${invoiceType} payout for booking ${booking._id}`,
+            source: 'processBookingDistributorPayout',
+            additionalData: {
+                bookingId: booking._id,
+                businessId: business._id,
+                amount: invoice.distributorAmount,
+                currency: payoutCurrency,
+                invoiceType
+            }
+        });
+
+        // Create transfer to distributor
+        const transfer = await stripe.transfers.create({
+            amount: payoutAmount,
+            currency: payoutCurrency.toLowerCase(),
+            destination: business.stripeAccountId,
+            source_transaction: chargeId,
+            description: `${invoiceType === 'deposit' ? 'Deposit (50%)' : 'Balance (50%)'} payout for booking ${booking._id}`,
+            metadata: {
+                bookingId: booking._id.toString(),
+                businessId: business._id.toString(),
+                invoiceId: stripeInvoice.id,
+                invoiceType,
+                transactionType: 'booking'
+            }
+        });
+
+        // Update booking with payout info
+        if (invoiceType === 'deposit') {
+            booking.depositPayoutId = transfer.id;
+            booking.depositPayoutStatus = 'paid';
+        } else if (invoiceType === 'balance') {
+            booking.balancePayoutId = transfer.id;
+            booking.balancePayoutStatus = 'paid';
+        }
+        await booking.save();
+
+        logInfo({
+            message: `${invoiceType} payout completed for booking ${booking._id}`,
+            source: 'processBookingDistributorPayout',
+            additionalData: {
+                bookingId: booking._id,
+                transferId: transfer.id,
+                amount: invoice.distributorAmount,
+                currency: payoutCurrency
+            }
+        });
+    } catch (error: any) {
+        logError({
+            message: `Payout failed for booking ${booking._id}: ${error.message}`,
+            error,
+            source: 'processBookingDistributorPayout',
+            additionalData: {
+                bookingId: booking._id,
+                invoiceType,
+                errorCode: error.code
+            }
+        });
+    }
 }
 
 async function handlePaymentFailed(

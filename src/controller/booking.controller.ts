@@ -139,7 +139,7 @@ export class BookingController {
                 return;
             }
 
-            const { status, paymentStatus, startDate, endDate, page, limit, sortBy, sortOrder } = req.query;
+            const { status, paymentStatus, startDate, endDate, page, limit, sortBy, sortOrder, completedStatus } = req.query;
 
             if(status && !['pending', 'confirmed', 'cancelled', 'completed', 'declined'].includes(status as string)){
                 res.status(400).json({ success: false, message: 'Status must be one of: pending, confirmed, cancelled, completed, declined', code: 'INVALID_STATUS' });
@@ -171,6 +171,11 @@ export class BookingController {
                 return;
             }
 
+            if(completedStatus && !['pending', 'request_completed', 'completed', 'rejected'].includes(completedStatus as string)){
+                res.status(400).json({ success: false, message: 'Completed status must be one of: pending, request_completed, completed, rejected', code: 'INVALID_COMPLETED_STATUS' });
+                return;
+            }
+
             const [error, result] = await catchError(BookingService.getBookings({
                 userId: req.user._id.toString(),
                 role: req.user.role,
@@ -181,7 +186,8 @@ export class BookingController {
                 startDate: startDate ? new Date(startDate as string) : undefined,
                 endDate: endDate ? new Date(endDate as string) : undefined,
                 sortBy: sortBy as string,
-                sortOrder: sortOrder as string
+                sortOrder: sortOrder as string,
+                completedStatus: completedStatus as string
             }));
 
             if (error) {
@@ -362,8 +368,6 @@ export class BookingController {
             res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
         }
     }
-
-    // ==================== GRANULAR QUOTE ITEM MANAGEMENT ====================
 
     static async acceptQuoteItem(req: AuthenticatedRequest, res: Response) {
         try {
@@ -608,8 +612,6 @@ export class BookingController {
             res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
         }
     }
-
-    // ==================== PAYMENT INTEGRATION ====================
 
     static async createPayment(req: AuthenticatedRequest, res: Response) {
         try {

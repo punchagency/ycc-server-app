@@ -11,7 +11,6 @@ import { CategoryService } from "../service/category.service"
 import OrderModel from '../models/order.model';
 import BusinessModel from '../models/business.model';
 import CONSTANTS from '../config/constant';
-import { CurrencyConverter } from '../utils/currencyConverter';
 import { CurrencyHelper } from '../utils/currencyHelper';
 
 export interface IProductInput {

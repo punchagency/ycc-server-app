@@ -264,8 +264,6 @@ export class ProductService {
 
     static async searchProducts(query: IProductSearchQuery, userCurrency?: string): Promise<{ products: any[]; total: number }> {
         const { name, category, minPrice, maxPrice, currency = 'usd', businessId, userRole, page = 1, limit = 20, random = false } = query;
-        const skip = (page - 1) * limit;
-
         const mongoQuery: any = {};
 
         if (userRole === 'user') {
@@ -288,26 +286,46 @@ export class ProductService {
             mongoQuery.currency = currency.toLowerCase();
         }
 
-        let productQuery = ProductModel.find(mongoQuery)
-            .populate('category', 'name')
-            .populate('businessId', 'businessName email phone address businessType');
+        const hasPriceFilter = minPrice !== undefined || maxPrice !== undefined;
 
-        if (random) {
+        if (random && !hasPriceFilter) {
             const [countError, totalCount] = await catchError(ProductModel.countDocuments(mongoQuery));
             if (countError || !totalCount) {
                 return { products: [], total: 0 };
             }
             const randomSkip = Math.floor(Math.random() * Math.max(0, totalCount - limit));
-            productQuery = productQuery.skip(randomSkip).limit(limit);
-        } else {
-            productQuery = productQuery.skip(skip).limit(limit).sort({ createdAt: -1 });
+            const [error, products] = await catchError(
+                ProductModel.find(mongoQuery)
+                    .populate('category', 'name')
+                    .populate('businessId', 'businessName email phone address businessType')
+                    .skip(randomSkip)
+                    .limit(limit)
+                    .exec()
+            );
+
+            if (error) {
+                await logError({
+                    message: 'Failed to search products',
+                    source: 'ProductService.searchProducts',
+                    additionalData: { query, error: error.message }
+                });
+                return { products: [], total: 0 };
+            }
+
+            if (userCurrency && products.length > 0) {
+                const convertedProducts = await CurrencyHelper.convertProductsForDisplay(products, userCurrency);
+                return { products: convertedProducts, total: totalCount };
+            }
+
+            return { products: products || [], total: totalCount };
         }
 
-        const [error, result] = await catchError(
-            Promise.all([
-                productQuery.exec(),
-                ProductModel.countDocuments(mongoQuery)
-            ])
+        const [error, allProducts] = await catchError(
+            ProductModel.find(mongoQuery)
+                .populate('category', 'name')
+                .populate('businessId', 'businessName email phone address businessType')
+                .sort({ createdAt: -1 })
+                .exec()
         );
 
         if (error) {
@@ -319,14 +337,14 @@ export class ProductService {
             return { products: [], total: 0 };
         }
 
-        let [products, total] = result;
+        let filteredProducts = allProducts;
 
-        if (minPrice !== undefined || maxPrice !== undefined) {
-            const filteredProducts = [];
-            for (const product of products) {
+        if (hasPriceFilter) {
+            const priceFiltered = [];
+            for (const product of allProducts) {
                 const productPrice = product.price || 0;
                 const productCurrency = product.currency || 'usd';
-                
+
                 const priceInQueryCurrency = await CurrencyHelper.convertPrice(
                     productPrice,
                     productCurrency,
@@ -338,18 +356,21 @@ export class ProductService {
                 if (minPrice !== undefined && convertedPrice < minPrice) continue;
                 if (maxPrice !== undefined && convertedPrice > maxPrice) continue;
                 
-                filteredProducts.push(product);
+                priceFiltered.push(product);
             }
-            products = filteredProducts;
-            total = products.length;
+            filteredProducts = priceFiltered;
         }
 
-        if (userCurrency && products.length > 0) {
-            const convertedProducts = await CurrencyHelper.convertProductsForDisplay(products, userCurrency);
+        const total = filteredProducts.length;
+        const skip = (page - 1) * limit;
+        const paginatedProducts = filteredProducts.slice(skip, skip + limit);
+
+        if (userCurrency && paginatedProducts.length > 0) {
+            const convertedProducts = await CurrencyHelper.convertProductsForDisplay(paginatedProducts, userCurrency);
             return { products: convertedProducts, total };
         }
 
-        return { products: products || [], total: total || 0 };
+        return { products: paginatedProducts, total };
     }
 
     static async vectorSearchProducts(query: string, limit: number = 20): Promise<IProduct[]> {

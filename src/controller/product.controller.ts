@@ -282,7 +282,7 @@ export class ProductController {
             return;
         }
 
-        if (searchQuery.minPrice && searchQuery.maxPrice && searchQuery.minPrice > searchQuery.maxPrice) {
+        if (searchQuery.minPrice && searchQuery.maxPrice && Number(searchQuery.minPrice) > Number(searchQuery.maxPrice)) {
             res.status(400).json({
                 success: false,
                 message: 'Minimum price cannot be greater than maximum price',
@@ -300,7 +300,11 @@ export class ProductController {
             return;
         }
 
-        const result = await ProductService.searchProducts(searchQuery, userCurrency);
+        const result = await ProductService.searchProducts({
+            ...searchQuery,
+            minPrice: searchQuery.minPrice ? Number(searchQuery.minPrice) : undefined,
+            maxPrice: searchQuery.maxPrice ? Number(searchQuery.maxPrice) : undefined,
+        }, userCurrency);
 
         res.json({
             success: true,

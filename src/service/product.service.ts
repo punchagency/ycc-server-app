@@ -322,13 +322,20 @@ export class ProductService {
 
         let [products, total] = result;
 
+        // Replace lines 325-333 with this:
         if (minPrice !== undefined || maxPrice !== undefined) {
-            products = products.filter(async(product) => {
-                const priceInUSD = await CurrencyConverter.convertToUSD(product.price || 0, product.currency || 'usd');
-                if (minPrice !== undefined && priceInUSD < minPrice) return false;
-                if (maxPrice !== undefined && priceInUSD > maxPrice) return false;
-                return true;
-            });
+            const priceChecks = await Promise.all(
+                products.map(async (product) => {
+                    const priceInUSD = await CurrencyConverter.convertToUSD(
+                        product.price || 0,
+                        product.currency || 'usd'
+                    );
+                    const passesMin = minPrice === undefined || priceInUSD >= minPrice;
+                    const passesMax = maxPrice === undefined || priceInUSD <= maxPrice;
+                    return passesMin && passesMax;
+                })
+            );
+            products = products.filter((_, index) => priceChecks[index]);
             total = products.length;
         }
 

@@ -496,7 +496,7 @@ class OrderController {
                 return res.status(400).json({ success: false, message: 'Order ID and status are required', code: 'VALIDATION_ERROR' });
             }
 
-            if (!['confirmed', 'processing', 'shipped', 'out_for_delivery', 'cancelled', 'delivered'].includes(status)) {
+            if (!['confirmed', 'processing', 'shipped', 'out_for_delivery', 'cancelled', 'delivered', 'declined'].includes(status)) {
                 return res.status(400).json({ success: false, message: 'Invalid status', code: 'VALIDATION_ERROR' });
             }
 

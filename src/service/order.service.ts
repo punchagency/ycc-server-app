@@ -1198,7 +1198,7 @@ export class OrderService {
             if (businessItems.length === 0) throw new Error('No items found for your business in this order');
 
             const validTransitions: Record<string, string[]> = {
-                'pending': ['confirmed', 'cancelled'],
+                'pending': ['confirmed', 'cancelled', 'declined'],
                 'confirmed': ['processing', 'cancelled'],
                 'declined': [],
                 'processing': ['shipped', 'cancelled'],

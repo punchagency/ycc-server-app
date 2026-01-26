@@ -25,7 +25,7 @@ export const handleAIChat = (socket: Socket) => {
                 }
             }
 
-            const result = await AIService.chat({ message, userId, sessionId, stream: true });
+            const result = await AIService.chat({ message, userId, sessionId, stream: false });
 
             if ('stream' in result) {
                 const stream = result.stream as any;
@@ -41,23 +41,24 @@ export const handleAIChat = (socket: Socket) => {
 
                 socket.emit('ai:complete', { response: fullResponse, sessionId: result.sessionId });
 
-                if (userId) {
-                    await ChatModel.findOneAndUpdate(
-                        { userId, sessionId: result.sessionId },
-                        {
-                            $push: {
-                                messages: {
-                                    $each: [
-                                        { type: 'human', data: { content: message, tool_calls: [], invalid_tool_calls: [], additional_kwargs: {}, response_metadata: {} }, createdAt: new Date() },
-                                        { type: 'ai', data: { content: fullResponse, tool_calls: [], invalid_tool_calls: [], additional_kwargs: {}, response_metadata: {} }, createdAt: new Date() }
-                                    ]
-                                }
-                            },
-                            $setOnInsert: { createdAt: new Date() }
+                const updateQuery = userId ? { userId, sessionId: result.sessionId } : { sessionId: result.sessionId, userId: { $exists: false } };
+                await ChatModel.findOneAndUpdate(
+                    updateQuery,
+                    {
+                        $push: {
+                            messages: {
+                                $each: [
+                                    { type: 'human', data: { content: message, tool_calls: [], invalid_tool_calls: [], additional_kwargs: {}, response_metadata: {} }, createdAt: new Date() },
+                                    { type: 'ai', data: { content: fullResponse, tool_calls: [], invalid_tool_calls: [], additional_kwargs: {}, response_metadata: {} }, createdAt: new Date() }
+                                ]
+                            }
                         },
-                        { upsert: true }
-                    );
-                }
+                        $setOnInsert: { createdAt: new Date(), ...(userId && { userId }) }
+                    },
+                    { upsert: true }
+                );
+            }else{
+                socket.emit('ai:complete', { response: result.response, sessionId: result.sessionId });
             }
         } catch (error: any) {
             await logError({ message: 'AI chat error', source: 'handleAIChat', error });

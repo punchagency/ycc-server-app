@@ -11,7 +11,6 @@ import { CategoryService } from "../service/category.service"
 import OrderModel from '../models/order.model';
 import BusinessModel from '../models/business.model';
 import CONSTANTS from '../config/constant';
-import { CurrencyConverter } from '../utils/currencyConverter';
 import { CurrencyHelper } from '../utils/currencyHelper';
 
 export interface IProductInput {
@@ -324,18 +323,25 @@ export class ProductService {
 
         // Replace lines 325-333 with this:
         if (minPrice !== undefined || maxPrice !== undefined) {
-            const priceChecks = await Promise.all(
-                products.map(async (product) => {
-                    const priceInUSD = await CurrencyConverter.convertToUSD(
-                        product.price || 0,
-                        product.currency || 'usd'
-                    );
-                    const passesMin = minPrice === undefined || priceInUSD >= minPrice;
-                    const passesMax = maxPrice === undefined || priceInUSD <= maxPrice;
-                    return passesMin && passesMax;
-                })
-            );
-            products = products.filter((_, index) => priceChecks[index]);
+            const filteredProducts = [];
+            for (const product of products) {
+                const productPrice = product.price || 0;
+                const productCurrency = product.currency || 'usd';
+                
+                const priceInQueryCurrency = await CurrencyHelper.convertPrice(
+                    productPrice,
+                    productCurrency,
+                    currency
+                );
+                
+                const convertedPrice = priceInQueryCurrency.convertedPrice;
+                
+                if (minPrice !== undefined && convertedPrice < minPrice) continue;
+                if (maxPrice !== undefined && convertedPrice > maxPrice) continue;
+                
+                filteredProducts.push(product);
+            }
+            products = filteredProducts;
             total = products.length;
         }
 

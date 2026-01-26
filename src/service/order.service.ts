@@ -24,6 +24,7 @@ export interface CreateOrderInput {
     products: { productId: string; quantity: number; discount?: number }[];
     deliveryAddress: { street: string; zipcode: string; city: string; state: string; country: string };
     estimatedDeliveryDate?: Date;
+    notes?: string;
 }
 
 export class OrderService {
@@ -413,7 +414,7 @@ export class OrderService {
         }
     }
     static async createOrder(data: CreateOrderInput) {
-        const { userId, userType, products, deliveryAddress, estimatedDeliveryDate } = data;
+        const { userId, userType, products, deliveryAddress, estimatedDeliveryDate, notes } = data;
 
         const [userError, user] = await catchError(UserModel.findById(userId));
         if (userError || !user) throw new Error('User not found');
@@ -509,7 +510,8 @@ export class OrderService {
             totalAmount: totalAmountUSD,
             platformFee,
             paymentStatus: 'pending',
-            orderHistory: []
+            orderHistory: [],
+            notes
         });
 
         await addNotificationJob({
@@ -553,7 +555,7 @@ export class OrderService {
                 totalPrice: businessTotal,
                 deliveryDate: estimatedDeliveryDate || new Date(),
                 deliveryAddress: deliveryAddressStr,
-                additionalNotes: '',
+                additionalNotes: notes || '',
                 confirmationUrl
             });
 
@@ -1196,7 +1198,7 @@ export class OrderService {
             if (businessItems.length === 0) throw new Error('No items found for your business in this order');
 
             const validTransitions: Record<string, string[]> = {
-                'pending': ['confirmed', 'cancelled'],
+                'pending': ['confirmed', 'cancelled', 'declined'],
                 'confirmed': ['processing', 'cancelled'],
                 'declined': [],
                 'processing': ['shipped', 'cancelled'],

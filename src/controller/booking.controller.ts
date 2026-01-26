@@ -139,7 +139,7 @@ export class BookingController {
                 return;
             }
 
-            const { status, paymentStatus, startDate, endDate, page, limit, sortBy, sortOrder } = req.query;
+            const { status, paymentStatus, startDate, endDate, page, limit, sortBy, sortOrder, completedStatus } = req.query;
 
             if(status && !['pending', 'confirmed', 'cancelled', 'completed', 'declined'].includes(status as string)){
                 res.status(400).json({ success: false, message: 'Status must be one of: pending, confirmed, cancelled, completed, declined', code: 'INVALID_STATUS' });
@@ -171,6 +171,11 @@ export class BookingController {
                 return;
             }
 
+            if(completedStatus && !['pending', 'request_completed', 'completed', 'rejected'].includes(completedStatus as string)){
+                res.status(400).json({ success: false, message: 'Completed status must be one of: pending, request_completed, completed, rejected', code: 'INVALID_COMPLETED_STATUS' });
+                return;
+            }
+
             const [error, result] = await catchError(BookingService.getBookings({
                 userId: req.user._id.toString(),
                 role: req.user.role,
@@ -181,7 +186,8 @@ export class BookingController {
                 startDate: startDate ? new Date(startDate as string) : undefined,
                 endDate: endDate ? new Date(endDate as string) : undefined,
                 sortBy: sortBy as string,
-                sortOrder: sortOrder as string
+                sortOrder: sortOrder as string,
+                completedStatus: completedStatus as string
             }));
 
             if (error) {
@@ -362,8 +368,6 @@ export class BookingController {
             res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
         }
     }
-
-    // ==================== GRANULAR QUOTE ITEM MANAGEMENT ====================
 
     static async acceptQuoteItem(req: AuthenticatedRequest, res: Response) {
         try {
@@ -609,8 +613,6 @@ export class BookingController {
         }
     }
 
-    // ==================== PAYMENT INTEGRATION ====================
-
     static async createPayment(req: AuthenticatedRequest, res: Response) {
         try {
             if (!req.user) {
@@ -643,6 +645,42 @@ export class BookingController {
             });
         } catch (error) {
             logError({ message: "Creating booking payment failed!", source: "BookingController.createPayment", error });
+            res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
+        }
+    }
+
+    static async createBalancePayment(req: AuthenticatedRequest, res: Response) {
+        try {
+            if (!req.user) {
+                res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
+                return;
+            }
+
+            const { id } = req.params;
+
+            if (!Validate.mongoId(id)) {
+                res.status(400).json({ success: false, message: 'Invalid booking ID', code: 'INVALID_BOOKING_ID' });
+                return;
+            }
+
+            const [error, result] = await catchError(BookingService.createBalancePayment({
+                bookingId: id,
+                userId: req.user._id.toString()
+            }));
+
+            if (error) {
+                logError({ message: "Creating balance payment failed!", source: "BookingController.createBalancePayment", error });
+                res.status(400).json({ success: false, message: error.message || 'Failed to create balance payment', code: 'BALANCE_PAYMENT_FAILED' });
+                return;
+            }
+
+            res.status(200).json({ 
+                success: true, 
+                message: 'Balance invoice created successfully', 
+                data: result 
+            });
+        } catch (error) {
+            logError({ message: "Creating balance payment failed!", source: "BookingController.createBalancePayment", error });
             res.status(500).json({ success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' });
         }
     }

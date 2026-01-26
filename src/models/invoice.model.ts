@@ -7,6 +7,7 @@ interface IInvoice extends Document {
     orderId?: Schema.Types.ObjectId;
     bookingId?: Schema.Types.ObjectId;
     businessIds: Schema.Types.ObjectId[];
+    invoiceType?: 'full' | 'deposit' | 'balance';
     originalAmount?: number;
     originalCurrency?: string;
     convertedAmount?: number;
@@ -32,6 +33,7 @@ const invoiceSchema = new Schema<IInvoice>({
     orderId: { type: Schema.Types.ObjectId, ref: 'Order' },
     bookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
     businessIds: [{ type: Schema.Types.ObjectId, ref: 'Business', required: true }],
+    invoiceType: { type: String, enum: ['full', 'deposit', 'balance'], default: 'full' },
     originalAmount: { type: Number, required: false },
     originalCurrency: { type: String, required: false },
     convertedAmount: { type: Number, required: false },

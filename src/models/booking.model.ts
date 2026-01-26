@@ -32,7 +32,11 @@ export interface IBooking extends Document {
     customerEmail?: string;
     customerPhone?: string;
     status: typeof BOOKING_STATUSES[number];
-    paymentStatus: 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded';
+    paymentStatus: 'pending' | 'deposit_paid' | 'paid' | 'failed' | 'cancelled' | 'refunded';
+    depositInvoiceId?: Schema.Types.ObjectId;
+    depositPaidAt?: Date;
+    balanceInvoiceId?: Schema.Types.ObjectId;
+    balancePaidAt?: Date;
     completedStatus?: 'pending' | 'request_completed' | 'completed' | 'rejected';
     completedRejectionReason?: string;
     attachments?: string[];
@@ -97,7 +101,11 @@ const bookingSchema = new Schema<IBooking>({
     customerEmail: { type: String },
     customerPhone: { type: String },
     status: { type: String, enum: ['pending', 'confirmed', 'cancelled', 'completed', 'declined'], required: true },
-    paymentStatus: { type: String, enum: ['pending', 'paid', 'failed', 'cancelled', 'refunded'], required: true },
+    paymentStatus: { type: String, enum: ['pending', 'deposit_paid', 'paid', 'failed', 'cancelled', 'refunded'], required: true },
+    depositInvoiceId: { type: Schema.Types.ObjectId, ref: 'Invoice' },
+    depositPaidAt: { type: Date },
+    balanceInvoiceId: { type: Schema.Types.ObjectId, ref: 'Invoice' },
+    balancePaidAt: { type: Date },
     completedStatus: { type: String, enum: ['pending', 'request_completed', 'completed', 'rejected'], default: 'pending' },
     completedRejectionReason: { type: String },
     attachments: [{ type: String }],

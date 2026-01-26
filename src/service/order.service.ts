@@ -24,6 +24,7 @@ export interface CreateOrderInput {
     products: { productId: string; quantity: number; discount?: number }[];
     deliveryAddress: { street: string; zipcode: string; city: string; state: string; country: string };
     estimatedDeliveryDate?: Date;
+    notes?: string;
 }
 
 export class OrderService {
@@ -413,7 +414,7 @@ export class OrderService {
         }
     }
     static async createOrder(data: CreateOrderInput) {
-        const { userId, userType, products, deliveryAddress, estimatedDeliveryDate } = data;
+        const { userId, userType, products, deliveryAddress, estimatedDeliveryDate, notes } = data;
 
         const [userError, user] = await catchError(UserModel.findById(userId));
         if (userError || !user) throw new Error('User not found');
@@ -509,7 +510,8 @@ export class OrderService {
             totalAmount: totalAmountUSD,
             platformFee,
             paymentStatus: 'pending',
-            orderHistory: []
+            orderHistory: [],
+            notes
         });
 
         await addNotificationJob({
@@ -553,7 +555,7 @@ export class OrderService {
                 totalPrice: businessTotal,
                 deliveryDate: estimatedDeliveryDate || new Date(),
                 deliveryAddress: deliveryAddressStr,
-                additionalNotes: '',
+                additionalNotes: notes || '',
                 confirmationUrl
             });
 
@@ -662,7 +664,7 @@ export class OrderService {
 
         return orderObj;
     }
-    static async getOrders({ userId, role, page = 1, limit = 10, status, paymentStatus, startDate, endDate, sortBy = 'createdAt', orderBy = 'desc', userType }: {
+    static async getOrders({ userId, role, page = 1, limit = 10, status, paymentStatus, startDate, endDate, sortBy = 'createdAt', orderBy = 'desc', userType, searchQuery }: {
         userId: string;
         role: typeof ROLES[number];
         page?: number;
@@ -674,6 +676,7 @@ export class OrderService {
         sortBy?: string;
         orderBy?: string;
         userType?: 'user' | 'distributor';
+        searchQuery?: string;
     }) {
         const query: any = {};
 
@@ -708,20 +711,35 @@ export class OrderService {
 
         const sortOptions: any = {};
         sortOptions[sortBy] = orderBy === 'asc' ? 1 : -1;
-
         const skip = (page - 1) * limit;
-        const total = await OrderModel.countDocuments(query);
 
-        const orders = await OrderModel.find(query)
+        let orders = await OrderModel.find(query)
             .populate('userId', 'firstName lastName email phone')
             .populate('items.productId', 'name price imageURLs')
             .populate('items.businessId', 'businessName email phone')
-            .sort(sortOptions)
-            .skip(skip)
-            .limit(limit);
+            .sort(sortOptions);
+
+        if (searchQuery) {
+            const search = searchQuery.toLowerCase();
+            orders = orders.filter(order => {
+                const orderId = order._id.toString().toLowerCase();
+                const user = order.userId as any;
+                const customerName = `${user?.firstName || ''} ${user?.lastName || ''}`.toLowerCase();
+                const productNames = order.items.map((item: any) => 
+                    (item.productId?.name || '').toLowerCase()
+                ).join(' ');
+                
+                return orderId.includes(search) || 
+                       customerName.includes(search) || 
+                       productNames.includes(search);
+            });
+        }
+
+        const total = orders.length;
+        const paginatedOrders = orders.slice(skip, skip + limit);
 
         return {
-            orders,
+            orders: paginatedOrders,
             pagination: {
                 total,
                 page,
@@ -1196,7 +1214,7 @@ export class OrderService {
             if (businessItems.length === 0) throw new Error('No items found for your business in this order');
 
             const validTransitions: Record<string, string[]> = {
-                'pending': ['confirmed', 'cancelled'],
+                'pending': ['confirmed', 'cancelled', 'declined'],
                 'confirmed': ['processing', 'cancelled'],
                 'declined': [],
                 'processing': ['shipped', 'cancelled'],

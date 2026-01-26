@@ -14,7 +14,7 @@ class OrderController {
                 res.status(401).json({ success: false, message: 'Authentication required', code: 'AUTH_REQUIRED' });
                 return;
             }
-            const { products, deliveryAddress, estimatedDeliveryDate } = req.body;
+            const { products, deliveryAddress, estimatedDeliveryDate, notes } = req.body;
             const userId = req.user?._id;
 
             if (!userId) {
@@ -44,7 +44,8 @@ class OrderController {
                 userType: req.user?.role as "user" | "distributor",
                 products,
                 deliveryAddress,
-                estimatedDeliveryDate: estimatedDeliveryDate ? new Date(estimatedDeliveryDate) : undefined
+                estimatedDeliveryDate: estimatedDeliveryDate ? new Date(estimatedDeliveryDate) : undefined,
+                notes
             }));
 
             if (error) {
@@ -404,7 +405,7 @@ class OrderController {
                 return;
             }
 
-            const { page, limit, status, paymentStatus, startDate, endDate, sortBy, orderBy, userType } = req.query;
+            const { page, limit, status, paymentStatus, startDate, endDate, sortBy, orderBy, userType, searchQuery } = req.query;
 
             if (status && !['pending', 'declined', 'confirmed', 'processing', 'out_for_delivery', 'shipped', 'delivered', 'cancelled'].includes(status as string)) {
                 res.status(400).json({ success: false, message: 'Invalid status value', code: 'INVALID_STATUS' });
@@ -457,7 +458,8 @@ class OrderController {
                 endDate: endDate ? new Date(endDate as string) : undefined,
                 sortBy: sortBy as string,
                 orderBy: orderBy as string,
-                userType: userType as 'user' | 'distributor' | undefined
+                userType: userType as 'user' | 'distributor' | undefined,
+                searchQuery: searchQuery as string
             }));
 
             if (error) {
@@ -495,7 +497,7 @@ class OrderController {
                 return res.status(400).json({ success: false, message: 'Order ID and status are required', code: 'VALIDATION_ERROR' });
             }
 
-            if (!['confirmed', 'processing', 'shipped', 'out_for_delivery', 'cancelled', 'delivered'].includes(status)) {
+            if (!['confirmed', 'processing', 'shipped', 'out_for_delivery', 'cancelled', 'delivered', 'declined'].includes(status)) {
                 return res.status(400).json({ success: false, message: 'Invalid status', code: 'VALIDATION_ERROR' });
             }
 

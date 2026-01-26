@@ -405,7 +405,7 @@ class OrderController {
                 return;
             }
 
-            const { page, limit, status, paymentStatus, startDate, endDate, sortBy, orderBy, userType } = req.query;
+            const { page, limit, status, paymentStatus, startDate, endDate, sortBy, orderBy, userType, searchQuery } = req.query;
 
             if (status && !['pending', 'declined', 'confirmed', 'processing', 'out_for_delivery', 'shipped', 'delivered', 'cancelled'].includes(status as string)) {
                 res.status(400).json({ success: false, message: 'Invalid status value', code: 'INVALID_STATUS' });
@@ -458,7 +458,8 @@ class OrderController {
                 endDate: endDate ? new Date(endDate as string) : undefined,
                 sortBy: sortBy as string,
                 orderBy: orderBy as string,
-                userType: userType as 'user' | 'distributor' | undefined
+                userType: userType as 'user' | 'distributor' | undefined,
+                searchQuery: searchQuery as string
             }));
 
             if (error) {

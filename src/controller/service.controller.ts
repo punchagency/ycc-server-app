@@ -504,12 +504,11 @@ export class ServiceController {
 
             const pageNum = parseInt(page as string) || 1;
             const limitNum = parseInt(limit as string) || 12;
-            const skip = (pageNum - 1) * limitNum;
+            const parsedMinPrice = minPrice ? parseFloat(minPrice as string) : undefined;
+            const parsedMaxPrice = maxPrice ? parseFloat(maxPrice as string) : undefined;
 
-            // Build match query
             const matchQuery: any = {};
 
-            // Search functionality
             if (search) {
                 matchQuery.$or = [
                     { name: { $regex: search, $options: 'i' } },
@@ -517,18 +516,15 @@ export class ServiceController {
                 ];
             }
 
-            // Category filter
             if (category && typeof category === 'string') {
                 if (Types.ObjectId.isValid(category)) {
                     matchQuery.categoryId = new Types.ObjectId(category);
                 }
             }
 
-            // Build aggregation pipeline
             const aggregationPipeline: any[] = [
                 { $match: matchQuery },
                 {
-                    // Join with category collection
                     $lookup: {
                         from: 'categories',
                         localField: 'categoryId',
@@ -538,11 +534,9 @@ export class ServiceController {
                 },
                 { $unwind: '$category' },
                 {
-                    // Filter only approved categories
                     $match: { 'category.isApproved': true }
                 },
                 {
-                    // Join with business collection
                     $lookup: {
                         from: 'businesses',
                         localField: 'businessId',
@@ -553,14 +547,12 @@ export class ServiceController {
                 { $unwind: '$business' }
             ];
 
-            // Add category filter after lookups (for name-based search)
             if (category && typeof category === 'string' && !Types.ObjectId.isValid(category)) {
                 aggregationPipeline.push({
                     $match: { 'category.name': { $regex: category, $options: 'i' } }
                 });
             }
 
-            // Project fields
             aggregationPipeline.push({
                 $project: {
                     _id: 1,
@@ -589,7 +581,6 @@ export class ServiceController {
                 }
             });
 
-            // Add sorting
             if (sortBy === 'price_asc') {
                 aggregationPipeline.push({ $sort: { price: 1 } });
             } else if (sortBy === 'price_desc') {
@@ -599,32 +590,29 @@ export class ServiceController {
             } else if(random == "false"){
                 aggregationPipeline.push({ $sort: { createdAt: -1 } });
             } else{
-                // Random order
                 aggregationPipeline.push({
                     $addFields: { randomSort: { $rand: {} } }
                 });
                 aggregationPipeline.push({ $sort: { randomSort: 1 } });
             }
 
-            // Execute aggregation
             let services = await ServiceService.aggregateServices(aggregationPipeline);
 
-            // Apply price filtering with currency conversion
-            if (minPrice !== undefined || maxPrice !== undefined) {
-                services = services.filter(async(service) => {
+            if (parsedMinPrice !== undefined || parsedMaxPrice !== undefined) {
+                const priceFiltered = [];
+                for (const service of services) {
                     const priceInUSD = await CurrencyConverter.convertToUSD(service.price || 0, service.currency || 'usd');
-                    if (minPrice !== undefined && priceInUSD < parseFloat(minPrice as string)) return false;
-                    if (maxPrice !== undefined && priceInUSD > parseFloat(maxPrice as string)) return false;
-                    return true;
-                });
+                    if (parsedMinPrice !== undefined && priceInUSD < parsedMinPrice) continue;
+                    if (parsedMaxPrice !== undefined && priceInUSD > parsedMaxPrice) continue;
+                    priceFiltered.push(service);
+                }
+                services = priceFiltered;
             }
 
             const totalServices = services.length;
-
-            // Apply pagination after filtering
+            const skip = (pageNum - 1) * limitNum;
             services = services.slice(skip, skip + limitNum);
 
-            // Calculate pagination info
             const totalPages = Math.ceil(totalServices / limitNum);
             const hasNextPage = pageNum < totalPages;
             const hasPrevPage = pageNum > 1;

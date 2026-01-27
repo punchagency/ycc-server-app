@@ -403,9 +403,9 @@ export class BookingService {
         if (paymentStatus) query.paymentStatus = paymentStatus;
         if (completedStatus) query.completedStatus = completedStatus;
         if (startDate || endDate) {
-            query.createdAt = {};
-            if (startDate) query.createdAt.$gte = startDate;
-            if (endDate) query.createdAt.$lte = endDate;
+            query.bookingDate = {};
+            if (startDate) query.bookingDate.$gte = startDate;
+            if (endDate) query.bookingDate.$lte = endDate;
         }
 
         const skip = (page - 1) * limit;

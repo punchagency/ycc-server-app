@@ -476,7 +476,7 @@ export class AuthController {
         }
     }
 
-    static async updateDistributorProfile(req: AuthenticatedRequest, res: Response): Promise<void> {
+    static async updateBusinessProfile(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
             if (!req.user) {
                 res.status(401).json({

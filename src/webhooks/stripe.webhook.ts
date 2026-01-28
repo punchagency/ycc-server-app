@@ -85,6 +85,7 @@ async function handlePaymentSuccess(
         return;
     }
 
+    const oldStatus = invoice.status;
     invoice.status = 'paid';
     invoice.paymentDate = new Date(stripeInvoice.status_transitions.paid_at! * 1000);
     await invoice.save();
@@ -101,6 +102,7 @@ async function handlePaymentSuccess(
         name: 'Invoice',
         entityId: invoice._id.toString(),
         entityType: "user",
+        oldValues: { status: oldStatus },
         newValues: { status: 'paid', paymentDate: invoice.paymentDate }
     });
 }
@@ -509,6 +511,7 @@ async function handlePaymentFailed(
     const invoice = await Invoice.findOne({ stripeInvoiceId: stripeInvoice.id });
     if (!invoice) return;
 
+    const oldStatus = invoice.status;
     invoice.status = 'failed';
     await invoice.save();
 
@@ -561,6 +564,7 @@ async function handlePaymentFailed(
         action: 'PAYMENT_FAILED',
         name: 'Invoice',
         entityId: invoice._id.toString(),
+        oldValues: { status: oldStatus },
         newValues: { status: 'failed' },
         entityType: "user"
     });
@@ -571,8 +575,19 @@ async function handleInvoiceVoided(stripeInvoice: Stripe.Invoice, orderId?: stri
 
     const invoice = await Invoice.findOne({ stripeInvoiceId: stripeInvoice.id });
     if (invoice) {
+        const oldStatus = invoice.status;
         invoice.status = 'cancelled';
         await invoice.save();
+
+        await saveAuditLog({
+            userId: invoice.userId,
+            action: 'INVOICE_VOIDED',
+            name: 'Invoice',
+            entityId: invoice._id.toString(),
+            oldValues: { status: oldStatus },
+            newValues: { status: 'cancelled' },
+            entityType: "user"
+        });
     }
 
     if (orderId) {
